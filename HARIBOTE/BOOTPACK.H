@@ -251,6 +251,11 @@ struct CONSOLE {
 	struct SHEET *sht;
 	int cur_x, cur_y, cur_c;
 	struct TIMER *timer;
+	int mode;/*命令行模式 0：普通文本模式*/
+	char* message;/*message为cmd中的内容，根据mode进行相应解析*/
+	int language;/*命令行所用的语言*/
+	int cons_stdout_mode;/*标准输出绑定情况*/
+	int cons_stderr_mode;/*标准错误绑定情况*/
 };
 struct FILEHANDLE {
 	char *buf;
