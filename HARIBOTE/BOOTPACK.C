@@ -52,8 +52,8 @@ void HariMain(void)
 	struct FILEINFO *finfo;
 	extern char hankaku[4096];
 
-	init_gdtidt();
-	init_pic();
+	init_gdtidt();//‰n‰»gdt˜aidt
+	init_pic();//‰n‰»pic
 	io_sti(); /* IDT/PIC‚Ì‰Šú‰»‚ªI‚í‚Á‚½‚Ì‚ÅCPU‚ÌŠ„‚è‚İ‹Ö~‚ğ‰ğœ */
 	fifo32_init(&fifo, 128, fifobuf, 0);
 	*((int *) 0x0fec) = (int) &fifo;
