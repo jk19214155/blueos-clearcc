@@ -28,38 +28,38 @@ default :
 
 # ファイル生成規則
 
-ipl09.bin : ipl09.nas Makefile
+ipl09.bin : ipl09.nas makefile
 	$(NASK) ipl09.nas ipl09.bin ipl09.lst
 
-asmhead.bin : asmhead.nas Makefile
+asmhead.bin : asmhead.nas makefile
 	$(NASK) asmhead.nas asmhead.bin asmhead.lst
 
-hankaku.bin : hankaku.txt Makefile
+hankaku.bin : hankaku.txt makefile
 	$(MAKEFONT) hankaku.txt hankaku.bin
 
-hankaku.obj : hankaku.bin Makefile
+hankaku.obj : hankaku.bin makefile
 	$(BIN2OBJ) hankaku.bin hankaku.obj _hankaku
 
-bootpack.bim : $(OBJS_BOOTPACK) Makefile
+bootpack.bim : $(OBJS_BOOTPACK) makefile
 	$(OBJ2BIM) @$(RULEFILE) out:bootpack.bim stack:3136k map:bootpack.map \
 		$(OBJS_BOOTPACK)
 # 3MB+64KB=3136KB
 
-bootpack.hrb : bootpack.bim Makefile
+bootpack.hrb : bootpack.bim makefile
 	$(BIM2HRB) bootpack.bim bootpack.hrb 0
 
-haribote.sys : asmhead.bin bootpack.hrb Makefile
+haribote.sys : asmhead.bin bootpack.hrb makefile
 	copy /B asmhead.bin+bootpack.hrb haribote.sys
 
 # 一般規則
 
-%.gas : %.c bootpack.h Makefile
+%.gas : %.c bootpack.h makefile
 	$(CC1) -o $*.gas $*.c
 
-%.nas : %.gas Makefile
+%.nas : %.gas makefile
 	$(GAS2NASK) $*.gas $*.nas
 
-%.obj : %.nas Makefile
+%.obj : %.nas makefile
 	$(NASK) $*.nas $*.obj $*.lst
 
 # コマンド

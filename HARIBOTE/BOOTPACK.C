@@ -1,7 +1,6 @@
 /* bootpack‚ÌƒƒCƒ“ */
 
 #include "bootpack.h"
-#include <stdio.h>
 
 #define KEYCMD_LED		0xed
 

@@ -326,6 +326,3 @@ _memset:	;void memset(char* s,int num,int longer)
 	pop eax
 	pop edi
 	ret
-_task_switch32:;void task_switch32(struct TSS32* old_tss,new_tss)
-	
-	

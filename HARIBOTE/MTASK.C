@@ -4,7 +4,6 @@
 
 struct TASKCTL *taskctl;
 struct TIMER *task_timer;
-void task_switch32(struct TSS32* now_tss,struct TSS32* next_tss);
 
 struct TASK *task_now(void)
 {
@@ -188,7 +187,7 @@ void task_switch(void)
 	struct TASKLEVEL *tl = &taskctl->level[taskctl->now_lv];
 	struct TASK *new_task, *now_task = tl->tasks[tl->now];
 	struct TSS32* old_tss32;
-	old_tss32=&((t1->task[t1->now]).TSS32);
+	//old_tss32=&((t1->task[t1->now]).TSS32);
 	tl->now++;//切?到下一个任?
 	if (tl->now == tl->running) {//如果切?到?尾?返回??
 		tl->now = 0;
@@ -200,8 +199,8 @@ void task_switch(void)
 	new_task = tl->tasks[tl->now];
 	timer_settime(task_timer, new_task->priority);
 	if (new_task != now_task) {
-		//farjmp(0, new_task->sel);
-		task_switch32(old_tss32,&(new_task->tss));
+		farjmp(0, new_task->sel);
+		//task_switch32(old_tss32,&(new_task->tss));
 	}
 	return;
 }
