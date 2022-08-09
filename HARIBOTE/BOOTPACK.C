@@ -50,17 +50,22 @@ void HariMain(void)
 	unsigned char *nihongo;
 	struct FILEINFO *finfo;
 	extern char hankaku[4096];
-
 	init_gdtidt();//初始化gdt和idt
-	init_pic();//初始化pic
+	if(support_apic()==1){//存在local_apic?使用local-apic?理中断
+		//init_pic();//初始化pic
+		init_apic((void*)0xfee00000);
+	}
+	else{
+		init_pic();//初始化pic
+	}
 	io_sti(); /* IDT/PICの初期化が終わったのでCPUの割り込み禁止を解除 */
 	fifo32_init(&fifo, 128, fifobuf, 0);
 	*((int *) 0x0fec) = (int) &fifo;
 	init_pit();
 	init_keyboard(&fifo, 256);
 	enable_mouse(&fifo, 512, &mdec);
-	io_out8(PIC0_IMR, 0xf8); /* PITとPIC1とキーボードを許可(11111000) */
-	io_out8(PIC1_IMR, 0xef); /* マウスを許可(11101111) */
+	//io_out8(PIC0_IMR, 0xf8); /* PITとPIC1とキーボードを許可(11111000) */
+	//io_out8(PIC1_IMR, 0xef); /* マウスを許可(11101111) */
 	fifo32_init(&keycmd, 32, keycmd_buf, 0);
 
 	memtotal = memtest(0x00400000, 0xbfffffff);

@@ -91,7 +91,9 @@ void inthandler20(int *esp)
 {
 	struct TIMER *timer;
 	char ts = 0;
-	io_out8(PIC0_OCW2, 0x60);	/* IRQ-00受付完了をPICに通知 */
+	//io_out8(PIC0_OCW2, 0x60);	/* IRQ-00受付完了をPICに通知 */
+	*(int*)(0xfec00040)=0;
+	*(int*)(0xfee000b0)=0;
 	timerctl.count++;
 	if (timerctl.next > timerctl.count) {
 		return;

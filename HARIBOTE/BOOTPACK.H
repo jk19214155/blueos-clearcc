@@ -35,6 +35,13 @@ void farcall(int eip, int cs);
 void asm_hrb_api(void);
 void start_app(int eip, int cs, int esp, int ds, int *tss_esp0);
 void asm_end_app(void);
+int support_apic(void);
+void io_wrmsr(int edx,int eax,int ecx);
+void io_rdmsr(int* edx,int* eax,int ecx);
+void test2(int eax,int ebx);
+//void memset(char* s,int num,int longer);
+//void strcpy(char* s,char* t,int longer);
+//int strcmp(char* s,char* t,int longer);
 
 /* fifo.c */
 struct FIFO32 {
@@ -102,6 +109,8 @@ void set_gatedesc(struct GATE_DESCRIPTOR *gd, int offset, int selector, int ar);
 
 /* int.c */
 void init_pic(void);
+void io_write_io_apic(unsigned char  index,unsigned int data);
+void init_apic(void* addr);
 #define PIC0_ICW1		0x0020
 #define PIC0_OCW2		0x0020
 #define PIC0_IMR		0x0021

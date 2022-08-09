@@ -9,8 +9,10 @@ void inthandler2c(int *esp)
 /* PS/2マウスからの割り込み */
 {
 	int data;
-	io_out8(PIC1_OCW2, 0x64);	/* IRQ-12受付完了をPIC1に通知 */
-	io_out8(PIC0_OCW2, 0x62);	/* IRQ-02受付完了をPIC0に通知 */
+	//io_out8(PIC1_OCW2, 0x64);	/* IRQ-12受付完了をPIC1に通知 */
+	//io_out8(PIC0_OCW2, 0x62);	/* IRQ-02受付完了をPIC0に通知 */
+	*(int*)(0xfec00040)=0;
+	*(int*)(0xfee000b0)=0;
 	data = io_in8(PORT_KEYDAT);
 	fifo32_put(mousefifo, data + mousedata0);
 	return;

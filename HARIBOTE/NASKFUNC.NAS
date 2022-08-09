@@ -19,7 +19,8 @@
 		GLOBAL	_memtest_sub
 		GLOBAL	_farjmp, _farcall
 		GLOBAL	_asm_hrb_api, _start_app
-		GLOBAL	_memset,_strcpy,_strcmp
+		;GLOBAL	_memset,_strcpy,_strcmp
+		global	_support_apic, _io_wrmsr, _io_rdmsr, _test2
 		EXTERN	_inthandler20, _inthandler21
 		EXTERN	_inthandler2c, _inthandler0d
 		EXTERN	_inthandler0c
@@ -326,4 +327,49 @@ _memset:	;void memset(char* s,int num,int longer)
 	pop ecx
 	pop eax
 	pop edi
+	ret
+_support_apic: ;int support_apic(void):
+	push edx
+	mov eax,1
+	cpuid 
+	bt edx,9
+	setc al
+	movzx eax,al
+	pop edx
+	ret
+_io_rdmsr: ;void io_rdmsr(int* edx,int* eax,int ecx)
+	push edx
+	push ecx
+	push eax
+	mov ecx,[esp+24]
+	rdmsr
+	mov ecx,[esp+16]
+	mov [ecx],edx
+	mov ecx,[esp+20]
+	mov [ecx],eax
+	pop eax
+	pop ecx
+	pop edx
+	ret
+_io_wrmsr: ;void io_wrmsr(int edx,int eax,int ecx)
+	push edx
+	push ecx
+	push eax
+	mov edx,[esp+16]
+	mov eax,[esp+20]
+	mov ecx,[esp+24]
+	wrmsr
+	pop eax
+	pop ecx
+	pop edx
+	ret
+_test2: ;void test(int eax,int ebx)
+	push eax
+	push ebx
+	mov eax,[esp+12]
+	mov ebx,[esp+16]
+	ud2
+	db 0x0f,0x0b
+	pop ebx
+	pop eax
 	ret
