@@ -23,6 +23,7 @@ void HariMain(void)
 	unsigned char *buf_back, buf_mouse[256];
 	struct SHEET *sht_back, *sht_mouse;
 	struct TASK *task_a, *task;
+	void* sys_esp;
 	static char keytable0[0x80] = {
 		0,   0,   '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '^', 0x08, 0,
 		'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '@', '[', 0x0a, 0, 'A', 'S',
@@ -72,7 +73,12 @@ void HariMain(void)
 	memman_init(memman);
 	memman_free(memman, 0x00001000, 0x0009e000); /* 0x00001000 - 0x0009efff */
 	memman_free(memman, 0x00400000, memtotal - 0x00400000);
-
+	/*?syscall-sysenter‰n‰»*/
+	sys_esp=memman_alloc_4k(memman,4096);//syscall“I?’i
+	io_wrmsr(0,0+4,0x174);
+	io_wrmsr(0,&(sys_call),0x176);
+	io_wrmsr(0,4096,0x175);
+	
 	init_palette();
 	shtctl = shtctl_init(memman, binfo->vram, binfo->scrnx, binfo->scrny);
 	task_a = task_init(memman);

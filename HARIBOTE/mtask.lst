@@ -120,7 +120,7 @@
    120 000000DF 31 FF                           	XOR	EDI,EDI
    121 000000E1 53                              	PUSH	EBX
    122 000000E2 31 F6                           	XOR	ESI,ESI
-   123 000000E4 68 0002FDF8                     	PUSH	196088
+   123 000000E4 68 00033C78                     	PUSH	212088
    124 000000E9 BB 000003E7                     	MOV	EBX,999
    125 000000EE FF 75 08                        	PUSH	DWORD [8+EBP]
    126 000000F1 E8 [00000000]                   	CALL	_memman_alloc_4k
@@ -146,10 +146,10 @@
    146 00000143 01 F8                           	ADD	EAX,EDI
    147 00000145 68 00000082                     	PUSH	130
    148 0000014A 05 0000108C                     	ADD	EAX,4236
-   149 0000014F 81 C7 000000C0                  	ADD	EDI,192
+   149 0000014F 81 C7 000000D0                  	ADD	EDI,208
    150 00000155 50                              	PUSH	EAX
    151 00000156 8D 86 00271F58                  	LEA	EAX,DWORD [2563928+ESI]
-   152 0000015C 6A 0F                           	PUSH	15
+   152 0000015C 6A 1F                           	PUSH	31
    153 0000015E 83 C6 08                        	ADD	ESI,8
    154 00000161 50                              	PUSH	EAX
    155 00000162 E8 [00000000]                   	CALL	_set_segmdesc
@@ -218,7 +218,7 @@
    218 0000024E 83 B8 00000FFC 00               	CMP	DWORD [4092+EAX],0
    219 00000255 74 13                           	JE	L56
    220 00000257 41                              	INC	ECX
-   221 00000258 81 C2 000000C0                  	ADD	EDX,192
+   221 00000258 81 C2 000000D0                  	ADD	EDX,208
    222 0000025E 81 F9 000003E7                  	CMP	ECX,999
    223 00000264 7E E0                           	JLE	L53
    224 00000266 31 C0                           	XOR	EAX,EAX

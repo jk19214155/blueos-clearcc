@@ -1,63 +1,63 @@
 ; haribote-ipl
 ; TAB=4
 
-CYLS	EQU		9				; �ǂ��܂œǂݍ��ނ�
+CYLS	EQU		9				; どこまで読み込むか
 
-		ORG		0x7c00			; ���̃v���O�������ǂ��ɓǂݍ��܂��̂�
+		ORG		0x7c00			; このプログラムがどこに読み込まれるのか
 
-; �ȉ��͕W���I��FAT12�t�H�[�}�b�g�t���b�s�[�f�B�X�N�̂��߂̋L�q
+; 以下は標準的なFAT12フォーマットフロッピーディスクのための記述
 
 		JMP		entry
 		DB		0x90
-		DB		"BOSCLEAR"		; 8����?�I��?����
-		DW		512				; ?��掚?����
-		DB		1				; ?�Ɛ�搔
-		DW		1				; �ۗ���搔
-		DB		2				; 2���������z�\
-		DW		224				; �ő卪��?��ژ����ifat32?0�j
-		DW		2880			; ?��搔�i�@�ʐ�0?�g�p0x20�I�召�j
-		DB		0xf0			; ��?�`�q�ibit0�F�o��?�u�� bit1�F?��8�i9�j���?�u�� bit2�F40�i80�j����?�u�ʁj
-		DW		9				; ?���������z�\�I���ifat32?0�j
-		DW		18				; ?������搔
-		DW		2				; ��?��
-		DD		0				; ?�U��搔��
-		DD		2880			; �@�ʒ�?65535?�g�p��?�I?��搔
-		DD		9				; ?��fat�\��p��搔�ifat32�g�p�j
+		DB		"BOSCLEAR"		; 8个字?的磁?名称
+		DW		512				; ?扇区字?数量
+		DB		1				; ?簇扇区数
+		DW		1				; 保留扇区数
+		DB		2				; 2个文件分配表
+		DW		224				; 最大根目?条目个数（fat32?0）
+		DW		2880			; ?扇区数（如果是0?使用0x20的大小）
+		DB		0xf0			; 介?描述（bit0：双面?志位 bit1：?面8（9）扇区?志位 bit2：40（80）磁道?志位）
+		DW		9				; ?个文件分配表的扇区（fat32?0）
+		DW		18				; ?磁道扇区数
+		DW		2				; 磁?数
+		DD		0				; ?藏扇区数量
+		DD		2880			; 如果超?65535?使用此?的?扇区数
+		DD		9				; ?个fat表占用扇区数（fat32使用）
 		DW		0x8f
-		DW		0				;FAT32�Ŗ{��
-		DD		2				;����?���ݑ�꘢�ƓI�ƍ�
-		DW		1				;�ۗ��撆FAT32��FSINFO??����I��搔�C�ʏ�?1�B
-		DW		6				;�@�ʕs?0�C�\���ݕۗ��撆��???�I?��������I��搔�C�ʏ�?6�B��?�s��?�g�p6�ȊO�I������?
-		RESB 12					;?�ȍ@?�W�ۗ�
-		DB		0				; ����??��?�^�i����n?�r��j
-		DB		0				; ���O��?�i�K?��0�j
-		DB		0x29		; ?�W��???�p
-		DD		0xffffffff		; ��?id
-		DB		"BLUEOSCLEAR"	; �f�B�X�N�̖��O�i11�o�C�g�j
-		DB		"FAT32   "		; �t�H�[�}�b�g�̖��O�i8�o�C�g�j
-		RESB	18				; �Ƃ肠����18�o�C�g�����Ă���
+		DW		0				;FAT32版本号
+		DD		2				;根目?所在第一个簇的簇号
+		DW		1				;保留区中FAT32卷FSINFO??所占的扇区数，通常?1。
+		DW		6				;如果不?0，表示在保留区中引???的?数据所占的扇区数，通常?6。同?不建?使用6以外的其他数?
+		RESB 12					;?以后?展保留
+		DB		0				; 物理??器?型（操作系?决定）
+		DB		0				; 当前磁?（必?是0）
+		DB		0x29		; ?展引???可用
+		DD		0xffffffff		; 磁?id
+		DB		"BLUEOSCLEAR"	; ディスクの名前（11バイト）
+		DB		"FAT32   "		; フォーマットの名前（8バイト）
+		RESB	18				; とりあえず18バイトあけておく
 
-; �v���O�����{��
+; プログラム本体
 
 entry:
-		MOV		AX,0			; ���W�X�^������
+		MOV		AX,0			; レジスタ初期化
 		MOV		SS,AX
 		MOV		SP,0x7c00
 		MOV		DS,AX
 
-; �f�B�X�N��ǂ�
+; ディスクを読む
 
 		MOV		AX,0x0820
 		MOV		ES,AX
-		MOV		CH,0			; �V�����_0
-		MOV		DH,0			; �w�b�h0
-		MOV		CL,2			; �Z�N�^2
-		MOV		BX,18*2*CYLS-1	; �ǂݍ��݂������v�Z�N�^��
-		CALL	readfast		; �����ǂݍ���
+		MOV		CH,0			; シリンダ0
+		MOV		DH,0			; ヘッド0
+		MOV		CL,2			; セクタ2
+		MOV		BX,18*2*CYLS-1	; 読み込みたい合計セクタ数
+		CALL	readfast		; 高速読み込み
 
-; �ǂݏI������̂�haribote.sys�����s���I
+; 読み終わったのでharibote.sysを実行だ！
 
-		MOV		BYTE [0x0ff0],CYLS	; IPL���ǂ��܂œǂ񂾂̂�������
+		MOV		BYTE [0x0ff0],CYLS	; IPLがどこまで読んだのかをメモ
 		JMP		0xc200
 
 error:
@@ -66,32 +66,32 @@ error:
 		MOV		SI,msg
 putloop:
 		MOV		AL,[SI]
-		ADD		SI,1			; SI��1�𑫂�
+		ADD		SI,1			; SIに1を足す
 		CMP		AL,0
 		JE		fin
-		MOV		AH,0x0e			; �ꕶ���\���t�@���N�V����
-		MOV		BX,15			; �J���[�R�[�h
-		INT		0x10			; �r�f�IBIOS�Ăяo��
+		MOV		AH,0x0e			; 一文字表示ファンクション
+		MOV		BX,15			; カラーコード
+		INT		0x10			; ビデオBIOS呼び出し
 		JMP		putloop
 fin:
-		HLT						; ��������܂�CPU���~������
-		JMP		fin				; �������[�v
+		HLT						; 何かあるまでCPUを停止させる
+		JMP		fin				; 無限ループ
 msg:
-		DB		0x0a, 0x0a		; ���s��2��
+		DB		0x0a, 0x0a		; 改行を2つ
 		DB		"load error"
-		DB		0x0a			; ���s
+		DB		0x0a			; 改行
 		DB		0
 
-readfast:	; AL���g���Ăł��邾���܂Ƃ߂ēǂݏo��
-;	ES:�ǂݍ��ݔԒn, CH:�V�����_, DH:�w�b�h, CL:�Z�N�^, BX:�ǂݍ��݃Z�N�^��
+readfast:	; ALを使ってできるだけまとめて読み出す
+;	ES:読み込み番地, CH:シリンダ, DH:ヘッド, CL:セクタ, BX:読み込みセクタ数
 
-		MOV		AX,ES			; < ES����AL�̍ő�l���v�Z >
-		SHL		AX,3			; AX��32�Ŋ����āA���̌��ʂ�AH�ɓ��ꂽ���ƂɂȂ� �iSHL�͍��V�t�g���߁j
-		AND		AH,0x7f			; AH��AH��128�Ŋ������]��i512*128=64K�j
-		MOV		AL,128			; AL = 128 - AH; ��ԋ߂�64KB���E�܂ōő剽�Z�N�^���邩
+		MOV		AX,ES			; < ESからALの最大値を計算 >
+		SHL		AX,3			; AXを32で割って、その結果をAHに入れたことになる （SHLは左シフト命令）
+		AND		AH,0x7f			; AHはAHを128で割った余り（512*128=64K）
+		MOV		AL,128			; AL = 128 - AH; 一番近い64KB境界まで最大何セクタ入るか
 		SUB		AL,AH
 
-		MOV		AH,BL			; < BX����AL�̍ő�l��AH�Ɍv�Z >
+		MOV		AH,BL			; < BXからALの最大値をAHに計算 >
 		CMP		BH,0			; if (BH != 0) { AH = 18; }
 		JE		.skip1
 		MOV		AH,18
@@ -101,7 +101,7 @@ readfast:	; AL���g���Ăł��邾���܂Ƃ߂ēǂݏo��
 		MOV		AL,AH
 .skip2:
 
-		MOV		AH,19			; < CL����AL�̍ő�l��AH�Ɍv�Z >
+		MOV		AH,19			; < CLからALの最大値をAHに計算 >
 		SUB		AH,CL			; AH = 19 - CL;
 		CMP		AL,AH			; if (AL > AH) { AL = AH; }
 		JBE		.skip3
@@ -109,23 +109,23 @@ readfast:	; AL���g���Ăł��邾���܂Ƃ߂ēǂݏo��
 .skip3:
 
 		PUSH	BX
-		MOV		SI,0			; ���s�񐔂𐔂��郌�W�X�^
+		MOV		SI,0			; 失敗回数を数えるレジスタ
 retry:
-		MOV		AH,0x02			; AH=0x02 : �f�B�X�N�ǂݍ���
+		MOV		AH,0x02			; AH=0x02 : ディスク読み込み
 		MOV		BX,0
-		MOV		DL,0x00			; A�h���C�u
+		MOV		DL,0x00			; Aドライブ
 		PUSH	ES
 		PUSH	DX
 		PUSH	CX
 		PUSH	AX
-		INT		0x13			; �f�B�X�NBIOS�Ăяo��
-		JNC		next			; �G���[�������Ȃ����next��
-		ADD		SI,1			; SI��1�𑫂�
-		CMP		SI,5			; SI��5���r
-		JAE		error			; SI >= 5 ��������error��
+		INT		0x13			; ディスクBIOS呼び出し
+		JNC		next			; エラーがおきなければnextへ
+		ADD		SI,1			; SIに1を足す
+		CMP		SI,5			; SIと5を比較
+		JAE		error			; SI >= 5 だったらerrorへ
 		MOV		AH,0x00
-		MOV		DL,0x00			; A�h���C�u
-		INT		0x13			; �h���C�u�̃��Z�b�g
+		MOV		DL,0x00			; Aドライブ
+		INT		0x13			; ドライブのリセット
 		POP		AX
 		POP		CX
 		POP		DX
@@ -135,28 +135,28 @@ next:
 		POP		AX
 		POP		CX
 		POP		DX
-		POP		BX				; ES�̓��e��BX�Ŏ󂯎��
-		SHR		BX,5			; BX��16�o�C�g�P�ʂ���512�o�C�g�P�ʂ�
+		POP		BX				; ESの内容をBXで受け取る
+		SHR		BX,5			; BXを16バイト単位から512バイト単位へ
 		MOV		AH,0
 		ADD		BX,AX			; BX += AL;
-		SHL		BX,5			; BX��512�o�C�g�P�ʂ���16�o�C�g�P�ʂ�
-		MOV		ES,BX			; ����� ES += AL * 0x20; �ɂȂ�
+		SHL		BX,5			; BXを512バイト単位から16バイト単位へ
+		MOV		ES,BX			; これで ES += AL * 0x20; になる
 		POP		BX
 		SUB		BX,AX
 		JZ		.ret
-		ADD		CL,AL			; CL��AL�𑫂�
-		CMP		CL,18			; CL��18���r
-		JBE		readfast		; CL <= 18 ��������readfast��
+		ADD		CL,AL			; CLにALを足す
+		CMP		CL,18			; CLと18を比較
+		JBE		readfast		; CL <= 18 だったらreadfastへ
 		MOV		CL,1
 		ADD		DH,1
 		CMP		DH,2
-		JB		readfast		; DH < 2 ��������readfast��
+		JB		readfast		; DH < 2 だったらreadfastへ
 		MOV		DH,0
 		ADD		CH,1
 		JMP		readfast
 .ret:
 		RET
 
-		RESB	0x7dfe-$		; 0x7dfe�܂ł�0x00�Ŗ��߂閽��
+		RESB	0x7dfe-$		; 0x7dfeまでを0x00で埋める命令
 
 		DB		0x55, 0xaa

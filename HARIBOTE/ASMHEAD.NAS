@@ -22,11 +22,48 @@ VMODE	EQU		0x0ff2			; 色数に関する情報。何ビットカラーか？
 SCRNX	EQU		0x0ff4			; 解像度のX
 SCRNY	EQU		0x0ff6			; 解像度のY
 VRAM	EQU		0x0ff8			; グラフィックバッファの開始番地
-
 		ORG		0xc200			; このプログラムがどこに読み込まれるのか
-
+		
+_cpu_init_setup:
+		jmp start
+_gdtr2: ;0xc202
+	RESD 2
+_idtr2: ;0xc20a
+	resd 2
+_resd_cpu_num: ;0xc212
+	resd 1
+_cpu_list: ;0xc216
+	resd 1
+start:
+;首先查看是否是bsp，然后决定下面的操作
+		mov ecx,0x1b
+		db 0x0f,0x32;rdmsr
+		test eax,1<<8
+		jnz start_bsp
+		cli
+		inc dword[0x8016] ;增加处理器队列
+		jmp start_ap
+ap_lock:
+		resd 1
+start_ap:
+		nop
+		nop
+		bts dword[ap_lock],0
+		jnc start_ap
+		lgdt [_gdtr2]
+		lidt [_idtr2]
+		
+		inc dword[0x8012]
+		btc dword[ap_lock],0
+		jmp ap_loop
+ap_loop:
+		hlt
+		jmp ap_loop
+		jmp dword 2*8:0x0000001b
+start_bsp:
+		mov dword[ap_lock],0
+		mov dword[_resd_cpu_num],0
 ; VBE存在確認
-
 		MOV		AX,0x9000
 		MOV		ES,AX
 		MOV		DI,0
@@ -193,11 +230,9 @@ GDT0:
 		RESB	8				; ヌルセレクタ
 		DW		0xffff,0x0000,0x9200,0x00cf	; 読み書き可能セグメント32bit
 		DW		0xffff,0x0000,0x9a28,0x0047	; 実行可能セグメント32bit（bootpack用）
-		DW		0xffff,0x0000,0x
 		DW		0
 GDTR0:
 		DW		8*3-1
 		DD		GDT0
-
 		ALIGNB	16
 bootpack:

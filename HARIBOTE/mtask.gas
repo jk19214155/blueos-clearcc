@@ -120,7 +120,7 @@ _task_init:
 	xorl	%edi, %edi
 	pushl	%ebx
 	xorl	%esi, %esi
-	pushl	$196088
+	pushl	$212088
 	movl	$999, %ebx
 	pushl	8(%ebp)
 	call	_memman_alloc_4k
@@ -146,10 +146,10 @@ L37:
 	addl	%edi, %eax
 	pushl	$130
 	addl	$4236, %eax
-	addl	$192, %edi
+	addl	$208, %edi
 	pushl	%eax
 	leal	2563928(%esi), %eax
-	pushl	$15
+	pushl	$31
 	addl	$8, %esi
 	pushl	%eax
 	call	_set_segmdesc
@@ -220,7 +220,7 @@ L53:
 	cmpl	$0, 4092(%eax)
 	je	L56
 	incl	%ecx
-	addl	$192, %edx
+	addl	$208, %edx
 	cmpl	$999, %ecx
 	jle	L53
 	xorl	%eax, %eax

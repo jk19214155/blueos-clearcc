@@ -339,6 +339,22 @@ L3:
 	pushl	$4194304
 	pushl	$3932160
 	call	_memman_free
+	pushl	$4096
+	pushl	$3932160
+	call	_memman_alloc_4k
+	pushl	$372
+	pushl	$4
+	pushl	$0
+	call	_io_wrmsr
+	addl	$32, %esp
+	pushl	$374
+	pushl	$_sys_call
+	pushl	$0
+	call	_io_wrmsr
+	pushl	$373
+	pushl	$4096
+	pushl	$0
+	call	_io_wrmsr
 	call	_init_palette
 	movswl	4086,%eax
 	pushl	%eax
@@ -347,20 +363,20 @@ L3:
 	pushl	4088
 	pushl	$3932160
 	call	_shtctl_init
+	addl	$40, %esp
 	pushl	$3932160
 	movl	%eax, -1044(%ebp)
 	call	_task_init
-	addl	$32, %esp
-	movl	%eax, -1080(%ebp)
-	movl	%eax, -68(%ebp)
 	pushl	$2
 	pushl	$1
 	pushl	%eax
+	movl	%eax, -1080(%ebp)
+	movl	%eax, -68(%ebp)
 	call	_task_run
 	movl	-1080(%ebp), %eax
 	movl	-1044(%ebp), %edx
 	movl	%edx, 4068
-	movb	$0, 188(%eax)
+	movb	$0, 204(%eax)
 	pushl	%edx
 	call	_sheet_alloc
 	movl	%eax, %esi
@@ -379,7 +395,7 @@ L3:
 	pushl	%ebx
 	pushl	%esi
 	call	_sheet_setbuf
-	addl	$44, %esp
+	addl	$48, %esp
 	movswl	4086,%eax
 	pushl	%eax
 	movswl	4084,%eax
@@ -549,9 +565,9 @@ L26:
 	addl	$16, %esp
 	jmp	L16
 L102:
-	imull	$192, %edx, %edx
+	imull	$208, %edx, %edx
 	addl	_taskctl, %edx
-	leal	-192520(%edx), %eax
+	leal	-208904(%edx), %eax
 	pushl	%eax
 	call	_close_constask
 L91:
@@ -716,7 +732,7 @@ L71:
 	movl	-1108(%ebp), %edx
 	movl	36(%edx), %ebx
 	pushl	$LC2
-	pushl	164(%ebx)
+	pushl	180(%ebx)
 	call	_cons_putstr0
 	call	_io_cli
 	leal	48(%ebx), %eax
@@ -884,7 +900,7 @@ L116:
 	cmpl	$0, 52(%ebx)
 	je	L48
 	pushl	$LC1
-	pushl	164(%ebx)
+	pushl	180(%ebx)
 	call	_cons_putstr0
 	call	_io_cli
 	leal	48(%ebx), %eax
@@ -1113,7 +1129,7 @@ _open_constask:
 	call	_memman_alloc_4k
 	movl	8(%ebp), %edx
 	movl	$_console_task, 76(%ebx)
-	movl	%eax, 172(%ebx)
+	movl	%eax, 188(%ebx)
 	addl	$65524, %eax
 	movl	%eax, 100(%ebx)
 	movl	$8, 116(%ebx)
@@ -1204,7 +1220,7 @@ _close_constask:
 	pushl	%ebx
 	call	_task_sleep
 	pushl	$65536
-	pushl	172(%ebx)
+	pushl	188(%ebx)
 	pushl	$3932160
 	call	_memman_free_4k
 	pushl	$512
@@ -1268,12 +1284,14 @@ _close_console:
 	.def	_open_console;	.scl	2;	.type	32;	.endef
 	.def	_init_screen8;	.scl	2;	.type	32;	.endef
 	.def	_sheet_setbuf;	.scl	2;	.type	32;	.endef
-	.def	_memman_alloc_4k;	.scl	2;	.type	32;	.endef
 	.def	_sheet_alloc;	.scl	2;	.type	32;	.endef
 	.def	_task_run;	.scl	2;	.type	32;	.endef
 	.def	_task_init;	.scl	2;	.type	32;	.endef
 	.def	_shtctl_init;	.scl	2;	.type	32;	.endef
 	.def	_init_palette;	.scl	2;	.type	32;	.endef
+	.def	_sys_call;	.scl	2;	.type	32;	.endef
+	.def	_io_wrmsr;	.scl	2;	.type	32;	.endef
+	.def	_memman_alloc_4k;	.scl	2;	.type	32;	.endef
 	.def	_memman_free;	.scl	2;	.type	32;	.endef
 	.def	_memman_init;	.scl	2;	.type	32;	.endef
 	.def	_memtest;	.scl	2;	.type	32;	.endef

@@ -9,6 +9,10 @@ struct BOOTINFO { /* 0x0ff0-0x0fff */
 };
 #define ADR_BOOTINFO	0x00000ff0
 #define ADR_DISKIMG		0x00100000
+struct EBOOTINFO{
+	int cpu_info;
+	int cpu_num;
+};
 
 /* naskfunc.nas */
 void io_hlt(void);
@@ -39,6 +43,10 @@ int support_apic(void);
 void io_wrmsr(int edx,int eax,int ecx);
 void io_rdmsr(int* edx,int* eax,int ecx);
 void test2(int eax,int ebx);
+void store_gdt(void* addr);
+void store_idt(void* addr);
+void sys_reboot(void);
+void sys_call(void);
 //void memset(char* s,int num,int longer);
 //void strcpy(char* s,char* t,int longer);
 //int strcmp(char* s,char* t,int longer);
@@ -111,6 +119,7 @@ void set_gatedesc(struct GATE_DESCRIPTOR *gd, int offset, int selector, int ar);
 void init_pic(void);
 void io_write_io_apic(unsigned char  index,unsigned int data);
 void init_apic(void* addr);
+void io_ipi_message(void *apic_base,unsigned int high,unsigned int low);
 #define PIC0_ICW1		0x0020
 #define PIC0_OCW2		0x0020
 #define PIC0_IMR		0x0021
@@ -220,7 +229,7 @@ struct TASK {
 	int level, priority;
 	struct FIFO32 fifo;
 	struct TSS32 tss;
-	struct SEGMENT_DESCRIPTOR ldt[2];
+	struct SEGMENT_DESCRIPTOR ldt[4];
 	struct CONSOLE *cons;
 	int ds_base, cons_stack;
 	struct FILEHANDLE *fhandle;

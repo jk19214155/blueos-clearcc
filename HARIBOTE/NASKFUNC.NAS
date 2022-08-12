@@ -20,7 +20,8 @@
 		GLOBAL	_farjmp, _farcall
 		GLOBAL	_asm_hrb_api, _start_app
 		;GLOBAL	_memset,_strcpy,_strcmp
-		global	_support_apic, _io_wrmsr, _io_rdmsr, _test2
+		global	_support_apic, _io_wrmsr, _io_rdmsr, _test2, _get_lock
+		global	_store_gdt, _store_idt,_sys_reboot,_sys_call
 		EXTERN	_inthandler20, _inthandler21
 		EXTERN	_inthandler2c, _inthandler0d
 		EXTERN	_inthandler0c
@@ -271,9 +272,9 @@ _asm_end_app:
 
 _start_app:		; void start_app(int eip, int cs, int esp, int ds, int *tss_esp0);
 		PUSHAD		; 32ビットレジスタを全部保存しておく
-		MOV		EAX,[ESP+36]	; アプリ用のEIP
-		MOV		ECX,[ESP+40]	; アプリ用のCS
-		MOV		EDX,[ESP+44]	; アプリ用のESP
+		MOV		EDX,[ESP+36]	; アプリ用のEIP
+		MOV		EAX,[ESP+40]	; アプリ用のCS
+		MOV		ECX,[ESP+44]	; アプリ用のESP
 		MOV		EBX,[ESP+48]	; アプリ用のDS/SS
 		MOV		EBP,[ESP+52]	; tss.esp0の番地
 		MOV		[EBP  ],ESP		; OS用のESPを保存
@@ -282,13 +283,14 @@ _start_app:		; void start_app(int eip, int cs, int esp, int ds, int *tss_esp0);
 		MOV		DS,BX
 		MOV		FS,BX
 		MOV		GS,BX
+		;db 0x0f,0x35;sys_ret
 ;	以下はRETFでアプリに行かせるためのスタック調整
-		OR		ECX,3			; アプリ用のセグメント番号に3をORする
+		OR		EAX,3			; アプリ用のセグメント番号に3をORする
 		OR		EBX,3			; アプリ用のセグメント番号に3をORする
 		PUSH	EBX				; アプリのSS
-		PUSH	EDX				; アプリのESP
-		PUSH	ECX				; アプリのCS
-		PUSH	EAX				; アプリのEIP
+		PUSH	ECX				; アプリのESP
+		PUSH	EAX				; アプリのCS
+		PUSH	EDX				; アプリのEIP
 		RETF
 ;	アプリが終了してもここには来ない
 _strcmp:	;int strcmp(char* s,char* t,int longer);
@@ -331,7 +333,7 @@ _memset:	;void memset(char* s,int num,int longer)
 _support_apic: ;int support_apic(void):
 	push edx
 	mov eax,1
-	cpuid 
+	db 0x0f,0xa2 ;cpuid 
 	bt edx,9
 	setc al
 	movzx eax,al
@@ -342,7 +344,7 @@ _io_rdmsr: ;void io_rdmsr(int* edx,int* eax,int ecx)
 	push ecx
 	push eax
 	mov ecx,[esp+24]
-	rdmsr
+	db 0x0f,0x32 ;rdmsr
 	mov ecx,[esp+16]
 	mov [ecx],edx
 	mov ecx,[esp+20]
@@ -358,7 +360,7 @@ _io_wrmsr: ;void io_wrmsr(int edx,int eax,int ecx)
 	mov edx,[esp+16]
 	mov eax,[esp+20]
 	mov ecx,[esp+24]
-	wrmsr
+	db 0x0f,0x30 ;wrmsr
 	pop eax
 	pop ecx
 	pop edx
@@ -368,8 +370,42 @@ _test2: ;void test(int eax,int ebx)
 	push ebx
 	mov eax,[esp+12]
 	mov ebx,[esp+16]
-	ud2
-	db 0x0f,0x0b
+	db 0x0f,0x0b ;ud2
 	pop ebx
 	pop eax
 	ret
+_get_lock: ;int get_lock(int* lock,int bit)
+	push ebp
+	mov ebp,esp
+	push ecx
+	push edx
+	mov ebx,[ebp+8]
+	mov ecx,[ebp+12]
+	lock bts dword [ebx],ecx
+	xor eax,eax
+	adc eax,eax
+	pop edx
+	pop ecx
+	mov esp,ebp
+	pop ebp
+	ret
+_store_gdt: ;void store_gdt(void* addr)
+	push eax
+	mov eax,[esp+8]
+	sgdt [eax]
+	pop eax
+	ret
+_store_idt: ;void store_gdt(void* addr)
+	push eax
+	mov eax,[esp+8]
+	sidt [eax]
+	pop eax
+	ret
+_sys_reboot: ;void sys_reboot(void)
+	cli
+	mov eax,cr0
+	and eax,0x7ffffffe
+	mov cr0,eax
+	db 0xea, 0x00, 0x00, 0xff, 0xff; jmp 0x7000:0
+_sys_call:
+	db 0x0f,0x35 ;sysexit
