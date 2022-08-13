@@ -27,6 +27,8 @@ void load_gdtr(int limit, int addr);
 void load_idtr(int limit, int addr);
 int load_cr0(void);
 void store_cr0(int cr0);
+int load_cr3(void);
+void store_cr3(int cr3);
 void load_tr(int tr);
 void asm_inthandler0c(void);
 void asm_inthandler0d(void);
@@ -166,6 +168,7 @@ unsigned int memman_alloc(struct MEMMAN *man, unsigned int size);
 int memman_free(struct MEMMAN *man, unsigned int addr, unsigned int size);
 unsigned int memman_alloc_4k(struct MEMMAN *man, unsigned int size);
 int memman_free_4k(struct MEMMAN *man, unsigned int addr, unsigned int size);
+void init_page(void);
 
 /* sheet.c */
 #define MAX_SHEETS		256

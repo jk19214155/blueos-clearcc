@@ -244,6 +244,7 @@ L56:
 	movl	$0, 136(%eax)
 	movl	$1073741824, 144(%eax)
 	movl	$0, 52(%eax)
+	movl	$2523136, 72(%eax)
 	jmp	L47
 	.balign 2
 .globl _task_run

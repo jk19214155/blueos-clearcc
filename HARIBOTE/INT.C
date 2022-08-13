@@ -55,9 +55,9 @@ void init_apic(void* apic_base)
 	store_idt((void*)0xc20a);
 	memcpy((void*)0x8000,(void*)0xc200,512);
 	for(i=1;i<16;i++){
-		io_ipi_message(apic_base,((char)i)<<24,0x05<<8);//广播init
-		io_ipi_message(apic_base,((char)i)<<24,(0x06<<8)+8);//广播sipi
-		io_ipi_message(apic_base,((char)i)<<24,(0x06<<8)+8);//广播sipi
+		//io_ipi_message(apic_base,((char)i)<<24,0x05<<8);//广播init
+		//io_ipi_message(apic_base,((char)i)<<24,(0x06<<8)+8);//广播sipi
+		//io_ipi_message(apic_base,((char)i)<<24,(0x06<<8)+8);//广播sipi
 	}
 	for(;;){
 		if((*(int*)(0x8016))==(*(int*)(0x8012)))

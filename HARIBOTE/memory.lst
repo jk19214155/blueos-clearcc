@@ -275,3 +275,29 @@
    275 00000231 89 45 10                        	MOV	DWORD [16+EBP],EAX
    276 00000234 5D                              	POP	EBP
    277 00000235 E9 FFFFFEE8                     	JMP	_memman_free
+   278 0000023A                                 	GLOBAL	_init_page
+   279 0000023A                                 _init_page:
+   280 0000023A 55                              	PUSH	EBP
+   281 0000023B BA 00400000                     	MOV	EDX,4194304
+   282 00000240 89 E5                           	MOV	EBP,ESP
+   283 00000242 31 C9                           	XOR	ECX,ECX
+   284 00000244                                 L72:
+   285 00000244 89 C8                           	MOV	EAX,ECX
+   286 00000246 81 C1 00001000                  	ADD	ECX,4096
+   287 0000024C 0D 00000107                     	OR	EAX,263
+   288 00000251 89 02                           	MOV	DWORD [EDX],EAX
+   289 00000253 83 C2 04                        	ADD	EDX,4
+   290 00000256 81 FA 007FFFFF                  	CMP	EDX,8388607
+   291 0000025C 7E E6                           	JLE	L72
+   292 0000025E BA 00268000                     	MOV	EDX,2523136
+   293 00000263 B9 00400000                     	MOV	ECX,4194304
+   294 00000268                                 L77:
+   295 00000268 89 C8                           	MOV	EAX,ECX
+   296 0000026A 81 C1 00001000                  	ADD	ECX,4096
+   297 00000270 0D 00000107                     	OR	EAX,263
+   298 00000275 89 02                           	MOV	DWORD [EDX],EAX
+   299 00000277 83 C2 04                        	ADD	EDX,4
+   300 0000027A 81 FA 00268FFF                  	CMP	EDX,2527231
+   301 00000280 7E E6                           	JLE	L77
+   302 00000282 5D                              	POP	EBP
+   303 00000283 C3                              	RET

@@ -52,6 +52,11 @@ void HariMain(void)
 	struct FILEINFO *finfo;
 	extern char hankaku[4096];
 	init_gdtidt();//初始化gdt和idt
+	init_page();//初始化分??境
+	j=load_cr0();
+	store_cr3(0x00268000);
+	j|=0x80000000;//??分?
+	store_cr0(j);
 	if(support_apic()==1){//存在local_apic?使用local-apic?理中断
 		//init_pic();//初始化pic
 		init_apic((void*)0xfee00000);
@@ -69,10 +74,10 @@ void HariMain(void)
 	//io_out8(PIC1_IMR, 0xef); /* マウスを許可(11101111) */
 	fifo32_init(&keycmd, 32, keycmd_buf, 0);
 
-	memtotal = memtest(0x00400000, 0xbfffffff);
+	memtotal = memtest(0x00800000, 0xbfffffff);
 	memman_init(memman);
-	memman_free(memman, 0x00001000, 0x0009e000); /* 0x00001000 - 0x0009efff */
-	memman_free(memman, 0x00400000, memtotal - 0x00400000);
+	//memman_free(memman, 0x00001000, 0x0009e000); /* 0x00001000 - 0x0009efff */
+	memman_free(memman, 0x00800000, memtotal - 0x00800000);
 	/*?syscall-sysenter初始化*/
 	sys_esp=memman_alloc_4k(memman,4096);//syscall的?段
 	io_wrmsr(0,0+4,0x174);

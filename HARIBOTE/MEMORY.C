@@ -158,3 +158,16 @@ int memman_free_4k(struct MEMMAN *man, unsigned int addr, unsigned int size)
 	i = memman_free(man, addr, size);
 	return i;
 }
+void init_page(void){
+	int i;
+	int j=0;
+	for(i=0x00400000;i<0x00800000;i=i+4){
+		*(int*)i=(j<<12) | (1<<8) | 7;//4k?面，G全局?志，PS?志，可?可写,存在?志,用?可以使用
+		j++;
+	}
+	j=0;
+	for(i=0x268000;i<0x269000;i+=4){
+		*(int*)i=(0x400000+0x1000*j) | (1<<8) | 7;//4k?面，G全局?志，PS?志，可?可写,存在?志,用?可以使用
+		j++;
+	}
+}

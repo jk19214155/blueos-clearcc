@@ -63,6 +63,10 @@ ap_loop:
 start_bsp:
 		mov dword[ap_lock],0
 		mov dword[_resd_cpu_num],0
+		
+		mov eax,cr4
+		or eax,16
+		mov cr4,eax
 ; VBE存在確認
 		MOV		AX,0x9000
 		MOV		ES,AX

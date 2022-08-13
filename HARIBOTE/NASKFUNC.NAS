@@ -12,6 +12,7 @@
 		GLOBAL	_io_load_eflags, _io_store_eflags
 		GLOBAL	_load_gdtr, _load_idtr
 		GLOBAL	_load_cr0, _store_cr0
+		GLOBAL	_load_cr3, _store_cr3
 		GLOBAL	_load_tr
 		GLOBAL	_asm_inthandler20, _asm_inthandler21
 		GLOBAL	_asm_inthandler2c, _asm_inthandler0c
@@ -111,6 +112,17 @@ _load_cr0:		; int load_cr0(void);
 _store_cr0:		; void store_cr0(int cr0);
 		MOV		EAX,[ESP+4]
 		MOV		CR0,EAX
+		nop
+		nop
+		RET
+		
+_load_cr3:		; int load_cr3(void);
+		MOV		EAX,CR3
+		RET
+
+_store_cr3:		; void store_cr3(int cr0);
+		MOV		EAX,[ESP+4]
+		MOV		CR3,EAX
 		RET
 
 _load_tr:		; void load_tr(int tr);
