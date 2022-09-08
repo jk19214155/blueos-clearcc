@@ -383,6 +383,10 @@ _test2: ;void test(int eax,int ebx)
 	mov eax,[esp+12]
 	mov ebx,[esp+16]
 	db 0x0f,0x0b ;ud2
+.fin:
+	cli
+	hlt
+	jmp .fin
 	pop ebx
 	pop eax
 	ret

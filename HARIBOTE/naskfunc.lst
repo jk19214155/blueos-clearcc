@@ -383,41 +383,45 @@
    383 0000023F 8B 44 24 0C                     	mov eax,[esp+12]
    384 00000243 8B 5C 24 10                     	mov ebx,[esp+16]
    385 00000247 0F 0B                           	db 0x0f,0x0b ;ud2
-   386 00000249 5B                              	pop ebx
-   387 0000024A 58                              	pop eax
-   388 0000024B C3                              	ret
-   389 0000024C                                 _get_lock: ;int get_lock(int* lock,int bit)
-   390 0000024C 55                              	push ebp
-   391 0000024D 89 E5                           	mov ebp,esp
-   392 0000024F 51                              	push ecx
-   393 00000250 52                              	push edx
-   394 00000251 8B 5D 08                        	mov ebx,[ebp+8]
-   395 00000254 8B 4D 0C                        	mov ecx,[ebp+12]
-   396 00000257 F0 0F AB 0B                     	lock bts dword [ebx],ecx
-   397 0000025B 31 C0                           	xor eax,eax
-   398 0000025D 11 C0                           	adc eax,eax
-   399 0000025F 5A                              	pop edx
-   400 00000260 59                              	pop ecx
-   401 00000261 89 EC                           	mov esp,ebp
-   402 00000263 5D                              	pop ebp
-   403 00000264 C3                              	ret
-   404 00000265                                 _store_gdt: ;void store_gdt(void* addr)
-   405 00000265 50                              	push eax
-   406 00000266 8B 44 24 08                     	mov eax,[esp+8]
-   407 0000026A 0F 01 00                        	sgdt [eax]
-   408 0000026D 58                              	pop eax
-   409 0000026E C3                              	ret
-   410 0000026F                                 _store_idt: ;void store_gdt(void* addr)
-   411 0000026F 50                              	push eax
-   412 00000270 8B 44 24 08                     	mov eax,[esp+8]
-   413 00000274 0F 01 08                        	sidt [eax]
-   414 00000277 58                              	pop eax
-   415 00000278 C3                              	ret
-   416 00000279                                 _sys_reboot: ;void sys_reboot(void)
-   417 00000279 FA                              	cli
-   418 0000027A 0F 20 C0                        	mov eax,cr0
-   419 0000027D 25 7FFFFFFE                     	and eax,0x7ffffffe
-   420 00000282 0F 22 C0                        	mov cr0,eax
-   421 00000285 EA 00 00 FF FF                  	db 0xea, 0x00, 0x00, 0xff, 0xff; jmp 0x7000:0
-   422 0000028A                                 _sys_call:
-   423 0000028A 0F 35                           	db 0x0f,0x35 ;sysexit
+   386 00000249                                 .fin:
+   387 00000249 FA                              	cli
+   388 0000024A F4                              	hlt
+   389 0000024B EB FC                           	jmp .fin
+   390 0000024D 5B                              	pop ebx
+   391 0000024E 58                              	pop eax
+   392 0000024F C3                              	ret
+   393 00000250                                 _get_lock: ;int get_lock(int* lock,int bit)
+   394 00000250 55                              	push ebp
+   395 00000251 89 E5                           	mov ebp,esp
+   396 00000253 51                              	push ecx
+   397 00000254 52                              	push edx
+   398 00000255 8B 5D 08                        	mov ebx,[ebp+8]
+   399 00000258 8B 4D 0C                        	mov ecx,[ebp+12]
+   400 0000025B F0 0F AB 0B                     	lock bts dword [ebx],ecx
+   401 0000025F 31 C0                           	xor eax,eax
+   402 00000261 11 C0                           	adc eax,eax
+   403 00000263 5A                              	pop edx
+   404 00000264 59                              	pop ecx
+   405 00000265 89 EC                           	mov esp,ebp
+   406 00000267 5D                              	pop ebp
+   407 00000268 C3                              	ret
+   408 00000269                                 _store_gdt: ;void store_gdt(void* addr)
+   409 00000269 50                              	push eax
+   410 0000026A 8B 44 24 08                     	mov eax,[esp+8]
+   411 0000026E 0F 01 00                        	sgdt [eax]
+   412 00000271 58                              	pop eax
+   413 00000272 C3                              	ret
+   414 00000273                                 _store_idt: ;void store_gdt(void* addr)
+   415 00000273 50                              	push eax
+   416 00000274 8B 44 24 08                     	mov eax,[esp+8]
+   417 00000278 0F 01 08                        	sidt [eax]
+   418 0000027B 58                              	pop eax
+   419 0000027C C3                              	ret
+   420 0000027D                                 _sys_reboot: ;void sys_reboot(void)
+   421 0000027D FA                              	cli
+   422 0000027E 0F 20 C0                        	mov eax,cr0
+   423 00000281 25 7FFFFFFE                     	and eax,0x7ffffffe
+   424 00000286 0F 22 C0                        	mov cr0,eax
+   425 00000289 EA 00 00 FF FF                  	db 0xea, 0x00, 0x00, 0xff, 0xff; jmp 0x7000:0
+   426 0000028E                                 _sys_call:
+   427 0000028E 0F 35                           	db 0x0f,0x35 ;sysexit

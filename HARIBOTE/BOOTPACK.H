@@ -13,7 +13,17 @@ struct EBOOTINFO{
 	int cpu_info;
 	int cpu_num;
 };
-
+struct MEMINFO {
+	int base_addr_low;
+	int base_addr_high;
+	int length_low;
+	int length_high;
+	int type;
+	int index;
+	int undefind1;
+	int undifind2;
+};
+#define ADR_MEMINFO		0x0026a000
 /* naskfunc.nas */
 void io_hlt(void);
 void io_cli(void);
@@ -152,6 +162,8 @@ void enable_mouse(struct FIFO32 *fifo, int data0, struct MOUSE_DEC *mdec);
 int mouse_decode(struct MOUSE_DEC *mdec, unsigned char dat);
 
 /* memory.c */
+#define SYS_CE3_ADDRESS 0x00268000
+#define SYS_CE3_ADDRESS_full 0x00269000
 #define MEMMAN_FREES		4090	/* これで約32KB */
 #define MEMMAN_ADDR			0x003c0000
 struct FREEINFO {	/* あき情報 */
@@ -161,6 +173,11 @@ struct MEMMAN {		/* メモリ管理 */
 	int frees, maxfrees, lostsize, losts;
 	struct FREEINFO free[MEMMAN_FREES];
 };
+struct PAGEMAN32 {
+	unsigned int free_page_num;
+	unsigned int total_page_num;
+	unsigned char* mem_map_base; 
+};
 unsigned int memtest(unsigned int start, unsigned int end);
 void memman_init(struct MEMMAN *man);
 unsigned int memman_total(struct MEMMAN *man);
@@ -168,8 +185,11 @@ unsigned int memman_alloc(struct MEMMAN *man, unsigned int size);
 int memman_free(struct MEMMAN *man, unsigned int addr, unsigned int size);
 unsigned int memman_alloc_4k(struct MEMMAN *man, unsigned int size);
 int memman_free_4k(struct MEMMAN *man, unsigned int addr, unsigned int size);
-void init_page(void);
-
+void init_page(struct PAGEMAN32 *man);
+unsigned int memmam_link_page_32_m(struct PAGEMAN32 *man,unsigned int cr3_address,unsigned int linear_address,unsigned int physical_address,int page_num);
+unsigned int memman_link_page_32(struct PAGEMAN32 *man,unsigned int cr3_address,unsigned int linear_address,unsigned int physical_address);
+unsigned int memman_alloc_page_32(struct PAGEMAN32 *man);
+unsigned int memman_free_page_32(struct PAGEMAN32 *man,unsigned physical_address);
 /* sheet.c */
 #define MAX_SHEETS		256
 struct SHEET {

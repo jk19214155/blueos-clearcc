@@ -1,4 +1,4 @@
-/* bootpack‚ÌƒƒCƒ“ */
+/* bootpackã®ãƒ¡ã‚¤ãƒ³ */
 
 #include "bootpack.h"
 
@@ -20,10 +20,12 @@ void HariMain(void)
 	unsigned int memtotal;
 	struct MOUSE_DEC mdec;
 	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
+		struct PAGEMAN32 struct_pageman;
+	struct PAGEMAN32 *pageman = &struct_pageman;
 	unsigned char *buf_back, buf_mouse[256];
 	struct SHEET *sht_back, *sht_mouse;
 	struct TASK *task_a, *task;
-	void* sys_esp;
+	//void* sys_esp;
 	static char keytable0[0x80] = {
 		0,   0,   '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '^', 0x08, 0,
 		'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '@', '[', 0x0a, 0, 'A', 'S',
@@ -51,41 +53,50 @@ void HariMain(void)
 	unsigned char *nihongo;
 	struct FILEINFO *finfo;
 	extern char hankaku[4096];
-	init_gdtidt();//‰n‰»gdt˜aidt
-	init_page();//‰n‰»•ª??‹«
+	init_gdtidt();//åˆå§‹åŒ–gdtå’Œidt
+	
+	//memtotal = memtest(0x00900000, 0xbfffffff);//åˆå§‹åŒ–å†…å­˜
+	memman_init(memman);
+	//memman_free(memman, 0x00001000, 0x0009e000); /* 0x00001000 - 0x0009efff */
+	//memman_free(memman, 0x00900000, memtotal - 0xb0000000);
+	memman_free(memman, 0x00900000, 0xb0000000);//è™šæ‹Ÿç©ºé—´çš„åœ°å€å¤§å°
+	init_page(pageman);//åˆå§‹åŒ–åˆ†??å¢ƒ
+	memmam_link_page_32_m(pageman,0x268000,0xc0000000,0x00270007,16);//gdtæ˜ å°„åˆ°æœ¬æ¥çš„ä½ç½®
+	memmam_link_page_32_m(pageman,0x268000,0xc0020000,0x0026f007,1);//idtæ˜ å°„åˆ°æœ¬æ¥çš„ä½ç½®
 	j=load_cr0();
-	store_cr3(0x00268000);
-	j|=0x80000000;//??•ª?
+	store_cr3(0x268000);//å†…æ ¸é¡µè¡¨åŠ è½½
+	j|=0x80000000;//å¼€å¯åˆ†é¡µ
 	store_cr0(j);
-	if(support_apic()==1){//‘¶İlocal_apic?g—plocal-apic?—’†’f
-		//init_pic();//‰n‰»pic
+	load_gdtr(0xffff,0xc0000000);//é‡è½½gdtè‡³é«˜ä½å†…å­˜
+	load_idtr(0xffff,0xc0020800);//é‡è½½idtè‡³é«˜ä½å†…å­˜
+	if(support_apic()==1){//å­˜åœ¨local_apic?ä½¿ç”¨local-apic?ç†ä¸­æ–­
 		init_apic((void*)0xfee00000);
 	}
 	else{
-		init_pic();//‰n‰»pic
+		init_pic();//åˆå§‹åŒ–pic
 	}
-	io_sti(); /* IDT/PIC‚Ì‰Šú‰»‚ªI‚í‚Á‚½‚Ì‚ÅCPU‚ÌŠ„‚è‚İ‹Ö~‚ğ‰ğœ */
+	io_sti(); //ä¸­æ–­åˆå§‹åŒ–å®Œæˆ
 	fifo32_init(&fifo, 128, fifobuf, 0);
 	*((int *) 0x0fec) = (int) &fifo;
 	init_pit();
 	init_keyboard(&fifo, 256);
 	enable_mouse(&fifo, 512, &mdec);
-	//io_out8(PIC0_IMR, 0xf8); /* PIT‚ÆPIC1‚ÆƒL[ƒ{[ƒh‚ğ‹–‰Â(11111000) */
-	//io_out8(PIC1_IMR, 0xef); /* ƒ}ƒEƒX‚ğ‹–‰Â(11101111) */
+	if(support_apic()==0){//ä½¿ç”¨apicæ—¶æ‰§è¡Œæ­¤ä»£ç 
+		io_out8(PIC0_IMR, 0xf8); /* PITã¨PIC1ã¨ã‚­ãƒ¼ãƒœãƒ¼ãƒ‰ã‚’è¨±å¯(11111000) */
+		io_out8(PIC1_IMR, 0xef); /* ãƒã‚¦ã‚¹ã‚’è¨±å¯(11101111) */
+	}
 	fifo32_init(&keycmd, 32, keycmd_buf, 0);
 
-	memtotal = memtest(0x00800000, 0xbfffffff);
-	memman_init(memman);
-	//memman_free(memman, 0x00001000, 0x0009e000); /* 0x00001000 - 0x0009efff */
-	memman_free(memman, 0x00800000, memtotal - 0x00800000);
-	/*?syscall-sysenter‰n‰»*/
-	sys_esp=memman_alloc_4k(memman,4096);//syscall“I?’i
-	io_wrmsr(0,0+4,0x174);
-	io_wrmsr(0,&(sys_call),0x176);
-	io_wrmsr(0,4096,0x175);
 	
-	init_palette();
+	/*?syscall-sysenteråˆå§‹åŒ–*/
+	//sys_esp=memman_alloc_4k(memman,4096);//syscallçš„?æ®µ
+	//io_wrmsr(0,0+4,0x174);
+	//io_wrmsr(0,&(sys_call),0x176);
+	//io_wrmsr(0,4096,0x175);
+	
+	init_palette();//åˆå§‹åŒ–å›¾å±‚
 	shtctl = shtctl_init(memman, binfo->vram, binfo->scrnx, binfo->scrny);
+	//è¿è¡Œç¬¬ä¸€ä¸ªä»»åŠ¡
 	task_a = task_init(memman);
 	fifo.task = task_a;
 	task_run(task_a, 1, 2);
@@ -95,7 +106,7 @@ void HariMain(void)
 	/* sht_back */
 	sht_back  = sheet_alloc(shtctl);
 	buf_back  = (unsigned char *) memman_alloc_4k(memman, binfo->scrnx * binfo->scrny);
-	sheet_setbuf(sht_back, buf_back, binfo->scrnx, binfo->scrny, -1); /* “§–¾F‚È‚µ */
+	sheet_setbuf(sht_back, buf_back, binfo->scrnx, binfo->scrny, -1); /* é€æ˜è‰²ãªã— */
 	init_screen8(buf_back, binfo->scrnx, binfo->scrny);
 
 	/* sht_cons */
@@ -105,7 +116,7 @@ void HariMain(void)
 	sht_mouse = sheet_alloc(shtctl);
 	sheet_setbuf(sht_mouse, buf_mouse, 16, 16, 99);
 	init_mouse_cursor8(buf_mouse, 99);
-	mx = (binfo->scrnx - 16) / 2; /* ‰æ–Ê’†‰›‚É‚È‚é‚æ‚¤‚ÉÀ•WŒvZ */
+	mx = (binfo->scrnx - 16) / 2; /* ç”»é¢ä¸­å¤®ã«ãªã‚‹ã‚ˆã†ã«åº§æ¨™è¨ˆç®— */
 	my = (binfo->scrny - 28 - 16) / 2;
 
 	sheet_slide(sht_back,  0,  0);
@@ -116,11 +127,11 @@ void HariMain(void)
 	sheet_updown(sht_mouse, 2);
 	keywin_on(key_win);
 
-	/* Å‰‚ÉƒL[ƒ{[ƒhó‘Ô‚Æ‚ÌH‚¢ˆá‚¢‚ª‚È‚¢‚æ‚¤‚ÉAİ’è‚µ‚Ä‚¨‚­‚±‚Æ‚É‚·‚é */
+	/* æœ€åˆã«ã‚­ãƒ¼ãƒœãƒ¼ãƒ‰çŠ¶æ…‹ã¨ã®é£Ÿã„é•ã„ãŒãªã„ã‚ˆã†ã«ã€è¨­å®šã—ã¦ãŠãã“ã¨ã«ã™ã‚‹ */
 	fifo32_put(&keycmd, KEYCMD_LED);
 	fifo32_put(&keycmd, key_leds);
 
-	/* nihongo.fnt‚Ì“Ç‚İ‚İ */
+	/* nihongo.fntã®èª­ã¿è¾¼ã¿ */
 	fat = (int *) memman_alloc_4k(memman, 4 * 2880);
 	file_readfat(fat, (unsigned char *) (ADR_DISKIMG + 0x000200));
 
@@ -131,25 +142,24 @@ void HariMain(void)
 	} else {
 		nihongo = (unsigned char *) memman_alloc_4k(memman, 16 * 256 + 32 * 94 * 47);
 		for (i = 0; i < 16 * 256; i++) {
-			nihongo[i] = hankaku[i]; /* ƒtƒHƒ“ƒg‚ª‚È‚©‚Á‚½‚Ì‚Å”¼Šp•”•ª‚ğƒRƒs[ */
+			nihongo[i] = hankaku[i]; /* ãƒ•ã‚©ãƒ³ãƒˆãŒãªã‹ã£ãŸã®ã§åŠè§’éƒ¨åˆ†ã‚’ã‚³ãƒ”ãƒ¼ */
 		}
 		for (i = 16 * 256; i < 16 * 256 + 32 * 94 * 47; i++) {
-			nihongo[i] = 0xff; /* ƒtƒHƒ“ƒg‚ª‚È‚©‚Á‚½‚Ì‚Å‘SŠp•”•ª‚ğ0xff‚Å–„‚ßs‚­‚· */
+			nihongo[i] = 0xff; /* ãƒ•ã‚©ãƒ³ãƒˆãŒãªã‹ã£ãŸã®ã§å…¨è§’éƒ¨åˆ†ã‚’0xffã§åŸ‹ã‚å°½ãã™ */
 		}
 	}
 	*((int *) 0x0fe8) = (int) nihongo;
 	memman_free_4k(memman, (int) fat, 4 * 2880);
-
 	for (;;) {
 		if (fifo32_status(&keycmd) > 0 && keycmd_wait < 0) {
-			/* ƒL[ƒ{[ƒhƒRƒ“ƒgƒ[ƒ‰‚É‘—‚éƒf[ƒ^‚ª‚ ‚ê‚ÎA‘—‚é */
+			/* ã‚­ãƒ¼ãƒœãƒ¼ãƒ‰ã‚³ãƒ³ãƒˆãƒ­ãƒ¼ãƒ©ã«é€ã‚‹ãƒ‡ãƒ¼ã‚¿ãŒã‚ã‚Œã°ã€é€ã‚‹ */
 			keycmd_wait = fifo32_get(&keycmd);
 			wait_KBC_sendready();
 			io_out8(PORT_KEYDAT, keycmd_wait);
 		}
 		io_cli();
 		if (fifo32_status(&fifo) == 0) {
-			/* FIFO‚ª‚©‚ç‚Á‚Û‚É‚È‚Á‚½‚Ì‚ÅA•Û—¯‚µ‚Ä‚¢‚é•`‰æ‚ª‚ ‚ê‚ÎÀs‚·‚é */
+			/* FIFOãŒã‹ã‚‰ã£ã½ã«ãªã£ãŸã®ã§ã€ä¿ç•™ã—ã¦ã„ã‚‹æç”»ãŒã‚ã‚Œã°å®Ÿè¡Œã™ã‚‹ */
 			if (new_mx >= 0) {
 				io_sti();
 				sheet_slide(sht_mouse, new_mx, new_my);
@@ -165,16 +175,16 @@ void HariMain(void)
 		} else {
 			i = fifo32_get(&fifo);
 			io_sti();
-			if (key_win != 0 && key_win->flags == 0) {	/* ƒEƒBƒ“ƒhƒE‚ª•Â‚¶‚ç‚ê‚½ */
-				if (shtctl->top == 1) {	/* ‚à‚¤ƒ}ƒEƒX‚Æ”wŒi‚µ‚©‚È‚¢ */
+			if (key_win != 0 && key_win->flags == 0) {	/* ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ãŒé–‰ã˜ã‚‰ã‚ŒãŸ */
+				if (shtctl->top == 1) {	/* ã‚‚ã†ãƒã‚¦ã‚¹ã¨èƒŒæ™¯ã—ã‹ãªã„ */
 					key_win = 0;
 				} else {
 					key_win = shtctl->sheets[shtctl->top - 1];
 					keywin_on(key_win);
 				}
 			}
-			if (256 <= i && i <= 511) { /* ƒL[ƒ{[ƒhƒf[ƒ^ */
-				if (i < 0x80 + 256) { /* ƒL[ƒR[ƒh‚ğ•¶šƒR[ƒh‚É•ÏŠ· */
+			if (256 <= i && i <= 511) { /* ã‚­ãƒ¼ãƒœãƒ¼ãƒ‰ãƒ‡ãƒ¼ã‚¿ */
+				if (i < 0x80 + 256) { /* ã‚­ãƒ¼ã‚³ãƒ¼ãƒ‰ã‚’æ–‡å­—ã‚³ãƒ¼ãƒ‰ã«å¤‰æ› */
 					if (key_shift == 0) {
 						s[0] = keytable0[i - 256];
 					} else {
@@ -183,13 +193,13 @@ void HariMain(void)
 				} else {
 					s[0] = 0;
 				}
-				if ('A' <= s[0] && s[0] <= 'Z') {	/* “ü—Í•¶š‚ªƒAƒ‹ƒtƒ@ƒxƒbƒg */
+				if ('A' <= s[0] && s[0] <= 'Z') {	/* å…¥åŠ›æ–‡å­—ãŒã‚¢ãƒ«ãƒ•ã‚¡ãƒ™ãƒƒãƒˆ */
 					if (((key_leds & 4) == 0 && key_shift == 0) ||
 							((key_leds & 4) != 0 && key_shift != 0)) {
-						s[0] += 0x20;	/* ‘å•¶š‚ğ¬•¶š‚É•ÏŠ· */
+						s[0] += 0x20;	/* å¤§æ–‡å­—ã‚’å°æ–‡å­—ã«å¤‰æ› */
 					}
 				}
-				if (s[0] != 0 && key_win != 0) { /* ’Êí•¶šAƒoƒbƒNƒXƒy[ƒXAEnter */
+				if (s[0] != 0 && key_win != 0) { /* é€šå¸¸æ–‡å­—ã€ãƒãƒƒã‚¯ã‚¹ãƒšãƒ¼ã‚¹ã€Enter */
 					fifo32_put(&key_win->task->fifo, s[0] + 256);
 				}
 				if (i == 256 + 0x0f && key_win != 0) {	/* Tab */
@@ -201,16 +211,16 @@ void HariMain(void)
 					key_win = shtctl->sheets[j];
 					keywin_on(key_win);
 				}
-				if (i == 256 + 0x2a) {	/* ¶ƒVƒtƒg ON */
+				if (i == 256 + 0x2a) {	/* å·¦ã‚·ãƒ•ãƒˆ ON */
 					key_shift |= 1;
 				}
-				if (i == 256 + 0x36) {	/* ‰EƒVƒtƒg ON */
+				if (i == 256 + 0x36) {	/* å³ã‚·ãƒ•ãƒˆ ON */
 					key_shift |= 2;
 				}
-				if (i == 256 + 0xaa) {	/* ¶ƒVƒtƒg OFF */
+				if (i == 256 + 0xaa) {	/* å·¦ã‚·ãƒ•ãƒˆ OFF */
 					key_shift &= ~1;
 				}
-				if (i == 256 + 0xb6) {	/* ‰EƒVƒtƒg OFF */
+				if (i == 256 + 0xb6) {	/* å³ã‚·ãƒ•ãƒˆ OFF */
 					key_shift &= ~2;
 				}
 				if (i == 256 + 0x3a) {	/* CapsLock */
@@ -232,15 +242,15 @@ void HariMain(void)
 					task = key_win->task;
 					if (task != 0 && task->tss.ss0 != 0) {
 						cons_putstr0(task->cons, "\nBreak(key) :\n");
-						io_cli();	/* ‹­§I—¹ˆ—’†‚Éƒ^ƒXƒN‚ª•Ï‚í‚é‚Æ¢‚é‚©‚ç */
+						io_cli();	/* å¼·åˆ¶çµ‚äº†å‡¦ç†ä¸­ã«ã‚¿ã‚¹ã‚¯ãŒå¤‰ã‚ã‚‹ã¨å›°ã‚‹ã‹ã‚‰ */
 						task->tss.eax = (int) &(task->tss.esp0);
 						task->tss.eip = (int) asm_end_app;
 						io_sti();
-						task_run(task, -1, 0);	/* I—¹ˆ—‚ğŠmÀ‚É‚â‚ç‚¹‚é‚½‚ß‚ÉAQ‚Ä‚¢‚½‚ç‹N‚±‚· */
+						task_run(task, -1, 0);	/* çµ‚äº†å‡¦ç†ã‚’ç¢ºå®Ÿã«ã‚„ã‚‰ã›ã‚‹ãŸã‚ã«ã€å¯ã¦ã„ãŸã‚‰èµ·ã“ã™ */
 					}
 				}
 				if (i == 256 + 0x3c && key_shift != 0) {	/* Shift+F2 */
-					/* V‚µ‚­ì‚Á‚½ƒRƒ“ƒ\[ƒ‹‚ğ“ü—Í‘I‘ğó‘Ô‚É‚·‚éi‚»‚Ì‚Ù‚¤‚ªeØ‚¾‚æ‚ËHj */
+					/* æ–°ã—ãä½œã£ãŸã‚³ãƒ³ã‚½ãƒ¼ãƒ«ã‚’å…¥åŠ›é¸æŠçŠ¶æ…‹ã«ã™ã‚‹ï¼ˆãã®ã»ã†ãŒè¦ªåˆ‡ã ã‚ˆã­ï¼Ÿï¼‰ */
 					if (key_win != 0) {
 						keywin_off(key_win);
 					}
@@ -252,16 +262,16 @@ void HariMain(void)
 				if (i == 256 + 0x57) {	/* F11 */
 					sheet_updown(shtctl->sheets[1], shtctl->top - 1);
 				}
-				if (i == 256 + 0xfa) {	/* ƒL[ƒ{[ƒh‚ªƒf[ƒ^‚ğ–³–‚Éó‚¯æ‚Á‚½ */
+				if (i == 256 + 0xfa) {	/* ã‚­ãƒ¼ãƒœãƒ¼ãƒ‰ãŒãƒ‡ãƒ¼ã‚¿ã‚’ç„¡äº‹ã«å—ã‘å–ã£ãŸ */
 					keycmd_wait = -1;
 				}
-				if (i == 256 + 0xfe) {	/* ƒL[ƒ{[ƒh‚ªƒf[ƒ^‚ğ–³–‚Éó‚¯æ‚ê‚È‚©‚Á‚½ */
+				if (i == 256 + 0xfe) {	/* ã‚­ãƒ¼ãƒœãƒ¼ãƒ‰ãŒãƒ‡ãƒ¼ã‚¿ã‚’ç„¡äº‹ã«å—ã‘å–ã‚Œãªã‹ã£ãŸ */
 					wait_KBC_sendready();
 					io_out8(PORT_KEYDAT, keycmd_wait);
 				}
-			} else if (512 <= i && i <= 767) { /* ƒ}ƒEƒXƒf[ƒ^ */
+			} else if (512 <= i && i <= 767) { /* ãƒã‚¦ã‚¹ãƒ‡ãƒ¼ã‚¿ */
 				if (mouse_decode(&mdec, i - 512) != 0) {
-					/* ƒ}ƒEƒXƒJ[ƒ\ƒ‹‚ÌˆÚ“® */
+					/* ãƒã‚¦ã‚¹ã‚«ãƒ¼ã‚½ãƒ«ã®ç§»å‹• */
 					mx += mdec.x;
 					my += mdec.y;
 					if (mx < 0) {
@@ -279,10 +289,10 @@ void HariMain(void)
 					new_mx = mx;
 					new_my = my;
 					if ((mdec.btn & 0x01) != 0) {
-						/* ¶ƒ{ƒ^ƒ“‚ğ‰Ÿ‚µ‚Ä‚¢‚é */
+						/* å·¦ãƒœã‚¿ãƒ³ã‚’æŠ¼ã—ã¦ã„ã‚‹ */
 						if (mmx < 0) {
-							/* ’Êíƒ‚[ƒh‚Ìê‡ */
-							/* ã‚Ì‰º‚¶‚«‚©‚ç‡”Ô‚Éƒ}ƒEƒX‚ªw‚µ‚Ä‚¢‚é‰º‚¶‚«‚ğ’T‚· */
+							/* é€šå¸¸ãƒ¢ãƒ¼ãƒ‰ã®å ´åˆ */
+							/* ä¸Šã®ä¸‹ã˜ãã‹ã‚‰é †ç•ªã«ãƒã‚¦ã‚¹ãŒæŒ‡ã—ã¦ã„ã‚‹ä¸‹ã˜ãã‚’æ¢ã™ */
 							for (j = shtctl->top - 1; j > 0; j--) {
 								sht = shtctl->sheets[j];
 								x = mx - sht->vx0;
@@ -296,24 +306,24 @@ void HariMain(void)
 											keywin_on(key_win);
 										}
 										if (3 <= x && x < sht->bxsize - 3 && 3 <= y && y < 21) {
-											mmx = mx;	/* ƒEƒBƒ“ƒhƒEˆÚ“®ƒ‚[ƒh‚Ö */
+											mmx = mx;	/* ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ç§»å‹•ãƒ¢ãƒ¼ãƒ‰ã¸ */
 											mmy = my;
 											mmx2 = sht->vx0;
 											new_wy = sht->vy0;
 										}
 										if (sht->bxsize - 21 <= x && x < sht->bxsize - 5 && 5 <= y && y < 19) {
-											/* u~vƒ{ƒ^ƒ“ƒNƒŠƒbƒN */
-											if ((sht->flags & 0x10) != 0) {		/* ƒAƒvƒŠ‚ªì‚Á‚½ƒEƒBƒ“ƒhƒE‚©H */
+											/* ã€ŒÃ—ã€ãƒœã‚¿ãƒ³ã‚¯ãƒªãƒƒã‚¯ */
+											if ((sht->flags & 0x10) != 0) {		/* ã‚¢ãƒ—ãƒªãŒä½œã£ãŸã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‹ï¼Ÿ */
 												task = sht->task;
 												cons_putstr0(task->cons, "\nBreak(mouse) :\n");
-												io_cli();	/* ‹­§I—¹ˆ—’†‚Éƒ^ƒXƒN‚ª•Ï‚í‚é‚Æ¢‚é‚©‚ç */
+												io_cli();	/* å¼·åˆ¶çµ‚äº†å‡¦ç†ä¸­ã«ã‚¿ã‚¹ã‚¯ãŒå¤‰ã‚ã‚‹ã¨å›°ã‚‹ã‹ã‚‰ */
 												task->tss.eax = (int) &(task->tss.esp0);
 												task->tss.eip = (int) asm_end_app;
 												io_sti();
 												task_run(task, -1, 0);
-											} else {	/* ƒRƒ“ƒ\[ƒ‹ */
+											} else {	/* ã‚³ãƒ³ã‚½ãƒ¼ãƒ« */
 												task = sht->task;
-												sheet_updown(sht, -1); /* ‚Æ‚è‚ ‚¦‚¸”ñ•\¦‚É‚µ‚Ä‚¨‚­ */
+												sheet_updown(sht, -1); /* ã¨ã‚Šã‚ãˆãšéè¡¨ç¤ºã«ã—ã¦ãŠã */
 												keywin_off(key_win);
 												key_win = shtctl->sheets[shtctl->top - 1];
 												keywin_on(key_win);
@@ -327,27 +337,27 @@ void HariMain(void)
 								}
 							}
 						} else {
-							/* ƒEƒBƒ“ƒhƒEˆÚ“®ƒ‚[ƒh‚Ìê‡ */
-							x = mx - mmx;	/* ƒ}ƒEƒX‚ÌˆÚ“®—Ê‚ğŒvZ */
+							/* ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ç§»å‹•ãƒ¢ãƒ¼ãƒ‰ã®å ´åˆ */
+							x = mx - mmx;	/* ãƒã‚¦ã‚¹ã®ç§»å‹•é‡ã‚’è¨ˆç®— */
 							y = my - mmy;
 							new_wx = (mmx2 + x + 2) & ~3;
 							new_wy = new_wy + y;
-							mmy = my;	/* ˆÚ“®Œã‚ÌÀ•W‚ÉXV */
+							mmy = my;	/* ç§»å‹•å¾Œã®åº§æ¨™ã«æ›´æ–° */
 						}
 					} else {
-						/* ¶ƒ{ƒ^ƒ“‚ğ‰Ÿ‚µ‚Ä‚¢‚È‚¢ */
-						mmx = -1;	/* ’Êíƒ‚[ƒh‚Ö */
+						/* å·¦ãƒœã‚¿ãƒ³ã‚’æŠ¼ã—ã¦ã„ãªã„ */
+						mmx = -1;	/* é€šå¸¸ãƒ¢ãƒ¼ãƒ‰ã¸ */
 						if (new_wx != 0x7fffffff) {
-							sheet_slide(sht, new_wx, new_wy);	/* ˆê“xŠm’è‚³‚¹‚é */
+							sheet_slide(sht, new_wx, new_wy);	/* ä¸€åº¦ç¢ºå®šã•ã›ã‚‹ */
 							new_wx = 0x7fffffff;
 						}
 					}
 				}
-			} else if (768 <= i && i <= 1023) {	/* ƒRƒ“ƒ\[ƒ‹I—¹ˆ— */
+			} else if (768 <= i && i <= 1023) {	/* ã‚³ãƒ³ã‚½ãƒ¼ãƒ«çµ‚äº†å‡¦ç† */
 				close_console(shtctl->sheets0 + (i - 768));
 			} else if (1024 <= i && i <= 2023) {
 				close_constask(taskctl->tasks0 + (i - 1024));
-			} else if (2024 <= i && i <= 2279) {	/* ƒRƒ“ƒ\[ƒ‹‚¾‚¯‚ğ•Â‚¶‚é */
+			} else if (2024 <= i && i <= 2279) {	/* ã‚³ãƒ³ã‚½ãƒ¼ãƒ«ã ã‘ã‚’é–‰ã˜ã‚‹ */
 				sht2 = shtctl->sheets0 + (i - 2024);
 				memman_free_4k(memman, (int) sht2->buf, 256 * 165);
 				sheet_free(sht2);
@@ -360,7 +370,7 @@ void keywin_off(struct SHEET *key_win)
 {
 	change_wtitle8(key_win, 0);
 	if ((key_win->flags & 0x20) != 0) {
-		fifo32_put(&key_win->task->fifo, 3); /* ƒRƒ“ƒ\[ƒ‹‚ÌƒJ[ƒ\ƒ‹OFF */
+		fifo32_put(&key_win->task->fifo, 3); /* ã‚³ãƒ³ã‚½ãƒ¼ãƒ«ã®ã‚«ãƒ¼ã‚½ãƒ«OFF */
 	}
 	return;
 }
@@ -369,7 +379,7 @@ void keywin_on(struct SHEET *key_win)
 {
 	change_wtitle8(key_win, 1);
 	if ((key_win->flags & 0x20) != 0) {
-		fifo32_put(&key_win->task->fifo, 2); /* ƒRƒ“ƒ\[ƒ‹‚ÌƒJ[ƒ\ƒ‹ON */
+		fifo32_put(&key_win->task->fifo, 2); /* ã‚³ãƒ³ã‚½ãƒ¼ãƒ«ã®ã‚«ãƒ¼ã‚½ãƒ«ON */
 	}
 	return;
 }
@@ -400,11 +410,11 @@ struct SHEET *open_console(struct SHTCTL *shtctl, unsigned int memtotal)
 	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
 	struct SHEET *sht = sheet_alloc(shtctl);
 	unsigned char *buf = (unsigned char *) memman_alloc_4k(memman, 256 * 165);
-	sheet_setbuf(sht, buf, 256, 165, -1); /* “§–¾F‚È‚µ */
+	sheet_setbuf(sht, buf, 256, 165, -1); /* é€æ˜è‰²ãªã— */
 	make_window8(buf, 256, 165, "console", 0);
 	make_textbox8(sht, 8, 28, 240, 128, COL8_000000);
 	sht->task = open_constask(sht, memtotal);
-	sht->flags |= 0x20;	/* ƒJ[ƒ\ƒ‹‚ ‚è */
+	sht->flags |= 0x20;	/* ã‚«ãƒ¼ã‚½ãƒ«ã‚ã‚Š */
 	return sht;
 }
 
@@ -414,7 +424,7 @@ void close_constask(struct TASK *task)
 	task_sleep(task);
 	memman_free_4k(memman, task->cons_stack, 64 * 1024);
 	memman_free_4k(memman, (int) task->fifo.buf, 128 * 4);
-	task->flags = 0; /* task_free(task); ‚Ì‘ã‚í‚è */
+	task->flags = 0; /* task_free(task); ã®ä»£ã‚ã‚Š */
 	return;
 }
 

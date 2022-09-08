@@ -151,7 +151,26 @@ keystatus:
 		MOV		AL,0xdf			; enable A20
 		OUT		0x60,AL
 		CALL	waitkbdout
-
+		
+memtest:
+; 获取内存分布情况
+		xor ax,ax
+		mov es,ax
+		mov ds,ax
+		mov ebx,0;第一次调用
+		mov edx,0x534d4150;;SMAP签名
+		mov di,0x7000
+.start:
+		mov ecx,20;使用20字节保存返回的信息
+		mov eax,0xe820;0xe820内存探测
+		mov dword[di+20],ebx;保存序列号
+		int 0x15
+		add di,32;区域宽度32
+		jc .fin
+		and ebx,ebx
+		jz .fin
+		jmp .start
+.fin:
 ; プロテクトモード移行
 
 		LGDT	[GDTR0]			; 暫定GDTを設定
@@ -167,7 +186,12 @@ pipelineflush:
 		MOV		FS,AX
 		MOV		GS,AX
 		MOV		SS,AX
-
+;内存分布图的传送
+		mov esi,0x7000
+		mov edi,0x0026a000
+		mov ecx,ebx
+		mov ecx,4096;假定内存分布传送区域不大于4k
+		movsb
 ; bootpackの転送
 
 		MOV		ESI,bootpack	; 転送元
