@@ -4,7 +4,6 @@
 
 struct FIFO32 *keyfifo;
 int keydata0;
-
 void inthandler21(int *esp)
 {
 	int data;

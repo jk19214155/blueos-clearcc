@@ -9,7 +9,9 @@ void keywin_on(struct SHEET *key_win);
 void close_console(struct SHEET *sht);
 void close_constask(struct TASK *task);
 
-void HariMain(void)
+struct PAGEMAN32 *pageman;
+
+void HariMain(int mode,...)
 {
 	struct BOOTINFO *binfo = (struct BOOTINFO *) ADR_BOOTINFO;
 	struct SHTCTL *shtctl;
@@ -20,8 +22,7 @@ void HariMain(void)
 	unsigned int memtotal;
 	struct MOUSE_DEC mdec;
 	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
-		struct PAGEMAN32 struct_pageman;
-	struct PAGEMAN32 *pageman = &struct_pageman;
+	struct PAGEMAN32 struct_pageman;
 	unsigned char *buf_back, buf_mouse[256];
 	struct SHEET *sht_back, *sht_mouse;
 	struct TASK *task_a, *task;
@@ -53,6 +54,7 @@ void HariMain(void)
 	unsigned char *nihongo;
 	struct FILEINFO *finfo;
 	extern char hankaku[4096];
+	struct PAGEMAN32 *pageman = &struct_pageman;
 	init_gdtidt();//初始化gdt和idt
 	
 	//memtotal = memtest(0x00900000, 0xbfffffff);//初始化内存
@@ -60,15 +62,21 @@ void HariMain(void)
 	//memman_free(memman, 0x00001000, 0x0009e000); /* 0x00001000 - 0x0009efff */
 	//memman_free(memman, 0x00900000, memtotal - 0xb0000000);
 	memman_free(memman, 0x00900000, 0xb0000000);//虚拟空间的地址大小
-	init_page(pageman);//初始化分??境
-	memmam_link_page_32_m(pageman,0x268000,0xc0000000,0x00270007,16);//gdt映射到本来的位置
-	memmam_link_page_32_m(pageman,0x268000,0xc0020000,0x0026f007,1);//idt映射到本来的位置
+	init_page(pageman);//初始化分页
+	memmam_link_page_32_m(pageman,0x268000,0xc0000000,0x00270007,16,1);//gdt映射到本来的位置
+	memmam_link_page_32_m(pageman,0x268000,0xc0020000,0x0026f007,1,1);//idt映射到本来的位置
+	memmam_link_page_32_m(pageman,0x268000,0xc0100000,0x00280007,128,1);//haribote.hrb映射到高地址
+	memmam_link_page_32_m(pageman,0x268000,0x07,0x07,0x900,1);//低地址映射到本来的位置
+	memmam_link_page_32_m(pageman,0x268000,0xe0000000,0xe0000007,0x20000,1);//高地址映射到本来的位置
+	*((struct PAGEMAN32 **)ADR_PAGEMAN)=pageman;//保存变量
+	
 	j=load_cr0();
 	store_cr3(0x268000);//内核页表加载
 	j|=0x80000000;//开启分页
 	store_cr0(j);
 	load_gdtr(0xffff,0xc0000000);//重载gdt至高位内存
 	load_idtr(0xffff,0xc0020800);//重载idt至高位内存
+	
 	if(support_apic()==1){//存在local_apic?使用local-apic?理中断
 		init_apic((void*)0xfee00000);
 	}
@@ -93,22 +101,21 @@ void HariMain(void)
 	//io_wrmsr(0,0+4,0x174);
 	//io_wrmsr(0,&(sys_call),0x176);
 	//io_wrmsr(0,4096,0x175);
-	
 	init_palette();//初始化图层
-	shtctl = shtctl_init(memman, binfo->vram, binfo->scrnx, binfo->scrny);
+	shtctl = shtctl_init(memman,pageman, binfo->vram, binfo->scrnx, binfo->scrny);
 	//运行第一个任务
 	task_a = task_init(memman);
 	fifo.task = task_a;
 	task_run(task_a, 1, 2);
 	*((int *) 0x0fe4) = (int) shtctl;
 	task_a->langmode = 0;
-
 	/* sht_back */
 	sht_back  = sheet_alloc(shtctl);
-	buf_back  = (unsigned char *) memman_alloc_4k(memman, binfo->scrnx * binfo->scrny);
+	buf_back  = (unsigned char *) memman_alloc_4k(memman, binfo->scrnx * binfo->scrny);//内存分配!!!
+	memmam_link_page_32_m(pageman,0x268000,buf_back,7,((binfo->scrnx * binfo->scrny)+0xfff)>>12,0);//没有目的链接地址
+	////
 	sheet_setbuf(sht_back, buf_back, binfo->scrnx, binfo->scrny, -1); /* 透明色なし */
 	init_screen8(buf_back, binfo->scrnx, binfo->scrny);
-
 	/* sht_cons */
 	key_win = open_console(shtctl, memtotal);
 
@@ -118,7 +125,6 @@ void HariMain(void)
 	init_mouse_cursor8(buf_mouse, 99);
 	mx = (binfo->scrnx - 16) / 2; /* 画面中央になるように座標計算 */
 	my = (binfo->scrny - 28 - 16) / 2;
-
 	sheet_slide(sht_back,  0,  0);
 	sheet_slide(key_win,   32, 4);
 	sheet_slide(sht_mouse, mx, my);
@@ -132,15 +138,19 @@ void HariMain(void)
 	fifo32_put(&keycmd, key_leds);
 
 	/* nihongo.fntの読み込み */
-	fat = (int *) memman_alloc_4k(memman, 4 * 2880);
+	fat = (int *) memman_alloc_4k(memman, 4 * 2880);//内存分配!!!
+	memmam_link_page_32_m(pageman,0x268000,fat,7,3,0);//
+	
 	file_readfat(fat, (unsigned char *) (ADR_DISKIMG + 0x000200));
 
 	finfo = file_search("nihongo.fnt", (struct FILEINFO *) (ADR_DISKIMG + 0x002600), 224);
+	
 	if (finfo != 0) {
 		i = finfo->size;
 		nihongo = file_loadfile2(finfo->clustno, &i, fat);
 	} else {
-		nihongo = (unsigned char *) memman_alloc_4k(memman, 16 * 256 + 32 * 94 * 47);
+		nihongo = (unsigned char *) memman_alloc_4k(memman, 16 * 256 + 32 * 94 * 47);//内存分配!!!
+		memmam_link_page_32_m(pageman,0x268000,nihongo,7,  22841,0);//
 		for (i = 0; i < 16 * 256; i++) {
 			nihongo[i] = hankaku[i]; /* フォントがなかったので半角部分をコピー */
 		}
@@ -288,12 +298,12 @@ void HariMain(void)
 					}
 					new_mx = mx;
 					new_my = my;
-					if ((mdec.btn & 0x01) != 0) {
+					if ((mdec.btn & 0x01) != 0) {//左键按下
 						/* 左ボタンを押している */
 						if (mmx < 0) {
 							/* 通常モードの場合 */
 							/* 上の下じきから順番にマウスが指している下じきを探す */
-							for (j = shtctl->top - 1; j > 0; j--) {
+							for (j = shtctl->top - 1; j > 0; j--) {//遍历所有图层
 								sht = shtctl->sheets[j];
 								x = mx - sht->vx0;
 								y = my - sht->vy0;
@@ -387,9 +397,12 @@ void keywin_on(struct SHEET *key_win)
 struct TASK *open_constask(struct SHEET *sht, unsigned int memtotal)
 {
 	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
+	struct PAGEMAN32 *pageman=*((struct PAGEMAN32 **)ADR_PAGEMAN);
 	struct TASK *task = task_alloc();
-	int *cons_fifo = (int *) memman_alloc_4k(memman, 128 * 4);
-	task->cons_stack = memman_alloc_4k(memman, 64 * 1024);
+	int *cons_fifo = (int *) memman_alloc_4k(memman, 128 * 4);//内存分配!!!
+	memmam_link_page_32_m(pageman,0x268000,cons_fifo,7, 1,0);//
+	task->cons_stack = memman_alloc_4k(memman, 64 * 1024);//内存分配!!!
+	memmam_link_page_32_m(pageman,0x268000,task->cons_stack,7,0x10,0);//
 	task->tss.esp = task->cons_stack + 64 * 1024 - 12;
 	task->tss.eip = (int) &console_task;
 	task->tss.es = 1 * 8;
@@ -408,8 +421,10 @@ struct TASK *open_constask(struct SHEET *sht, unsigned int memtotal)
 struct SHEET *open_console(struct SHTCTL *shtctl, unsigned int memtotal)
 {
 	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
+	struct PAGEMAN32 *pageman=*((struct PAGEMAN32 **)ADR_PAGEMAN);
 	struct SHEET *sht = sheet_alloc(shtctl);
-	unsigned char *buf = (unsigned char *) memman_alloc_4k(memman, 256 * 165);
+	unsigned char *buf = (unsigned char *) memman_alloc_4k(memman, 256 * 165);//内存分配!!!
+	memmam_link_page_32_m(pageman,0x268000,buf,7,0x0b,0);//
 	sheet_setbuf(sht, buf, 256, 165, -1); /* 透明色なし */
 	make_window8(buf, 256, 165, "console", 0);
 	make_textbox8(sht, 8, 28, 240, 128, COL8_000000);

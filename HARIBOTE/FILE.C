@@ -77,13 +77,16 @@ char *file_loadfile2(int clustno, int *psize, int *fat)
 {
 	int size = *psize, size2;
 	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
+	struct PAGEMAN32 *pageman=*(struct PAGEMAN32 **)ADR_PAGEMAN;
 	char *buf, *buf2;
 	buf = (char *) memman_alloc_4k(memman, size);
+	memmam_link_page_32_m(pageman,0x268000,buf,7,(size+0xfff)>>12,0);//
 	file_loadfile(clustno, size, buf, fat, (char *) (ADR_DISKIMG + 0x003e00));
 	if (size >= 17) {
 		size2 = tek_getsize(buf);
 		if (size2 > 0) {	/* tekˆ³k‚ª‚©‚©‚Á‚Ä‚¢‚½ */
 			buf2 = (char *) memman_alloc_4k(memman, size2);
+			memmam_link_page_32_m(pageman,0x268000,buf2,7,(size2+0xfff)>>12,0);//
 			tek_decomp(buf, buf2, size2);
 			memman_free_4k(memman, (int) buf, size);
 			buf = buf2;

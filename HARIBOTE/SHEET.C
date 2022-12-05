@@ -4,15 +4,18 @@
 
 #define SHEET_USE		1
 
-struct SHTCTL *shtctl_init(struct MEMMAN *memman, unsigned char *vram, int xsize, int ysize)
+
+struct SHTCTL *shtctl_init(struct MEMMAN *memman, struct PAGEMAN32 *pageman, unsigned char *vram, int xsize, int ysize)
 {
 	struct SHTCTL *ctl;
 	int i;
-	ctl = (struct SHTCTL *) memman_alloc_4k(memman, sizeof (struct SHTCTL));
+	ctl = (struct SHTCTL *) memman_alloc_4k(memman, sizeof (struct SHTCTL));//mem_alloc!!!
+	memmam_link_page_32_m(pageman,0x268000,ctl,0x07,(sizeof (struct SHTCTL)+0xfff)>>12,0);
 	if (ctl == 0) {
 		goto err;
 	}
 	ctl->map = (unsigned char *) memman_alloc_4k(memman, xsize * ysize);
+	memmam_link_page_32_m(pageman,0x268000,ctl->map,0x07,(xsize * ysize+0xfff)>>12,0);
 	if (ctl->map == 0) {
 		memman_free_4k(memman, (int) ctl, sizeof (struct SHTCTL));
 		goto err;

@@ -3,12 +3,13 @@
 #include "bootpack.h"
 #include <stdio.h>
 #include <string.h>
-
 void console_task(struct SHEET *sheet, int memtotal)
 {
+	struct PAGEMAN32 *pageman=*(struct PAGEMAN32 **)ADR_PAGEMAN;
 	struct TASK *task = task_now();
 	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
-	int i, *fat = (int *) memman_alloc_4k(memman, 4 * 2880);
+	int i, *fat = (int *) memman_alloc_4k(memman, 4 * 2880);//内存分配!!!
+	memmam_link_page_32_m(pageman,(task_now()->tss).cr3,fat,7,3,0);//
 	struct CONSOLE cons;
 	struct FILEHANDLE fhandle[8];
 	char cmdline[30];
@@ -220,7 +221,9 @@ void cons_runcmd(char *cmdline, struct CONSOLE *cons, int *fat, int memtotal)
 		cmd_langmode(cons, cmdline);
 	} else if (strcmp(cmdline, "reload") == 0) {
 		sys_reboot();
-	} else if (cmdline[0] != 0) {
+	} else if (strcmp(cmdline, "shutdown") == 0) {
+		io_out8(0x0805,0x3c);//intel南桥的关机方法
+	}else if (cmdline[0] != 0) {
 		if (cmd_app(cons, fat, cmdline) == 0) {
 			/* コマンドではなく、アプリでもなく、さらに空行でもない */
 			cons_putstr0(cons, "Bad command0.\n\n");
@@ -346,6 +349,7 @@ void cmd_langmode(struct CONSOLE *cons, char *cmdline)
 
 int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline)
 {
+	struct PAGEMAN32 *pageman=*(struct PAGEMAN32 **)ADR_PAGEMAN;
 	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
 	struct FILEINFO *finfo;
 	char name[18], *p, *q;
@@ -384,7 +388,8 @@ int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline)
 			esp    = *((int *) (p + 0x000c));
 			datsiz = *((int *) (p + 0x0010));
 			dathrb = *((int *) (p + 0x0014));
-			q = (char *) memman_alloc_4k(memman, segsiz);
+			q = (char *) memman_alloc_4k(memman, segsiz);//内存分配!!!
+			memmam_link_page_32_m(pageman,(task_now()->tss).cr3,q,7,(segsiz+0xfff)>>12,0);//
 			task->ds_base = (int) q;
 			set_segmdesc(task->ldt + 2, appsiz - 1, (int) p, AR_CODE32_ER + 0x60);
 			set_segmdesc(task->ldt + 3, segsiz - 1, (int) q, AR_DATA32_RW + 0x60);
@@ -437,15 +442,15 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 	struct FILEHANDLE *fh;
 	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
 
-	if (edx == 1) {
+	if (edx == 1) {//命令行输出字符
 		cons_putchar(cons, eax & 0xff, 1);
-	} else if (edx == 2) {
+	} else if (edx == 2) {//命令行输出字符串0结尾
 		cons_putstr0(cons, (char *) ebx + ds_base);
-	} else if (edx == 3) {
+	} else if (edx == 3) {//命令行输出字符串指定长度
 		cons_putstr1(cons, (char *) ebx + ds_base, ecx);
-	} else if (edx == 4) {
+	} else if (edx == 4) {//结束应用程序api_end
 		return &(task->tss.esp0);
-	} else if (edx == 5) {
+	} else if (edx == 5) {//创建窗口
 		sht = sheet_alloc(shtctl);
 		sht->task = task;
 		sht->flags |= 0x10;
@@ -454,38 +459,38 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 		sheet_slide(sht, ((shtctl->xsize - esi) / 2) & ~3, (shtctl->ysize - edi) / 2);
 		sheet_updown(sht, shtctl->top); /* 今のマウスと同じ高さになるように指定： マウスはこの上になる */
 		reg[7] = (int) sht;
-	} else if (edx == 6) {
+	} else if (edx == 6) {//在指定窗口画一个字符
 		sht = (struct SHEET *) (ebx & 0xfffffffe);
 		putfonts8_asc(sht->buf, sht->bxsize, esi, edi, eax, (char *) ebp + ds_base);
 		if ((ebx & 1) == 0) {
 			sheet_refresh(sht, esi, edi, esi + ecx * 8, edi + 16);
 		}
-	} else if (edx == 7) {
+	} else if (edx == 7) {//在指定窗口画一个矩形
 		sht = (struct SHEET *) (ebx & 0xfffffffe);
 		boxfill8(sht->buf, sht->bxsize, ebp, eax, ecx, esi, edi);
 		if ((ebx & 1) == 0) {
 			sheet_refresh(sht, eax, ecx, esi + 1, edi + 1);
 		}
-	} else if (edx == 8) {
+	} else if (edx == 8) {//应用程序用malloc_init
 		memman_init((struct MEMMAN *) (ebx + ds_base));
 		ecx &= 0xfffffff0;	/* 16バイト単位に */
 		memman_free((struct MEMMAN *) (ebx + ds_base), eax, ecx);
-	} else if (edx == 9) {
+	} else if (edx == 9) {//应用程序用malloc
 		ecx = (ecx + 0x0f) & 0xfffffff0; /* 16バイト単位に切り上げ */
 		reg[7] = memman_alloc((struct MEMMAN *) (ebx + ds_base), ecx);
-	} else if (edx == 10) {
+	} else if (edx == 10) {//应用程序用free
 		ecx = (ecx + 0x0f) & 0xfffffff0; /* 16バイト単位に切り上げ */
 		memman_free((struct MEMMAN *) (ebx + ds_base), eax, ecx);
-	} else if (edx == 11) {
+	} else if (edx == 11) {//在指定图层画一个像素
 		sht = (struct SHEET *) (ebx & 0xfffffffe);
 		sht->buf[sht->bxsize * edi + esi] = eax;
 		if ((ebx & 1) == 0) {
 			sheet_refresh(sht, esi, edi, esi + 1, edi + 1);
 		}
-	} else if (edx == 12) {
+	} else if (edx == 12) {//强制刷新窗口
 		sht = (struct SHEET *) ebx;
 		sheet_refresh(sht, eax, ecx, esi, edi);
-	} else if (edx == 13) {
+	} else if (edx == 13) {//在指定窗口画直线
 		sht = (struct SHEET *) (ebx & 0xfffffffe);
 		hrb_api_linewin(sht, eax, ecx, esi, edi, ebp);
 		if ((ebx & 1) == 0) {
@@ -501,9 +506,9 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 			}
 			sheet_refresh(sht, eax, ecx, esi + 1, edi + 1);
 		}
-	} else if (edx == 14) {
+	} else if (edx == 14) {//关闭窗口(直接清楚图层)
 		sheet_free((struct SHEET *) ebx);
-	} else if (edx == 15) {
+	} else if (edx == 15) {//获取键盘按键
 		for (;;) {
 			io_cli();
 			if (fifo32_status(&task->fifo) == 0) {
@@ -540,16 +545,16 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 				return 0;
 			}
 		}
-	} else if (edx == 16) {
+	} else if (edx == 16) {//获取计时器
 		reg[7] = (int) timer_alloc();
 		((struct TIMER *) reg[7])->flags2 = 1;	/* 自動キャンセル有効 */
-	} else if (edx == 17) {
+	} else if (edx == 17) {//初始化计时器
 		timer_init((struct TIMER *) ebx, &task->fifo, eax + 256);
-	} else if (edx == 18) {
+	} else if (edx == 18) {//计时器定时
 		timer_settime((struct TIMER *) ebx, eax);
-	} else if (edx == 19) {
+	} else if (edx == 19) {//计时器释放
 		timer_free((struct TIMER *) ebx);
-	} else if (edx == 20) {
+	} else if (edx == 20) {//播放声音(蜂鸣器发声)
 		if (eax == 0) {
 			i = io_in8(0x61);
 			io_out8(0x61, i & 0x0d);
@@ -561,7 +566,7 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 			i = io_in8(0x61);
 			io_out8(0x61, (i | 0x03) & 0x0f);
 		}
-	} else if (edx == 21) {
+	} else if (edx == 21) {//打开文件fopen
 		for (i = 0; i < 8; i++) {
 			if (task->fhandle[i].buf == 0) {
 				break;
@@ -579,11 +584,11 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 				fh->buf = file_loadfile2(finfo->clustno, &fh->size, task->fat);
 			}
 		}
-	} else if (edx == 22) {
+	} else if (edx == 22) {//关闭文件fclose
 		fh = (struct FILEHANDLE *) eax;
 		memman_free_4k(memman, (int) fh->buf, fh->size);
 		fh->buf = 0;
-	} else if (edx == 23) {
+	} else if (edx == 23) {//文件定位fseek
 		fh = (struct FILEHANDLE *) eax;
 		if (ecx == 0) {
 			fh->pos = ebx;
@@ -598,7 +603,7 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 		if (fh->pos > fh->size) {
 			fh->pos = fh->size;
 		}
-	} else if (edx == 24) {
+	} else if (edx == 24) {//获取文件大小fsize
 		fh = (struct FILEHANDLE *) eax;
 		if (ecx == 0) {
 			reg[7] = fh->size;
@@ -607,7 +612,7 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 		} else if (ecx == 2) {
 			reg[7] = fh->pos - fh->size;
 		}
-	} else if (edx == 25) {
+	} else if (edx == 25) {//读取文件fread
 		fh = (struct FILEHANDLE *) eax;
 		for (i = 0; i < ecx; i++) {
 			if (fh->pos == fh->size) {
@@ -617,7 +622,7 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 			fh->pos++;
 		}
 		reg[7] = i;
-	} else if (edx == 26) {
+	} else if (edx == 26) {//获取命令行
 		i = 0;
 		for (;;) {
 			*((char *) ebx + ds_base + i) =  task->cmdline[i];
@@ -630,7 +635,7 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 			i++;
 		}
 		reg[7] = i;
-	} else if (edx == 27) {
+	} else if (edx == 27) {//设置语言
 		reg[7] = task->langmode;
 	}
 	return 0;

@@ -22,7 +22,7 @@
 		GLOBAL	_asm_hrb_api, _start_app
 		;GLOBAL	_memset,_strcpy,_strcmp
 		global	_support_apic, _io_wrmsr, _io_rdmsr, _test2, _get_lock
-		global	_store_gdt, _store_idt,_sys_reboot,_sys_call
+		global	_store_gdt, _store_idt,_sys_reboot,_sys_call,_test3
 		EXTERN	_inthandler20, _inthandler21
 		EXTERN	_inthandler2c, _inthandler0d
 		EXTERN	_inthandler0c
@@ -420,8 +420,15 @@ _store_idt: ;void store_gdt(void* addr)
 _sys_reboot: ;void sys_reboot(void)
 	cli
 	mov eax,cr0
-	and eax,0x7ffffffe
-	mov cr0,eax
-	db 0xea, 0x00, 0x00, 0xff, 0xff; jmp 0x7000:0
+	mov dx,0x64
+	mov ax,0xfe
+	out dx,ax
+.fin:
+	hlt
+	jmp .fin
 _sys_call:
 	db 0x0f,0x35 ;sysexit
+_test3:
+	db 0xf4
+.fin:
+	jmp .fin

@@ -1,3 +1,4 @@
+void test3();
 /* asmhead.nas */
 struct BOOTINFO { /* 0x0ff0-0x0fff */
 	char cyls; /* ブートセクタはどこまでディスクを読んだのか */
@@ -24,6 +25,7 @@ struct MEMINFO {
 	int undifind2;
 };
 #define ADR_MEMINFO		0x0026a000
+#define ADR_PAGEMAN 	0x0026f000
 /* naskfunc.nas */
 void io_hlt(void);
 void io_cli(void);
@@ -186,8 +188,8 @@ int memman_free(struct MEMMAN *man, unsigned int addr, unsigned int size);
 unsigned int memman_alloc_4k(struct MEMMAN *man, unsigned int size);
 int memman_free_4k(struct MEMMAN *man, unsigned int addr, unsigned int size);
 void init_page(struct PAGEMAN32 *man);
-unsigned int memmam_link_page_32_m(struct PAGEMAN32 *man,unsigned int cr3_address,unsigned int linear_address,unsigned int physical_address,int page_num);
-unsigned int memman_link_page_32(struct PAGEMAN32 *man,unsigned int cr3_address,unsigned int linear_address,unsigned int physical_address);
+unsigned int memmam_link_page_32_m(struct PAGEMAN32 *man,unsigned int cr3_address,unsigned int linear_address,unsigned int physical_address,int page_num,int mode);
+unsigned int memman_link_page_32(struct PAGEMAN32 *man,unsigned int cr3_address,unsigned int linear_address,unsigned int physical_address,int mode);
 unsigned int memman_alloc_page_32(struct PAGEMAN32 *man);
 unsigned int memman_free_page_32(struct PAGEMAN32 *man,unsigned physical_address);
 /* sheet.c */
@@ -204,7 +206,7 @@ struct SHTCTL {
 	struct SHEET *sheets[MAX_SHEETS];
 	struct SHEET sheets0[MAX_SHEETS];
 };
-struct SHTCTL *shtctl_init(struct MEMMAN *memman, unsigned char *vram, int xsize, int ysize);
+struct SHTCTL *shtctl_init(struct MEMMAN *memman,struct PAGEMAN32 *pageman, unsigned char *vram, int xsize, int ysize);
 struct SHEET *sheet_alloc(struct SHTCTL *ctl);
 void sheet_setbuf(struct SHEET *sht, unsigned char *buf, int xsize, int ysize, int col_inv);
 void sheet_updown(struct SHEET *sht, int height);

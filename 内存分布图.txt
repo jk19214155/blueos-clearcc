@@ -3,7 +3,7 @@
 0x00100000-0x00267fff 1440kb软盘内容
 0x00268000-0x00269000 4k内核页表(正常使用)(4k映射)
 0x00269000-0x0026a000 4k内核页表(紧急调试)(4M全映射)
-0x0026a000-0x0026b000 4k内存分布图
+0x0026a000-0x0026b000 内存分布探测图
 0x00268000-0x00267fff 30k空
 0x0026f800-0x0026ffff 2k idt
 0x00270000-0x0027ffff 64kgdt
@@ -11,18 +11,20 @@
 0x00300000-0x003fffff 1M 栈空间
 0x00400000-0x00800000 4M内核页表
 0x00800000-0x00900000 1M内存分配表
-0x00900000-0xbfffffff 自由内存区
+0x00900000-7 自由内存区
+
 虚拟地址
 0x00000000-0xbfffffff 自由内存区
 0xc0000000-0xc000ffff 64k gdt
 0xc0010000-0xc001ffff 64k ldt
 0xc0020000-0xc00207ff 2k idt
-
-
-
-
-
-
+0xc0100000-0xc017ffff 512k haribote.hrb
+全局变量区
+0x0026f000(int) pageman
+0x0026f004(int) total_page_num
+0x0026f008(int) free_page_num
+0x0026f00c(int) last_free_page_num
+0x0026f010(int) last_err_free_page_num
 
 
 

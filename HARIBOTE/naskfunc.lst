@@ -22,7 +22,7 @@
     22 00000000                                 		GLOBAL	_asm_hrb_api, _start_app
     23 00000000                                 		;GLOBAL	_memset,_strcpy,_strcmp
     24 00000000                                 		global	_support_apic, _io_wrmsr, _io_rdmsr, _test2, _get_lock
-    25 00000000                                 		global	_store_gdt, _store_idt,_sys_reboot,_sys_call
+    25 00000000                                 		global	_store_gdt, _store_idt,_sys_reboot,_sys_call,_test3
     26 00000000                                 		EXTERN	_inthandler20, _inthandler21
     27 00000000                                 		EXTERN	_inthandler2c, _inthandler0d
     28 00000000                                 		EXTERN	_inthandler0c
@@ -420,8 +420,15 @@
    420 0000027D                                 _sys_reboot: ;void sys_reboot(void)
    421 0000027D FA                              	cli
    422 0000027E 0F 20 C0                        	mov eax,cr0
-   423 00000281 25 7FFFFFFE                     	and eax,0x7ffffffe
-   424 00000286 0F 22 C0                        	mov cr0,eax
-   425 00000289 EA 00 00 FF FF                  	db 0xea, 0x00, 0x00, 0xff, 0xff; jmp 0x7000:0
-   426 0000028E                                 _sys_call:
-   427 0000028E 0F 35                           	db 0x0f,0x35 ;sysexit
+   423 00000281 66 BA 0064                      	mov dx,0x64
+   424 00000285 66 B8 00FE                      	mov ax,0xfe
+   425 00000289 66 EF                           	out dx,ax
+   426 0000028B                                 .fin:
+   427 0000028B F4                              	hlt
+   428 0000028C EB FD                           	jmp .fin
+   429 0000028E                                 _sys_call:
+   430 0000028E 0F 35                           	db 0x0f,0x35 ;sysexit
+   431 00000290                                 _test3:
+   432 00000290 F4                              	db 0xf4
+   433 00000291                                 .fin:
+   434 00000291 EB FE                           	jmp .fin

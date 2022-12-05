@@ -165,19 +165,24 @@ void init_page(struct PAGEMAN32 *man){
 	int j=0;
 	int a;
 	int addr_from,addr_to;
-	struct MEMINFO* meminfo=(struct MEMINFO*)ADR_MEMINFO;
+	struct MEMINFO* meminfo=(struct MEMINFO*)0x26a000;//ADR_MEMINFO;
+	j=0;
+	//初始化内核4M二级页表
 	for (i=0x400000;i<0x800000;i=i+4){
-		*(int*)i=(j<<12) | 7;//4k?面，G全局?志，可?可写,存在?志,用?可以使用
-		j++;
+		//*(int*)i=(j<<12) | 7;//4k页面，G全局访问标志，可读可写,存在标志,用户可以使用
+		//j++;
+		*(int*)i=0;
 	}
+	//初始化内核4K一级页表
 	j=0;
 	for (i=0x268000;i<0x269000;i+=4){
-		*(int*)i=(0x400000+0x1000*j) | 7;//4k?面，可?可写,存在?志,用?可以使用
+		*(int*)i=(0x400000+0x1000*j) | 7;//4k页面，可读可写,存在标志,用户可以使用
 		j++;
 	}
+	//初始化内核紧急页表
 	j=0;
 	for (i=0x269000;i<0x26a000;i+=4){
-		*(int*)i=(j<<22) | (1<<8) | (1<<7) | 7;//4k?面，G全局?志，PS?志，可?可写,存在?志,用?可以使用
+		*(int*)i=(j<<22) | (1<<8) | (1<<7) | 7;//4k页面，G全局访问标志，，PS标志，可读可写,存在标志,用户可以使用
 		j++;
 	}
 	man->mem_map_base=(char*)0x00800000;
@@ -191,38 +196,50 @@ void init_page(struct PAGEMAN32 *man){
 	for(i=0;i<128;i++){
 		if(meminfo[i].index==i){//区?信息完整
 			if(meminfo[i].base_addr_high>0){//属于高4G内存
-				continue;//?不?理
+				continue;//不处理
 			}
 			addr_from=meminfo[i].base_addr_low;
-			addr_to=meminfo[i].base_addr_low+=meminfo[i].length_low;
-			if(meminfo[i].type!=0){//是不可用内存
-				addr_from&=0xfff;//4k向下取整
-				addr_to=(addr_to+0xfff)&0xfff;//向上取整
+			addr_to=addr_from+meminfo[i].length_low;
+			if(meminfo[i].type!=1){//是不可用内存
+				addr_from&=0xfffff000;//4k向下取整
+				addr_to=(addr_to+0xfff)&0xfffff000;//向上取整
 			}
-			else{//是可用?面
-				addr_from=(addr_to+0xfff)&0xfff;//向上取整
-				addr_to&=0xfff;//4k向下取整
+			else{//是可用内存
+				addr_from=(addr_from+0xfff)&0xfffff000;//向上取整
+				addr_to&=0xfffff000;//4k向下取整
 			}
 			addr_from>>=12;
 			addr_to>>=12;
-			if(meminfo[i].type==0){//可用内存
+			if(meminfo[i].type==1){//可用内存
 				a=0;
 			}
 			else{//不可用内存
 				a=-1;
 			}
+			
 			for(j=addr_from;j<=addr_to;j++){
 				man->mem_map_base[j]=(unsigned char)a;
-				if(a==0){//??可用内存??数
+				if(a==0){//增加可用内存计数
 					man->free_page_num++;
 				}
-				man->total_page_num++;//??内存??数
+				man->total_page_num++;//总内存计数
 			}
 		}
 		else{//信息校验失败
+			*(int*)0x0026f004=man->total_page_num;
+			*(int*)0x0026f008=man->free_page_num;
 			break;
 		}
 	}
+	for(i=0x01;i<0x00900;i++){//0x900000之前没有可用内存
+		if(man->mem_map_base[i]==0){
+			man->free_page_num--;
+		}
+		man->mem_map_base[i]=0xff;
+	}
+	//for(i=0xc0000;i<=0xfffff;i++){//0xc00000之后没有可用内存
+	//	man->mem_map_base[i]=0xff;
+	//}
 	return;
 }
 
@@ -236,32 +253,33 @@ void init_page(struct PAGEMAN32 *man){
 	int undefind1;
 	int undifind2;
 }*/
-unsigned int memmam_link_page_32_m(struct PAGEMAN32 *man,unsigned int cr3_address,unsigned int linear_address,unsigned int physical_address,int page_num){
+unsigned int memmam_link_page_32_m(struct PAGEMAN32 *man,unsigned int cr3_address,unsigned int linear_address,unsigned int physical_address,int page_num,int mode){
 	int i;
-	if(physical_address<0x1000){//没有要?接的?面
+	if(mode==0){//没有要链接的页面
 		for(i=0;i<page_num;i++){
-			memman_link_page_32(man,cr3_address,linear_address+i*0x1000,physical_address);
+			memman_link_page_32(man,cr3_address,linear_address+i*0x1000,physical_address,mode);
 		}
 	}
 	else{
 		for(i=0;i<page_num;i++){
-			memman_link_page_32(man,cr3_address,linear_address+i*0x1000,physical_address+i*0x1000);
+			memman_link_page_32(man,cr3_address,linear_address+i*0x1000,physical_address+i*0x1000,mode);
 		}
 	}
+	*(int*)0x0026f00c=man->free_page_num;
 	return physical_address;
 }
 
-unsigned int memman_link_page_32(struct PAGEMAN32 *man,unsigned int cr3_address,unsigned int linear_address,unsigned int physical_address){
+unsigned int memman_link_page_32(struct PAGEMAN32 *man,unsigned int cr3_address,unsigned int linear_address,unsigned int physical_address,int mode){
 	int index,addr;
 	index=(linear_address>>20)&0xffc;
 	addr=index+cr3_address;
-	if((*(int*)addr)&1==0){//?目??面不存在
+	if((*(int*)addr)&1==0){//要链接的目标页面不存在
 		*(int*)addr=memman_alloc_page_32(man)|7;
 	}
-	addr=(*(int*)addr)&0xfffff000;//?取?表的地址
-	index=((linear_address>>10)&0xffc);//保留中?10位索引
+	addr=(*(int*)addr)&0xfffff000;//获取页表的地址
+	index=((linear_address>>10)&0xffc);//保留中间10位索引
 	addr=addr+index;
-	if(physical_address<0x1000){//没有想要?接的地址
+	if(mode==0){//没有想要链接的地址
 		physical_address=(physical_address&0xfff)|(memman_alloc_page_32(man));
 		return *(int*)addr=physical_address;
 	}
@@ -269,18 +287,35 @@ unsigned int memman_link_page_32(struct PAGEMAN32 *man,unsigned int cr3_address,
 	return *(int*)addr;
 }
 
+unsigned int memman_unlink_page_32(struct PAGEMAN32 *man,unsigned int cr3_address,unsigned int linear_address){
+	int index,addr;
+	unsigned int res;
+	index=(linear_address>>20)&0xffc;
+	addr=index+cr3_address;
+	if((*(int*)addr)&1==0){//要链接的目标页面不存在
+		//*(int*)addr=memman_alloc_page_32(man)|7;
+		return 0;//不用释放
+	}
+	addr=(*(int*)addr)&0xfffff000;//获取页表的地址
+	index=((linear_address>>10)&0xffc);//保留中间10位索引
+	addr=addr+index;
+	res=*(unsigned int*)addr;
+	*(int*)addr=0;//取消链接
+	//memman_free_page_32(man,*(unsigned int*)addr);//释放内存页
+	return res;
+}
+
 unsigned int memman_alloc_page_32(struct PAGEMAN32 *man){
 	int i;
-	if(man->free_page_num<=0){//没有可用的物理内存
-		return -1;
-	}
-	for(i=0;i<man->total_page_num;i++){
+	for(i=0;i<0x100000;i++){
 		if(man->mem_map_base[i]==0){
 			man->mem_map_base[i]=1;//已使用
 			man->free_page_num--;
 			return i*4096;//返回物理地址
 		}
 	}
+	*(int*)0x0026f010=man->free_page_num;//记录最后一次内存请求失败的时候的free值
+	for(;;);
 	return -1;//没有找到可用的物理内存
 }
 
@@ -295,7 +330,6 @@ unsigned int memman_free_page_32_m(struct PAGEMAN32 *man,unsigned physical_addre
 	}
 	return 0;
 }
-
 unsigned int memman_free_page_32(struct PAGEMAN32 *man,unsigned physical_address){
 	int index=physical_address>>12;//得到?的索引
 	if(man->mem_map_base[index]==1){//正在使用

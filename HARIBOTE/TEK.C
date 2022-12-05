@@ -247,6 +247,8 @@ static int tek_decmain5(int *work, UCHAR *src, int osiz, UCHAR *q, int lc, int p
 static int tek_lzrestore_tek5(int srcsiz, UCHAR *src, int outsiz, UCHAR *outbuf)
 {
 	int wrksiz, lc, lp, pb, flags, *work, prop0, fl;
+	
+	struct PAGEMAN32 *pageman=*(struct PAGEMAN32 **)ADR_PAGEMAN;
 
 	if ((fl = (prop0 = *src) & 0x0f) == 0x01) /* 0001 */
 		flags |= -1;
@@ -285,6 +287,7 @@ static int tek_lzrestore_tek5(int srcsiz, UCHAR *src, int outsiz, UCHAR *outbuf)
 	}
 	wrksiz = 0x180 * sizeof (UINT32) + (0x840 + (0x300 << (lc + lp))) * sizeof (tek_TPRB); /* Å’á15KB, lc+lp=3‚È‚çA36KB */
 	work = (int *) memman_alloc_4k((struct MEMMAN *) MEMMAN_ADDR, wrksiz);
+	memmam_link_page_32_m(pageman,0x268000,work,7,(wrksiz+0xfff)>>12,0);//
 	if (work == NULL)
 		return -1;
 	flags = tek_decmain5(work, src, outsiz, outbuf, lc, pb, lp, flags);

@@ -351,7 +351,7 @@ int jpeg_init(JPEG *jpeg)
 		if (jpeg->fp[0] != 0xff)
             goto err0;
 		c = jpeg->fp[1];
-		jpeg->fp += 2;
+		jpeg->fp += 2;//w?@ˆÚ
 		if (c == 0xd8)
 			continue; /* SOI */
 		if (c == 0xd9)

@@ -187,11 +187,13 @@ pipelineflush:
 		MOV		GS,AX
 		MOV		SS,AX
 ;内存分布图的传送
+		cld
 		mov esi,0x7000
 		mov edi,0x0026a000
-		mov ecx,ebx
 		mov ecx,4096;假定内存分布传送区域不大于4k
-		movsb
+		;rep movsb
+		call memcpy;
+		;db 0x66,0xf3,0xa4
 ; bootpackの転送
 
 		MOV		ESI,bootpack	; 転送元
@@ -234,8 +236,16 @@ pipelineflush:
 		CALL	memcpy
 skip:
 		MOV		ESP,[EBX+12]	; スタック初期値
+		push  0			;传入参数
 		JMP		DWORD 2*8:0x0000001b
-
+reboot:
+		mov eax,0xfe
+		mov edx,0x60
+		out dx,ax
+.fin:
+		cli
+		hlt
+		jmp .fin
 waitkbdout:
 		IN		 AL,0x64
 		AND		 AL,0x02

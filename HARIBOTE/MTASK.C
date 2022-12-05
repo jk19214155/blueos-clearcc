@@ -77,8 +77,9 @@ struct TASK *task_init(struct MEMMAN *memman)
 	int i;
 	struct TASK *task, *idle;
 	struct SEGMENT_DESCRIPTOR *gdt = (struct SEGMENT_DESCRIPTOR *) ADR_GDT;
-
+	struct PAGEMAN32 *pageman=*(struct PAGEMAN32 **)ADR_PAGEMAN;
 	taskctl = (struct TASKCTL *) memman_alloc_4k(memman, sizeof (struct TASKCTL));
+	memmam_link_page_32_m(pageman,0x268000,taskctl,7,(sizeof (struct TASKCTL)+0xfff)>>12,0);//
 	for (i = 0; i < MAX_TASKS; i++) {
 		taskctl->tasks0[i].flags = 0;
 		taskctl->tasks0[i].sel = (TASK_GDT0 + i) * 8;
@@ -90,7 +91,6 @@ struct TASK *task_init(struct MEMMAN *memman)
 		taskctl->level[i].running = 0;
 		taskctl->level[i].now = 0;
 	}
-
 	task = task_alloc();
 	task->flags = 2;	/* 動作中マーク */
 	task->priority = 2; /* 0.02秒 */
@@ -100,9 +100,9 @@ struct TASK *task_init(struct MEMMAN *memman)
 	load_tr(task->sel);
 	task_timer = timer_alloc();
 	timer_settime(task_timer, task->priority);
-
 	idle = task_alloc();
 	idle->tss.esp = memman_alloc_4k(memman, 64 * 1024) + 64 * 1024;
+	memmam_link_page_32_m(pageman,0x268000,idle->tss.esp- 64 * 1024,7,(64*1024+0xfff)>>12,0);//
 	idle->tss.eip = (int) &task_idle;
 	idle->tss.es = 1 * 8;
 	idle->tss.cs = 2 * 8;
