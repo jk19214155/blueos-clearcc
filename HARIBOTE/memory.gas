@@ -590,19 +590,21 @@ L169:
 _memman_free_page_32:
 	pushl	%ebp
 	movl	%esp, %ebp
-	movl	8(%ebp), %ecx
-	movl	12(%ebp), %eax
-	shrl	$12, %eax
-	movl	8(%ecx), %edx
-	cmpb	$1, (%eax,%edx)
+	movl	8(%ebp), %eax
+	movl	12(%ebp), %edx
+	shrl	$12, %edx
+	movl	8(%eax), %ecx
+	cmpb	$1, (%edx,%ecx)
 	je	L172
 L171:
-	movb	$0, (%eax,%edx)
+	movb	$0, (%edx,%ecx)
+	movl	(%eax), %eax
+	movl	%eax, 2551820
 	xorl	%eax, %eax
 	popl	%ebp
 	ret
 L172:
-	incl	(%ecx)
+	incl	(%eax)
 	jmp	L171
 	.def	_memman_alloc_page_32;	.scl	2;	.type	32;	.endef
 	.def	_memman_link_page_32;	.scl	2;	.type	32;	.endef

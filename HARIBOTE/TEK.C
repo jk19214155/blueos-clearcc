@@ -291,6 +291,11 @@ static int tek_lzrestore_tek5(int srcsiz, UCHAR *src, int outsiz, UCHAR *outbuf)
 	if (work == NULL)
 		return -1;
 	flags = tek_decmain5(work, src, outsiz, outbuf, lc, pb, lp, flags);
+	int i;
+	for(i=0;i<(wrksiz+0xfff)>>12;i++){
+		void* po=memman_unlink_page_32(pageman,0x268000,(int)(work)+0x1000*i);
+		memman_free_page_32(pageman,po);
+	}
 	memman_free_4k((struct MEMMAN *) MEMMAN_ADDR, (int) work, wrksiz);
 	return flags;
 }

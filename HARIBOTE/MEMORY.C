@@ -294,7 +294,7 @@ unsigned int memman_unlink_page_32(struct PAGEMAN32 *man,unsigned int cr3_addres
 	addr=index+cr3_address;
 	if((*(int*)addr)&1==0){//要链接的目标页面不存在
 		//*(int*)addr=memman_alloc_page_32(man)|7;
-		return 0;//不用释放
+		return -1;//不用释放
 	}
 	addr=(*(int*)addr)&0xfffff000;//获取页表的地址
 	index=((linear_address>>10)&0xffc);//保留中间10位索引
@@ -336,5 +336,6 @@ unsigned int memman_free_page_32(struct PAGEMAN32 *man,unsigned physical_address
 		man->free_page_num++;
 	}
 	man->mem_map_base[index]=0;//未使用;
+	*(int*)0x0026f00c=man->free_page_num;
 	return 0;
 }

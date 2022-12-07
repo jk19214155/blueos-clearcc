@@ -238,6 +238,8 @@ void cmd_mem(struct CONSOLE *cons, int memtotal)
 	char s[60];
 	sprintf(s, "total   %dMB\nfree %dKB\n\n", memtotal / (1024 * 1024), memman_total(memman) / 1024);
 	cons_putstr0(cons, s);
+	sprintf(s,"t_p: %d l_p: %d\n\n",*(int*)0x0026f004,*(int*)0x0026f00c);
+	cons_putstr0(cons, s);
 	return;
 }
 
@@ -283,12 +285,18 @@ void cmd_dir(struct CONSOLE *cons)
 
 void cmd_exit(struct CONSOLE *cons, int *fat)
 {
+	struct PAGEMAN32 *pageman=*(struct PAGEMAN32 **)ADR_PAGEMAN;
 	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
 	struct TASK *task = task_now();
 	struct SHTCTL *shtctl = (struct SHTCTL *) *((int *) 0x0fe4);
 	struct FIFO32 *fifo = (struct FIFO32 *) *((int *) 0x0fec);
+	int i;
 	if (cons->sht != 0) {
 		timer_cancel(cons->timer);
+	}
+	for(i=0;i<3;i++){
+		void* p=memman_unlink_page_32(pageman,0x268000,(int)fat+0x1000*i);
+		memman_free_page_32(pageman,p);
 	}
 	memman_free_4k(memman, (int) fat, 4 * 2880);
 	io_cli();
@@ -357,7 +365,7 @@ int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline)
 	int i, segsiz, datsiz, esp, dathrb, appsiz;
 	struct SHTCTL *shtctl;
 	struct SHEET *sht;
-
+	
 	/* コマンドラインからファイル名を生成 */
 	for (i = 0; i < 13; i++) {
 		if (cmdline[i] <= ' ') {
@@ -407,15 +415,27 @@ int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline)
 			}
 			for (i = 0; i < 8; i++) {	/* クローズしてないファイルをクローズ */
 				if (task->fhandle[i].buf != 0) {
+					for(i=0;i<(task->fhandle[i].size+0xfff)>>12;i++){
+						void* po=memman_unlink_page_32(pageman,0x268000,(int)(task->fhandle[i].buf)+0x1000*i);
+						memman_free_page_32(pageman,po);
+					}
 					memman_free_4k(memman, (int) task->fhandle[i].buf, task->fhandle[i].size);
 					task->fhandle[i].buf = 0;
 				}
 			}
 			timer_cancelall(&task->fifo);
+			for(i=0;i<(segsiz+0xfff)>>12;i++){
+				void* po=memman_unlink_page_32(pageman,0x268000,(int)q+0x1000*i);
+				memman_free_page_32(pageman,po);
+			}
 			memman_free_4k(memman, (int) q, segsiz);
 			task->langbyte1 = 0;
 		} else {
 			cons_putstr0(cons, ".hrb file format error.\n");
+		}
+		for(i=0;i<((appsiz+0xfff)>>12);i++){
+			void* po=memman_unlink_page_32(pageman,0x268000,(int)p+0x1000*i);
+			memman_free_page_32(pageman,po);
 		}
 		memman_free_4k(memman, (int) p, appsiz);
 		cons_newline(cons);
@@ -427,6 +447,7 @@ int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline)
 
 int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int eax)
 {
+	struct PAGEMAN32 *pageman=*(struct PAGEMAN32 **)ADR_PAGEMAN;
 	struct TASK *task = task_now();
 	int ds_base = task->ds_base;
 	struct CONSOLE *cons = task->cons;
@@ -586,6 +607,10 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 		}
 	} else if (edx == 22) {//关闭文件fclose
 		fh = (struct FILEHANDLE *) eax;
+		for(i=0;i<(fh->size+0xfff)>>12;i++){
+			void* p=memman_unlink_page_32(pageman,0x268000,(int)(fh->buf)+0x1000*i);
+			memman_free_page_32(pageman,p);
+		}
 		memman_free_4k(memman, (int) fh->buf, fh->size);
 		fh->buf = 0;
 	} else if (edx == 23) {//文件定位fseek

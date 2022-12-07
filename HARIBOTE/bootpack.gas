@@ -361,7 +361,7 @@ _HariMain:
 	call	_support_apic
 	addl	$24, %esp
 	decl	%eax
-	je	L97
+	je	L111
 	call	_init_pic
 L3:
 	leal	-92(%ebp), %ebx
@@ -562,95 +562,135 @@ L4:
 	movl	%eax, %ebx
 L6:
 	movl	%ebx, 4072
+	xorl	%eax, %eax
+	movl	$0, -1056(%ebp)
+L21:
+	sall	$12, %eax
+	leal	-796(%ebp), %edx
+	leal	(%eax,%esi), %eax
+	pushl	%eax
+	pushl	$2523136
+	pushl	%edx
+	call	_memman_unlink_page_32
+	pushl	%eax
+	leal	-796(%ebp), %eax
+	pushl	%eax
+	call	_memman_free_page_32
+	movl	-1056(%ebp), %eax
+	incl	%eax
+	addl	$20, %esp
+	movl	%eax, -1056(%ebp)
+	cmpl	$2, %eax
+	jle	L21
 	pushl	$11520
 	pushl	%esi
 	pushl	$3932160
 	call	_memman_free_4k
-L93:
+L107:
 	addl	$12, %esp
-L17:
+L22:
 	leal	-124(%ebp), %ebx
 	pushl	%ebx
 	call	_fifo32_status
 	popl	%edi
 	testl	%eax, %eax
-	jle	L20
+	jle	L25
 	cmpl	$0, -1108(%ebp)
-	js	L98
-L20:
+	js	L112
+L25:
 	leal	-92(%ebp), %ebx
 	call	_io_cli
 	pushl	%ebx
 	call	_fifo32_status
 	popl	%esi
 	testl	%eax, %eax
-	je	L99
+	je	L113
 	pushl	%ebx
 	call	_fifo32_get
 	movl	%eax, -1056(%ebp)
 	call	_io_sti
 	popl	%ebx
 	cmpl	$0, -1128(%ebp)
-	je	L27
+	je	L32
 	movl	-1128(%ebp), %eax
 	cmpl	$0, 28(%eax)
-	jne	L27
+	jne	L32
 	movl	-1060(%ebp), %edx
 	movl	$0, -1128(%ebp)
 	movl	16(%edx), %eax
 	cmpl	$1, %eax
-	je	L27
+	je	L32
 	movl	-1060(%ebp), %edx
 	movl	16(%edx,%eax,4), %eax
 	pushl	%eax
 	movl	%eax, -1128(%ebp)
 	call	_keywin_on
 	popl	%ecx
-L27:
+L32:
 	movl	-1056(%ebp), %edx
 	leal	-256(%edx), %eax
 	cmpl	$255, %eax
-	jbe	L100
+	jbe	L114
 	leal	-512(%edx), %eax
 	cmpl	$255, %eax
-	jbe	L101
+	jbe	L115
 	leal	-768(%edx), %eax
 	cmpl	$255, %eax
-	jbe	L102
+	jbe	L116
 	leal	-1024(%edx), %eax
 	cmpl	$999, %eax
-	jbe	L103
+	jbe	L117
 	leal	-2024(%edx), %eax
 	cmpl	$255, %eax
-	ja	L17
+	ja	L22
 	imull	$40, %edx, %eax
-	addl	-1060(%ebp), %eax
+	movl	-1060(%ebp), %edx
+	movl	$0, -1056(%ebp)
+	leal	-79916(%eax,%edx), %ebx
+	xorl	%eax, %eax
+L95:
+	sall	$12, %eax
+	addl	(%ebx), %eax
+	pushl	%eax
+	leal	-796(%ebp), %eax
+	pushl	$2523136
+	pushl	%eax
+	call	_memman_unlink_page_32
+	leal	-796(%ebp), %edx
+	pushl	%eax
+	pushl	%edx
+	call	_memman_free_page_32
+	movl	-1056(%ebp), %eax
+	incl	%eax
+	addl	$20, %esp
+	movl	%eax, -1056(%ebp)
+	cmpl	$10, %eax
+	jle	L95
 	pushl	$42240
-	pushl	-79916(%eax)
+	pushl	(%ebx)
 	pushl	$3932160
-	leal	-79916(%eax), %ebx
 	call	_memman_free_4k
 	pushl	%ebx
 	call	_sheet_free
 	addl	$16, %esp
-	jmp	L17
-L103:
+	jmp	L22
+L117:
 	imull	$208, %edx, %edx
 	addl	_taskctl, %edx
 	leal	-208904(%edx), %eax
 	pushl	%eax
 	call	_close_constask
-L92:
+L106:
 	popl	%eax
-	jmp	L17
-L102:
+	jmp	L22
+L116:
 	imull	$40, %edx, %eax
 	movl	-1060(%ebp), %edx
 	leal	-29676(%eax,%edx), %eax
 	pushl	%eax
 	call	_close_console
-	jmp	L92
-L101:
+	jmp	L106
+L115:
 	movzbl	-1056(%ebp), %eax
 	pushl	%eax
 	leal	-780(%ebp), %eax
@@ -659,47 +699,47 @@ L101:
 	popl	%edx
 	popl	%ecx
 	testl	%eax, %eax
-	je	L17
+	je	L22
 	movl	-772(%ebp), %eax
 	movl	-776(%ebp), %edx
 	addl	%eax, -1068(%ebp)
 	addl	%edx, -1064(%ebp)
-	js	L104
-L59:
+	js	L118
+L64:
 	cmpl	$0, -1068(%ebp)
-	js	L105
-L60:
+	js	L119
+L65:
 	movswl	4084,%eax
 	decl	%eax
 	cmpl	%eax, -1064(%ebp)
-	jle	L61
+	jle	L66
 	movl	%eax, -1064(%ebp)
-L61:
+L66:
 	movswl	4086,%eax
 	decl	%eax
 	cmpl	%eax, -1068(%ebp)
-	jle	L62
+	jle	L67
 	movl	%eax, -1068(%ebp)
-L62:
+L67:
 	movl	-1064(%ebp), %eax
 	movl	-1068(%ebp), %edx
 	movl	%eax, -1072(%ebp)
 	movl	%edx, -1076(%ebp)
 	testl	$1, -768(%ebp)
-	jne	L106
+	jne	L120
 	movl	$-1, -1112(%ebp)
 	cmpl	$2147483647, -1080(%ebp)
-	je	L17
-L94:
+	je	L22
+L108:
 	pushl	-1084(%ebp)
 	pushl	-1080(%ebp)
 	pushl	-1124(%ebp)
 	call	_sheet_slide
 	movl	$2147483647, -1080(%ebp)
-	jmp	L93
-L106:
+	jmp	L107
+L120:
 	cmpl	$0, -1112(%ebp)
-	js	L107
+	js	L121
 	movl	-1064(%ebp), %esi
 	movl	-1120(%ebp), %eax
 	subl	-1112(%ebp), %esi
@@ -711,14 +751,14 @@ L106:
 	movl	%esi, -1080(%ebp)
 	addl	%edi, -1084(%ebp)
 	andl	$-4, -1080(%ebp)
-	jmp	L17
-L107:
+	jmp	L22
+L121:
 	movl	-1060(%ebp), %eax
 	movl	16(%eax), %ecx
 	leal	-1(%ecx), %ebx
-L96:
+L110:
 	testl	%ebx, %ebx
-	jle	L17
+	jle	L22
 	movl	-1060(%ebp), %edx
 	movl	-1068(%ebp), %edi
 	movl	-1064(%ebp), %esi
@@ -726,14 +766,14 @@ L96:
 	movl	%edx, -1124(%ebp)
 	subl	16(%edx), %edi
 	subl	12(%edx), %esi
-	js	L67
+	js	L72
 	movl	4(%edx), %eax
 	cmpl	%eax, %esi
-	jge	L67
+	jge	L72
 	testl	%edi, %edi
-	js	L67
+	js	L72
 	cmpl	8(%edx), %edi
-	jge	L67
+	jge	L72
 	imull	%edi, %eax
 	movl	%eax, -1136(%ebp)
 	movl	(%edx), %edx
@@ -742,11 +782,11 @@ L96:
 	movzbl	(%eax,%edx), %eax
 	movl	-1124(%ebp), %edx
 	cmpl	20(%edx), %eax
-	jne	L108
-L67:
+	jne	L122
+L72:
 	decl	%ebx
-	jmp	L96
-L108:
+	jmp	L110
+L122:
 	leal	-1(%ecx), %eax
 	pushl	%eax
 	pushl	%edx
@@ -755,7 +795,7 @@ L108:
 	popl	%eax
 	movl	-1128(%ebp), %eax
 	cmpl	%eax, -1124(%ebp)
-	je	L71
+	je	L76
 	pushl	%eax
 	call	_keywin_off
 	movl	-1124(%ebp), %edx
@@ -764,18 +804,18 @@ L108:
 	call	_keywin_on
 	popl	%edx
 	popl	%ecx
-L71:
+L76:
 	cmpl	$2, %esi
-	jle	L72
+	jle	L77
 	movl	-1124(%ebp), %edx
 	movl	4(%edx), %eax
 	subl	$3, %eax
 	cmpl	%eax, %esi
-	jge	L72
+	jge	L77
 	cmpl	$2, %edi
-	jle	L72
+	jle	L77
 	cmpl	$20, %edi
-	jg	L72
+	jg	L77
 	movl	-1064(%ebp), %eax
 	movl	-1068(%ebp), %edx
 	movl	%eax, -1112(%ebp)
@@ -786,22 +826,22 @@ L71:
 	movl	16(%edx), %edx
 	movl	%eax, -1120(%ebp)
 	movl	%edx, -1084(%ebp)
-L72:
+L77:
 	movl	-1124(%ebp), %eax
 	movl	4(%eax), %edx
 	leal	-21(%edx), %eax
 	cmpl	%esi, %eax
-	jg	L17
+	jg	L22
 	leal	-5(%edx), %eax
 	cmpl	%eax, %esi
-	jge	L17
+	jge	L22
 	cmpl	$4, %edi
-	jle	L17
+	jle	L22
 	cmpl	$18, %edi
-	jg	L17
+	jg	L22
 	movl	-1124(%ebp), %edx
 	testb	$16, 28(%edx)
-	je	L109
+	je	L123
 	movl	-1124(%ebp), %edx
 	movl	36(%edx), %ebx
 	pushl	$LC2
@@ -817,8 +857,8 @@ L72:
 	pushl	%ebx
 	call	_task_run
 	addl	$20, %esp
-	jmp	L17
-L109:
+	jmp	L22
+L123:
 	movl	36(%edx), %ebx
 	pushl	$-1
 	pushl	%edx
@@ -838,36 +878,36 @@ L109:
 	call	_fifo32_put
 	call	_io_sti
 	addl	$24, %esp
-	jmp	L17
-L105:
+	jmp	L22
+L119:
 	movl	$0, -1068(%ebp)
-	jmp	L60
-L104:
+	jmp	L65
+L118:
 	movl	$0, -1064(%ebp)
-	jmp	L59
-L100:
+	jmp	L64
+L114:
 	cmpl	$383, %edx
-	jg	L31
+	jg	L36
 	cmpl	$0, -1100(%ebp)
-	jne	L32
+	jne	L37
 	movb	_keytable0.0-256(%edx), %al
-L95:
+L109:
 	movb	%al, -60(%ebp)
-L34:
+L39:
 	movb	-60(%ebp), %dl
 	leal	-65(%edx), %eax
 	cmpb	$25, %al
-	ja	L35
+	ja	L40
 	testl	$4, -1104(%ebp)
-	jne	L90
+	jne	L104
 	cmpl	$0, -1100(%ebp)
-	je	L37
-L35:
+	je	L42
+L40:
 	movb	-60(%ebp), %al
 	testb	%al, %al
-	je	L39
+	je	L44
 	cmpl	$0, -1128(%ebp)
-	je	L39
+	je	L44
 	movsbl	%al,%eax
 	movl	-1128(%ebp), %edx
 	addl	$256, %eax
@@ -878,58 +918,58 @@ L35:
 	call	_fifo32_put
 	popl	%eax
 	popl	%edx
-L39:
+L44:
 	cmpl	$271, -1056(%ebp)
-	je	L110
-L40:
+	je	L124
+L45:
 	movl	-1056(%ebp), %eax
 	cmpl	$298, %eax
-	je	L111
-L42:
-	cmpl	$310, %eax
-	je	L112
-L43:
-	cmpl	$426, %eax
-	je	L113
-L44:
-	cmpl	$438, %eax
-	je	L114
-L45:
-	cmpl	$314, %eax
-	je	L115
-L46:
-	cmpl	$325, -1056(%ebp)
-	je	L116
+	je	L125
 L47:
-	cmpl	$326, -1056(%ebp)
-	je	L117
+	cmpl	$310, %eax
+	je	L126
 L48:
-	cmpl	$315, -1056(%ebp)
-	je	L118
+	cmpl	$426, %eax
+	je	L127
 L49:
-	cmpl	$316, -1056(%ebp)
-	je	L119
+	cmpl	$438, %eax
+	je	L128
+L50:
+	cmpl	$314, %eax
+	je	L129
 L51:
-	cmpl	$343, -1056(%ebp)
-	je	L120
+	cmpl	$325, -1056(%ebp)
+	je	L130
+L52:
+	cmpl	$326, -1056(%ebp)
+	je	L131
 L53:
+	cmpl	$315, -1056(%ebp)
+	je	L132
+L54:
+	cmpl	$316, -1056(%ebp)
+	je	L133
+L56:
+	cmpl	$343, -1056(%ebp)
+	je	L134
+L58:
 	movl	-1056(%ebp), %eax
 	cmpl	$506, %eax
-	je	L121
-L54:
+	je	L135
+L59:
 	cmpl	$510, %eax
-	jne	L17
+	jne	L22
 	call	_wait_KBC_sendready
 	pushl	-1108(%ebp)
 	pushl	$96
 	call	_io_out8
 	popl	%ebx
 	popl	%esi
-	jmp	L17
-L121:
+	jmp	L22
+L135:
 	movl	$-1, -1108(%ebp)
-	jmp	L54
-L120:
+	jmp	L59
+L134:
 	movl	-1060(%ebp), %edx
 	movl	16(%edx), %eax
 	decl	%eax
@@ -938,16 +978,16 @@ L120:
 	call	_sheet_updown
 	popl	%edi
 	popl	%eax
-	jmp	L53
-L119:
+	jmp	L58
+L133:
 	cmpl	$0, -1100(%ebp)
-	je	L51
+	je	L56
 	cmpl	$0, -1128(%ebp)
-	je	L52
+	je	L57
 	pushl	-1128(%ebp)
 	call	_keywin_off
 	popl	%eax
-L52:
+L57:
 	pushl	-1088(%ebp)
 	pushl	-1060(%ebp)
 	call	_open_console
@@ -963,18 +1003,18 @@ L52:
 	pushl	-1128(%ebp)
 	call	_keywin_on
 	addl	$32, %esp
-	jmp	L51
-L118:
+	jmp	L56
+L132:
 	cmpl	$0, -1100(%ebp)
-	je	L49
+	je	L54
 	cmpl	$0, -1128(%ebp)
-	je	L49
+	je	L54
 	movl	-1128(%ebp), %edx
 	movl	36(%edx), %ebx
 	testl	%ebx, %ebx
-	je	L49
+	je	L54
 	cmpl	$0, 52(%ebx)
-	je	L49
+	je	L54
 	pushl	$LC1
 	pushl	180(%ebx)
 	call	_cons_putstr0
@@ -988,8 +1028,8 @@ L118:
 	pushl	%ebx
 	call	_task_run
 	addl	$20, %esp
-	jmp	L49
-L117:
+	jmp	L54
+L131:
 	pushl	$237
 	leal	-124(%ebp), %ebx
 	pushl	%ebx
@@ -999,8 +1039,8 @@ L117:
 	pushl	%ebx
 	call	_fifo32_put
 	addl	$16, %esp
-	jmp	L48
-L116:
+	jmp	L53
+L130:
 	pushl	$237
 	leal	-124(%ebp), %ebx
 	pushl	%ebx
@@ -1010,8 +1050,8 @@ L116:
 	pushl	%ebx
 	call	_fifo32_put
 	addl	$16, %esp
-	jmp	L47
-L115:
+	jmp	L52
+L129:
 	pushl	$237
 	leal	-124(%ebp), %ebx
 	pushl	%ebx
@@ -1021,75 +1061,75 @@ L115:
 	pushl	%ebx
 	call	_fifo32_put
 	addl	$16, %esp
-	jmp	L46
-L114:
+	jmp	L51
+L128:
 	andl	$-3, -1100(%ebp)
-	jmp	L45
-L113:
+	jmp	L50
+L127:
 	andl	$-2, -1100(%ebp)
-	jmp	L44
-L112:
+	jmp	L49
+L126:
 	orl	$2, -1100(%ebp)
-	jmp	L43
-L111:
+	jmp	L48
+L125:
 	orl	$1, -1100(%ebp)
-	jmp	L42
-L110:
+	jmp	L47
+L124:
 	cmpl	$0, -1128(%ebp)
-	je	L40
+	je	L45
 	pushl	-1128(%ebp)
 	call	_keywin_off
 	popl	%eax
 	movl	-1128(%ebp), %eax
 	movl	24(%eax), %ebx
 	decl	%ebx
-	jne	L41
+	jne	L46
 	movl	-1060(%ebp), %edx
 	movl	16(%edx), %ebx
 	decl	%ebx
-L41:
+L46:
 	movl	-1060(%ebp), %eax
 	movl	20(%eax,%ebx,4), %ebx
 	pushl	%ebx
 	movl	%ebx, -1128(%ebp)
 	call	_keywin_on
 	popl	%eax
-	jmp	L40
-L37:
+	jmp	L45
+L42:
 	leal	32(%edx), %eax
 	movb	%al, -60(%ebp)
-	jmp	L35
-L90:
+	jmp	L40
+L104:
 	cmpl	$0, -1100(%ebp)
-	je	L35
-	jmp	L37
-L32:
+	je	L40
+	jmp	L42
+L37:
 	movb	_keytable1.1-256(%edx), %al
-	jmp	L95
-L31:
+	jmp	L109
+L36:
 	movb	$0, -60(%ebp)
-	jmp	L34
-L99:
+	jmp	L39
+L113:
 	cmpl	$0, -1072(%ebp)
-	jns	L122
+	jns	L136
 	cmpl	$2147483647, -1080(%ebp)
-	jne	L123
+	jne	L137
 	pushl	-1096(%ebp)
 	call	_task_sleep
 	call	_io_sti
-	jmp	L92
-L123:
+	jmp	L106
+L137:
 	call	_io_sti
-	jmp	L94
-L122:
+	jmp	L108
+L136:
 	call	_io_sti
 	pushl	-1076(%ebp)
 	pushl	-1072(%ebp)
 	pushl	-1092(%ebp)
 	call	_sheet_slide
 	movl	$-1, -1072(%ebp)
-	jmp	L93
-L98:
+	jmp	L107
+L112:
 	pushl	%ebx
 	call	_fifo32_get
 	movl	%eax, -1108(%ebp)
@@ -1098,7 +1138,7 @@ L98:
 	pushl	$96
 	call	_io_out8
 	addl	$12, %esp
-	jmp	L20
+	jmp	L25
 L5:
 	pushl	$145472
 	pushl	$3932160
@@ -1134,7 +1174,7 @@ L16:
 	cmpl	$145471, %eax
 	jle	L16
 	jmp	L6
-L97:
+L111:
 	pushl	$-18874368
 	call	_init_apic
 	popl	%eax
@@ -1153,12 +1193,12 @@ _keywin_off:
 	testb	$32, 28(%ebx)
 	popl	%ecx
 	popl	%eax
-	jne	L126
-L124:
+	jne	L140
+L138:
 	movl	-4(%ebp), %ebx
 	leave
 	ret
-L126:
+L140:
 	pushl	$3
 	movl	36(%ebx), %eax
 	addl	$16, %eax
@@ -1166,7 +1206,7 @@ L126:
 	call	_fifo32_put
 	popl	%eax
 	popl	%edx
-	jmp	L124
+	jmp	L138
 	.balign 2
 .globl _keywin_on
 	.def	_keywin_on;	.scl	2;	.type	32;	.endef
@@ -1181,12 +1221,12 @@ _keywin_on:
 	testb	$32, 28(%ebx)
 	popl	%ecx
 	popl	%eax
-	jne	L129
-L127:
+	jne	L143
+L141:
 	movl	-4(%ebp), %ebx
 	leave
 	ret
-L129:
+L143:
 	pushl	$2
 	movl	36(%ebx), %eax
 	addl	$16, %eax
@@ -1194,7 +1234,7 @@ L129:
 	call	_fifo32_put
 	popl	%eax
 	popl	%edx
-	jmp	L127
+	jmp	L141
 	.balign 2
 .globl _open_constask
 	.def	_open_constask;	.scl	2;	.type	32;	.endef
@@ -1330,21 +1370,57 @@ _open_console:
 _close_constask:
 	pushl	%ebp
 	movl	%esp, %ebp
+	pushl	%edi
+	pushl	%esi
+	xorl	%edi, %edi
 	pushl	%ebx
-	movl	8(%ebp), %ebx
-	pushl	%ebx
+	movl	$15, %esi
+	movl	2551808, %ebx
+	pushl	8(%ebp)
 	call	_task_sleep
+	popl	%eax
+L151:
+	movl	8(%ebp), %edx
+	movl	188(%edx), %eax
+	addl	%edi, %eax
+	addl	$4096, %edi
+	pushl	%eax
+	pushl	$2523136
+	pushl	%ebx
+	call	_memman_unlink_page_32
+	pushl	%eax
+	pushl	%ebx
+	call	_memman_free_page_32
+	addl	$20, %esp
+	decl	%esi
+	jns	L151
+	movl	8(%ebp), %eax
 	pushl	$65536
-	pushl	188(%ebx)
+	pushl	188(%eax)
 	pushl	$3932160
 	call	_memman_free_4k
+	movl	8(%ebp), %edx
+	addl	$12, %esp
+	pushl	16(%edx)
+	pushl	$2523136
+	pushl	%ebx
+	call	_memman_unlink_page_32
+	pushl	%eax
+	pushl	%ebx
+	call	_memman_free_page_32
+	movl	8(%ebp), %eax
+	addl	$20, %esp
 	pushl	$512
-	pushl	16(%ebx)
+	pushl	16(%eax)
 	pushl	$3932160
 	call	_memman_free_4k
-	movl	$0, 4(%ebx)
-	movl	-4(%ebp), %ebx
-	leave
+	movl	8(%ebp), %edx
+	movl	$0, 4(%edx)
+	leal	-12(%ebp), %esp
+	popl	%ebx
+	popl	%esi
+	popl	%edi
+	popl	%ebp
 	ret
 	.balign 2
 .globl _close_console
@@ -1352,28 +1428,48 @@ _close_constask:
 _close_console:
 	pushl	%ebp
 	movl	%esp, %ebp
+	pushl	%edi
 	pushl	%esi
+	xorl	%edi, %edi
 	pushl	%ebx
+	movl	$10, %esi
+	pushl	%eax
+	pushl	%eax
 	movl	8(%ebp), %ebx
-	movl	36(%ebx), %esi
+	movl	2551808, %eax
+	movl	%eax, -16(%ebp)
+	movl	36(%ebx), %eax
+	movl	%eax, -20(%ebp)
+L166:
+	movl	(%ebx), %eax
+	addl	%edi, %eax
+	addl	$4096, %edi
+	pushl	%eax
+	pushl	$2523136
+	pushl	-16(%ebp)
+	call	_memman_unlink_page_32
+	pushl	%eax
+	pushl	-16(%ebp)
+	call	_memman_free_page_32
+	addl	$20, %esp
+	decl	%esi
+	jns	L166
 	pushl	$42240
 	pushl	(%ebx)
 	pushl	$3932160
 	call	_memman_free_4k
 	pushl	%ebx
 	call	_sheet_free
-	movl	%esi, 8(%ebp)
+	movl	-20(%ebp), %eax
+	movl	%eax, 8(%ebp)
 	addl	$16, %esp
-	leal	-8(%ebp), %esp
+	leal	-12(%ebp), %esp
 	popl	%ebx
 	popl	%esi
+	popl	%edi
 	popl	%ebp
 	jmp	_close_constask
-.globl _pageman
-	.data
-	.balign 4
-_pageman:
-	.space 4
+	.def	_memman_unlink_page_32;	.scl	2;	.type	32;	.endef
 	.def	_make_textbox8;	.scl	2;	.type	32;	.endef
 	.def	_make_window8;	.scl	2;	.type	32;	.endef
 	.def	_console_task;	.scl	2;	.type	32;	.endef
@@ -1392,6 +1488,7 @@ _pageman:
 	.def	_fifo32_get;	.scl	2;	.type	32;	.endef
 	.def	_fifo32_status;	.scl	2;	.type	32;	.endef
 	.def	_memman_free_4k;	.scl	2;	.type	32;	.endef
+	.def	_memman_free_page_32;	.scl	2;	.type	32;	.endef
 	.def	_file_loadfile2;	.scl	2;	.type	32;	.endef
 	.def	_file_search;	.scl	2;	.type	32;	.endef
 	.def	_file_readfat;	.scl	2;	.type	32;	.endef

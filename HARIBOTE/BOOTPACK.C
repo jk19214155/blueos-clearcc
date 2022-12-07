@@ -9,7 +9,6 @@ void keywin_on(struct SHEET *key_win);
 void close_console(struct SHEET *sht);
 void close_constask(struct TASK *task);
 
-struct PAGEMAN32 *pageman;
 
 void HariMain(int mode,...)
 {
@@ -159,6 +158,10 @@ void HariMain(int mode,...)
 		}
 	}
 	*((int *) 0x0fe8) = (int) nihongo;
+	for(i=0;i<3;i++){
+		void* p=memman_unlink_page_32(pageman,0x268000,(int)fat+0x1000*i);
+		memman_free_page_32(pageman,p);
+	}
 	memman_free_4k(memman, (int) fat, 4 * 2880);
 	for (;;) {
 		if (fifo32_status(&keycmd) > 0 && keycmd_wait < 0) {
@@ -369,6 +372,10 @@ void HariMain(int mode,...)
 				close_constask(taskctl->tasks0 + (i - 1024));
 			} else if (2024 <= i && i <= 2279) {	/* コンソールだけを閉じる */
 				sht2 = shtctl->sheets0 + (i - 2024);
+				for(i=0;i<(256 * 165+0xfff)>>12;i++){
+					void* po=memman_unlink_page_32(pageman,0x268000,(int)(sht2->buf)+0x1000*i);
+					memman_free_page_32(pageman,po);
+				}
 				memman_free_4k(memman, (int) sht2->buf, 256 * 165);
 				sheet_free(sht2);
 			}
@@ -436,8 +443,18 @@ struct SHEET *open_console(struct SHTCTL *shtctl, unsigned int memtotal)
 void close_constask(struct TASK *task)
 {
 	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
+	struct PAGEMAN32 *pageman=*(struct PAGEMAN32 **)ADR_PAGEMAN;
+	int i;
 	task_sleep(task);
+	for(i=0;i<(64 * 1024+0xfff)>>12;i++){
+		void* po=memman_unlink_page_32(pageman,0x268000,(int)(task->cons_stack)+0x1000*i);
+		memman_free_page_32(pageman,po);
+	}
 	memman_free_4k(memman, task->cons_stack, 64 * 1024);
+	for(i=0;i<(128 * 4+0xfff)>>12;i++){
+		void* po=memman_unlink_page_32(pageman,0x268000,(int)(task->fifo.buf)+0x1000*i);
+		memman_free_page_32(pageman,po);
+	}
 	memman_free_4k(memman, (int) task->fifo.buf, 128 * 4);
 	task->flags = 0; /* task_free(task); の代わり */
 	return;
@@ -445,8 +462,14 @@ void close_constask(struct TASK *task)
 
 void close_console(struct SHEET *sht)
 {
+	struct PAGEMAN32 *pageman=*(struct PAGEMAN32 **)ADR_PAGEMAN;
 	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
+	int i;
 	struct TASK *task = sht->task;
+	for(i=0;i<(256 * 165+0xfff)>>12;i++){
+		void* po=memman_unlink_page_32(pageman,0x268000,(int)(sht->buf)+0x1000*i);
+		memman_free_page_32(pageman,po);
+	}
 	memman_free_4k(memman, (int) sht->buf, 256 * 165);
 	sheet_free(sht);
 	close_constask(task);

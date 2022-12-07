@@ -572,17 +572,19 @@
    572 00000503                                 _memman_free_page_32:
    573 00000503 55                              	PUSH	EBP
    574 00000504 89 E5                           	MOV	EBP,ESP
-   575 00000506 8B 4D 08                        	MOV	ECX,DWORD [8+EBP]
-   576 00000509 8B 45 0C                        	MOV	EAX,DWORD [12+EBP]
-   577 0000050C C1 E8 0C                        	SHR	EAX,12
-   578 0000050F 8B 51 08                        	MOV	EDX,DWORD [8+ECX]
-   579 00000512 80 3C 10 01                     	CMP	BYTE [EAX+EDX*1],1
-   580 00000516 74 08                           	JE	L172
+   575 00000506 8B 45 08                        	MOV	EAX,DWORD [8+EBP]
+   576 00000509 8B 55 0C                        	MOV	EDX,DWORD [12+EBP]
+   577 0000050C C1 EA 0C                        	SHR	EDX,12
+   578 0000050F 8B 48 08                        	MOV	ECX,DWORD [8+EAX]
+   579 00000512 80 3C 0A 01                     	CMP	BYTE [EDX+ECX*1],1
+   580 00000516 74 0F                           	JE	L172
    581 00000518                                 L171:
-   582 00000518 C6 04 10 00                     	MOV	BYTE [EAX+EDX*1],0
-   583 0000051C 31 C0                           	XOR	EAX,EAX
-   584 0000051E 5D                              	POP	EBP
-   585 0000051F C3                              	RET
-   586 00000520                                 L172:
-   587 00000520 FF 01                           	INC	DWORD [ECX]
-   588 00000522 EB F4                           	JMP	L171
+   582 00000518 C6 04 0A 00                     	MOV	BYTE [EDX+ECX*1],0
+   583 0000051C 8B 00                           	MOV	EAX,DWORD [EAX]
+   584 0000051E A3 0026F00C                     	MOV	DWORD [2551820],EAX
+   585 00000523 31 C0                           	XOR	EAX,EAX
+   586 00000525 5D                              	POP	EBP
+   587 00000526 C3                              	RET
+   588 00000527                                 L172:
+   589 00000527 FF 00                           	INC	DWORD [EAX]
+   590 00000529 EB ED                           	JMP	L171
