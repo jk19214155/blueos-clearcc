@@ -287,13 +287,13 @@ static int tek_lzrestore_tek5(int srcsiz, UCHAR *src, int outsiz, UCHAR *outbuf)
 	}
 	wrksiz = 0x180 * sizeof (UINT32) + (0x840 + (0x300 << (lc + lp))) * sizeof (tek_TPRB); /* Å’á15KB, lc+lp=3‚È‚çA36KB */
 	work = (int *) memman_alloc_4k((struct MEMMAN *) MEMMAN_ADDR, wrksiz);
-	memmam_link_page_32_m(pageman,0x268000,work,7,(wrksiz+0xfff)>>12,0);//
+	pageman_link_page_32_m(pageman,work,7,(wrksiz+0xfff)>>12,0);//
 	if (work == NULL)
 		return -1;
 	flags = tek_decmain5(work, src, outsiz, outbuf, lc, pb, lp, flags);
 	int i;
 	for(i=0;i<(wrksiz+0xfff)>>12;i++){
-		void* po=memman_unlink_page_32(pageman,0x268000,(int)(work)+0x1000*i);
+		void* po=pageman_unlink_page_32(pageman,(int)(work)+0x1000*i,1);
 		memman_free_page_32(pageman,po);
 	}
 	memman_free_4k((struct MEMMAN *) MEMMAN_ADDR, (int) work, wrksiz);

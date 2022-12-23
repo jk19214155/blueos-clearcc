@@ -100,3 +100,9 @@ char *file_loadfile2(int clustno, int *psize, int *fat)
 	}
 	return buf;
 }
+int task_vfs(){
+	struct PAGEMAN32 *pageman=*(struct PAGEMAN32 **)ADR_PAGEMAN;
+	struct TASK *task = task_now();
+	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
+	return 0;
+}

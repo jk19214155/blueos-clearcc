@@ -11,6 +11,66 @@ struct TASK *task_now(void)
 	return tl->tasks[tl->now];
 }
 
+void add_child_task(struct TASK* task_now0,struct TASK* task){
+	if(task_now0->child_task==0){
+		task_now0->child_task=task;
+		task->brother_task=task;//兄弟进程是自己
+		task->father_task=task_now0;//父进程是当前进程
+	}
+	else{
+		struct TASK* p;
+		for(p=task_now0->child_task;(p->brother_task)!=(task_now0->child_task);p=p->brother_task);//p是初始子进程，p的兄弟进程不是初始子进程，p指向下一个进程
+		task->brother_task=p->brother_task;//task的兄弟进程是p的兄弟进程
+		p->brother_task=task;//最后兄弟进程成为一个进程环
+		task->father_task=task_now0;//父进程是当前进程
+	}
+	return;
+}
+
+struct TASK* find_child_task(struct TASK* task){//函数使用深度优先，用于在一个进程结束时，递归找出所有还在运行的子进程
+	if(task->child_task==0){
+		return 0;//无子进程
+	}
+	else{
+		struct TASK* p=task->child_task,*p0;
+		p0=p;
+		for(;;){
+			if(p->child_task!=0){//有子进程进入子进程
+				p=p->child_task;
+				p0=p;
+				continue;
+			}
+			else if(p->brother_task!=p0){//没有子进程就找兄弟进程
+				p=p->brother_task;
+				continue;
+			}
+			else{//当前任务环的兄弟进程都没有子进程
+				return p;
+			}
+		}
+	}
+}
+
+int unlink_task(struct TASK* task){
+	if(task->child_task!=0){//还有子进程
+		//return -1;
+		//考虑到可能有进程树移植的情况，因此这里不返回错误
+	}
+	else{
+		struct TASK* p;
+		for(p=task;p->brother_task!=task;p=p->brother_task);
+		if(p==task){//环上只有自己
+			p=p->father_task;
+			p->child_task=0;//把自己移除
+			return 0;
+		}
+		else{
+			p->brother_task=task->brother_task;//重新连接环
+			return 0;
+		}
+	}
+}
+
 void task_add(struct TASK *task)
 {
 	struct TASKLEVEL *tl = &taskctl->level[task->level];
@@ -23,8 +83,20 @@ void task_add(struct TASK *task)
 void task_remove(struct TASK *task)
 {
 	int i;
+	struct TASK* p;
 	struct TASKLEVEL *tl = &taskctl->level[task->level];
-
+//goto next;
+	for(;;){
+		p=find_child_task(task);
+		if(p!=0){
+			task_remove(p);//先关闭子进程
+			unlink_task(p);
+		}
+		else{
+			break;
+		}
+	}
+next:
 	/* taskがどこにいるかを探す */
 	for (i = 0; i < tl->running; i++) {
 		if (tl->tasks[i] == task) {
@@ -92,6 +164,8 @@ struct TASK *task_init(struct MEMMAN *memman)
 		taskctl->level[i].now = 0;
 	}
 	task = task_alloc();
+	task->tss.cr3= 0x00268000;
+	task->memman=memman;
 	task->flags = 2;	/* 動作中マーク */
 	task->priority = 2; /* 0.02秒 */
 	task->level = 0;	/* 最高レベル */
@@ -110,6 +184,10 @@ struct TASK *task_init(struct MEMMAN *memman)
 	idle->tss.ds = 1 * 8;
 	idle->tss.fs = 1 * 8;
 	idle->tss.gs = 1 * 8;
+	idle->tss.cr3=0x268000;
+	idle->father_task=0;
+	idle->child_task=0;
+	idle->brother_task=idle;
 	task_run(idle, MAX_TASKLEVELS - 1, 1);
 
 	return task;
@@ -119,6 +197,7 @@ struct TASK *task_alloc(void)
 {
 	int i;
 	struct TASK *task;
+	struct PAGEMAN32 *pageman=*(struct PAGEMAN32 **)ADR_PAGEMAN;
 	for (i = 0; i < MAX_TASKS; i++) {
 		if (taskctl->tasks0[i].flags == 0) {
 			task = &taskctl->tasks0[i];
@@ -137,7 +216,16 @@ struct TASK *task_alloc(void)
 			task->tss.gs = 0;
 			task->tss.iomap = 0x40000000;
 			task->tss.ss0 = 0;
-			task->tss.cr3= 0x00268000;//暂时使用os的页表
+			//void* p=memman_alloc_page_32(pageman);
+			//task->tss.cr3= 0x00268000;//暂时使用os的页表
+			task->tss.cr3=0;//动态申请
+			task->father_task=0;
+			task->child_task=0;
+			task->brother_task=task;
+			task->index=0;
+			task->taskctl=0;
+			task->timerctl=0;
+			task->shtctl=0;
 			return task;
 		}
 	}
@@ -204,4 +292,10 @@ void task_switch(void)
 		//task_switch32(old_tss32,&(new_task->tss));
 	}
 	return;
+}
+void task_lanch(int num){
+	
+}
+void task_get_index(){
+	
 }

@@ -18,6 +18,7 @@
 0xc0000000-0xc000ffff 64k gdt
 0xc0010000-0xc001ffff 64k ldt
 0xc0020000-0xc00207ff 2k idt
+0xc0021000 memman
 0xc0100000-0xc017ffff 512k haribote.hrb
 全局变量区
 0x0026f000(int) pageman
@@ -25,7 +26,9 @@
 0x0026f008(int) free_page_num
 0x0026f00c(int) last_free_page_num
 0x0026f010(int) last_err_free_page_num
-
+0x0026f014(int) memman_core
+0x0026f018(int) memm
+0x0026f01c(int) memma
 
 
 00:00:10.565085 0000000000000000-000000000009ffff 0000000000000000 Conventional RAM

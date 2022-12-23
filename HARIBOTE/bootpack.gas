@@ -293,8 +293,8 @@ _HariMain:
 	call	_init_gdtidt
 	pushl	$3932160
 	call	_memman_init
-	pushl	$-1342177280
-	pushl	$9437184
+	pushl	$-536870913
+	pushl	$-1071644672
 	pushl	$3932160
 	call	_memman_free
 	leal	-796(%ebp), %eax
@@ -336,7 +336,7 @@ _HariMain:
 	call	_memmam_link_page_32_m
 	leal	-796(%ebp), %edx
 	pushl	$1
-	pushl	$131072
+	pushl	$130048
 	pushl	$-536870905
 	pushl	$-536870912
 	pushl	$2523136
@@ -415,17 +415,18 @@ L4:
 	pushl	$3932160
 	movl	%eax, -1060(%ebp)
 	call	_task_init
+	movl	$2523136, 72(%esi)
 	pushl	$2
-	pushl	$1
-	pushl	%eax
 	movl	%eax, -1096(%ebp)
+	pushl	$1
 	movl	%eax, -68(%ebp)
-	call	_task_run
-	movl	-1096(%ebp), %edx
-	movl	-1060(%ebp), %eax
-	movl	%eax, 4068
-	movb	$0, 204(%edx)
 	pushl	%eax
+	call	_task_run
+	movl	-1096(%ebp), %eax
+	movl	-1060(%ebp), %edx
+	movl	%edx, 4068
+	movb	$0, 204(%eax)
+	pushl	%edx
 	call	_sheet_alloc
 	movl	%eax, %esi
 	movswl	4086,%edx
@@ -440,13 +441,13 @@ L4:
 	movswl	4084,%eax
 	imull	%edx, %eax
 	addl	$4095, %eax
+	leal	-796(%ebp), %edx
 	sarl	$12, %eax
 	pushl	%eax
-	leal	-796(%ebp), %eax
 	pushl	$7
 	pushl	%ebx
 	pushl	$2523136
-	pushl	%eax
+	pushl	%edx
 	call	_memmam_link_page_32_m
 	addl	$52, %esp
 	pushl	$-1
@@ -465,24 +466,21 @@ L4:
 	leal	-1052(%ebp), %ebx
 	call	_init_screen8
 	addl	$32, %esp
-	pushl	-1088(%ebp)
 	pushl	-1060(%ebp)
-	call	_open_console
-	pushl	-1060(%ebp)
-	movl	%eax, -1128(%ebp)
+	movl	$0, -1128(%ebp)
 	call	_sheet_alloc
 	pushl	$99
 	pushl	$16
-	movl	%eax, -1092(%ebp)
 	pushl	$16
+	movl	%eax, -1092(%ebp)
 	pushl	%ebx
 	pushl	%eax
 	call	_sheet_setbuf
-	addl	$32, %esp
 	pushl	$99
 	pushl	%ebx
 	movl	$2, %ebx
 	call	_init_mouse_cursor8
+	addl	$32, %esp
 	movswl	4084,%eax
 	leal	-16(%eax), %ecx
 	movl	%ecx, %eax
@@ -501,28 +499,28 @@ L4:
 	call	_sheet_slide
 	pushl	$4
 	pushl	$32
-	pushl	-1128(%ebp)
+	pushl	$0
 	call	_sheet_slide
-	addl	$32, %esp
 	pushl	-1068(%ebp)
 	pushl	-1064(%ebp)
 	pushl	-1092(%ebp)
 	call	_sheet_slide
+	addl	$36, %esp
 	pushl	$0
 	pushl	%esi
 	call	_sheet_updown
 	pushl	$1
-	pushl	-1128(%ebp)
+	pushl	$0
 	call	_sheet_updown
 	pushl	$2
 	pushl	-1092(%ebp)
 	call	_sheet_updown
-	addl	$36, %esp
-	pushl	-1128(%ebp)
+	pushl	$0
 	call	_keywin_on
 	pushl	$237
 	pushl	%edi
 	call	_fifo32_put
+	addl	$36, %esp
 	pushl	-1104(%ebp)
 	pushl	%edi
 	call	_fifo32_put
@@ -538,7 +536,7 @@ L4:
 	pushl	$2523136
 	pushl	%edx
 	call	_memmam_link_page_32_m
-	addl	$52, %esp
+	addl	$40, %esp
 	pushl	$1049088
 	pushl	%esi
 	call	_file_readfat
@@ -675,9 +673,9 @@ L95:
 	addl	$16, %esp
 	jmp	L22
 L117:
-	imull	$208, %edx, %edx
+	imull	$276, %edx, %edx
 	addl	_taskctl, %edx
-	leal	-208904(%edx), %eax
+	leal	-278536(%edx), %eax
 	pushl	%eax
 	call	_close_constask
 L106:
@@ -843,23 +841,23 @@ L77:
 	testb	$16, 28(%edx)
 	je	L123
 	movl	-1124(%ebp), %edx
-	movl	36(%edx), %ebx
+	movl	36(%edx), %esi
 	pushl	$LC2
-	pushl	180(%ebx)
+	pushl	180(%esi)
 	call	_cons_putstr0
 	call	_io_cli
-	leal	48(%ebx), %eax
-	movl	%eax, 84(%ebx)
-	movl	$_asm_end_app, 76(%ebx)
+	leal	48(%esi), %eax
+	movl	%eax, 84(%esi)
+	movl	$_asm_end_app, 76(%esi)
 	call	_io_sti
 	pushl	$0
 	pushl	$-1
-	pushl	%ebx
+	pushl	%esi
 	call	_task_run
 	addl	$20, %esp
 	jmp	L22
 L123:
-	movl	36(%edx), %ebx
+	movl	36(%edx), %esi
 	pushl	$-1
 	pushl	%edx
 	call	_sheet_updown
@@ -872,7 +870,7 @@ L123:
 	movl	%eax, -1128(%ebp)
 	call	_keywin_on
 	call	_io_cli
-	leal	16(%ebx), %eax
+	leal	16(%esi), %eax
 	pushl	$4
 	pushl	%eax
 	call	_fifo32_put
@@ -1010,22 +1008,22 @@ L132:
 	cmpl	$0, -1128(%ebp)
 	je	L54
 	movl	-1128(%ebp), %edx
-	movl	36(%edx), %ebx
-	testl	%ebx, %ebx
+	movl	36(%edx), %esi
+	testl	%esi, %esi
 	je	L54
-	cmpl	$0, 52(%ebx)
+	cmpl	$0, 52(%esi)
 	je	L54
 	pushl	$LC1
-	pushl	180(%ebx)
+	pushl	180(%esi)
 	call	_cons_putstr0
 	call	_io_cli
-	leal	48(%ebx), %eax
-	movl	%eax, 84(%ebx)
-	movl	$_asm_end_app, 76(%ebx)
+	leal	48(%esi), %eax
+	movl	%eax, 84(%esi)
+	movl	$_asm_end_app, 76(%esi)
 	call	_io_sti
 	pushl	$0
 	pushl	$-1
-	pushl	%ebx
+	pushl	%esi
 	call	_task_run
 	addl	$20, %esp
 	jmp	L54
@@ -1244,61 +1242,121 @@ _open_constask:
 	pushl	%edi
 	pushl	%esi
 	pushl	%ebx
-	movl	2551808, %esi
+	subl	$16, %esp
+	movl	2551808, %eax
+	movl	%eax, -16(%ebp)
 	call	_task_alloc
+	movl	%eax, %esi
+	call	_task_now
 	pushl	$512
-	movl	%eax, %ebx
 	pushl	$3932160
+	movl	%eax, -20(%ebp)
 	call	_memman_alloc_4k
 	pushl	$0
 	pushl	$1
-	movl	%eax, %edi
 	pushl	$7
+	movl	%eax, -24(%ebp)
 	pushl	%eax
 	pushl	$2523136
-	pushl	%esi
+	pushl	-16(%ebp)
 	call	_memmam_link_page_32_m
 	addl	$32, %esp
 	pushl	$65536
 	pushl	$3932160
 	call	_memman_alloc_4k
-	movl	%eax, 188(%ebx)
+	movl	%eax, 188(%esi)
 	pushl	$0
 	pushl	$16
 	pushl	$7
-	pushl	188(%ebx)
-	pushl	$2523136
-	pushl	%esi
-	call	_memmam_link_page_32_m
-	addl	$32, %esp
-	movl	188(%ebx), %edx
-	movl	8(%ebp), %eax
-	addl	$65524, %edx
-	movl	%edx, 100(%ebx)
-	movl	$_console_task, 76(%ebx)
-	movl	$8, 116(%ebx)
-	movl	$16, 120(%ebx)
-	movl	$8, 124(%ebx)
-	movl	$8, 128(%ebx)
-	movl	$8, 132(%ebx)
-	movl	$8, 136(%ebx)
-	movl	%eax, 4(%edx)
-	movl	100(%ebx), %edx
-	movl	12(%ebp), %eax
-	movl	%eax, 8(%edx)
-	pushl	$2
-	pushl	$2
-	pushl	%ebx
-	call	_task_run
-	leal	16(%ebx), %eax
+	pushl	%eax
+	pushl	-16(%ebp)
+	call	_pageman_link_page_32_m
+	movl	188(%esi), %eax
+	addl	$65524, %eax
+	movl	%eax, 100(%esi)
+	movl	$_console_task, 76(%esi)
+	movl	$8, 116(%esi)
+	movl	$16, 120(%esi)
+	movl	$8, 124(%esi)
+	movl	$8, 128(%esi)
+	movl	$8, 132(%esi)
+	movl	$8, 136(%esi)
+	movl	$8, 240(%esi)
+	pushl	$4096
+	pushl	$3932160
+	call	_memman_alloc_4k
+	addl	$36, %esp
+	pushl	-16(%ebp)
+	movl	%eax, %edi
+	call	_memman_alloc_page_32
+	movl	%eax, %ebx
+	pushl	$1
+	orl	$7, %ebx
+	movl	%eax, -28(%ebp)
 	pushl	%ebx
 	pushl	%edi
+	pushl	-16(%ebp)
+	call	_pageman_link_page_32
+	addl	$20, %esp
+	movl	%ebx, 4092(%edi)
+	movl	$3072, %edx
+L149:
+	movb	-4096(%edx), %al
+	movb	%al, (%edx,%edi)
+	incl	%edx
+	cmpl	$4091, %edx
+	jle	L149
+	xorl	%edx, %edx
+L154:
+	movl	-4096(,%edx,4), %eax
+	movl	%eax, (%edi,%edx,4)
+	incl	%edx
+	cmpl	$2, %edx
+	jle	L154
+	andl	$-4096, -28(%ebp)
+	movl	-28(%ebp), %eax
+	movl	%eax, 72(%esi)
+	pushl	$32736
+	pushl	$3932160
+	call	_memman_alloc_4k
+	movl	%eax, 260(%esi)
+	pushl	$0
+	pushl	$8
+	pushl	$7
+	pushl	%eax
+	pushl	$2523136
+	pushl	-16(%ebp)
+	call	_memmam_link_page_32_m
+	addl	$32, %esp
+	pushl	260(%esi)
+	call	_memman_init
+	pushl	$-1073741825
+	pushl	$12582912
+	pushl	260(%esi)
+	call	_memman_free
+	movl	8(%ebp), %eax
+	movl	100(%esi), %edx
+	movl	%eax, 4(%edx)
+	movl	100(%esi), %edx
+	movl	12(%ebp), %eax
+	movl	%eax, 8(%edx)
+	pushl	%esi
+	pushl	-20(%ebp)
+	call	_add_child_task
+	pushl	$2
+	pushl	$2
+	pushl	%esi
+	call	_task_run
+	leal	16(%esi), %eax
+	addl	$36, %esp
+	pushl	%esi
+	pushl	-24(%ebp)
 	pushl	$128
 	pushl	%eax
 	call	_fifo32_init
 	leal	-12(%ebp), %esp
-	movl	%ebx, %eax
 	popl	%ebx
+	movl	%esi, %eax
 	popl	%esi
 	popl	%edi
 	popl	%ebp
@@ -1379,7 +1437,7 @@ _close_constask:
 	pushl	8(%ebp)
 	call	_task_sleep
 	popl	%eax
-L151:
+L165:
 	movl	8(%ebp), %edx
 	movl	188(%edx), %eax
 	addl	%edi, %eax
@@ -1393,7 +1451,7 @@ L151:
 	call	_memman_free_page_32
 	addl	$20, %esp
 	decl	%esi
-	jns	L151
+	jns	L165
 	movl	8(%ebp), %eax
 	pushl	$65536
 	pushl	188(%eax)
@@ -1440,7 +1498,7 @@ _close_console:
 	movl	%eax, -16(%ebp)
 	movl	36(%ebx), %eax
 	movl	%eax, -20(%ebp)
-L166:
+L180:
 	movl	(%ebx), %eax
 	addl	%edi, %eax
 	addl	$4096, %edi
@@ -1453,7 +1511,7 @@ L166:
 	call	_memman_free_page_32
 	addl	$20, %esp
 	decl	%esi
-	jns	L166
+	jns	L180
 	pushl	$42240
 	pushl	(%ebx)
 	pushl	$3932160
@@ -1472,13 +1530,19 @@ L166:
 	.def	_memman_unlink_page_32;	.scl	2;	.type	32;	.endef
 	.def	_make_textbox8;	.scl	2;	.type	32;	.endef
 	.def	_make_window8;	.scl	2;	.type	32;	.endef
+	.def	_add_child_task;	.scl	2;	.type	32;	.endef
+	.def	_pageman_link_page_32;	.scl	2;	.type	32;	.endef
+	.def	_memman_alloc_page_32;	.scl	2;	.type	32;	.endef
 	.def	_console_task;	.scl	2;	.type	32;	.endef
+	.def	_pageman_link_page_32_m;	.scl	2;	.type	32;	.endef
+	.def	_task_now;	.scl	2;	.type	32;	.endef
 	.def	_task_alloc;	.scl	2;	.type	32;	.endef
 	.def	_change_wtitle8;	.scl	2;	.type	32;	.endef
 	.def	_sheet_free;	.scl	2;	.type	32;	.endef
 	.def	_close_constask;	.scl	2;	.type	32;	.endef
 	.def	_close_console;	.scl	2;	.type	32;	.endef
 	.def	_mouse_decode;	.scl	2;	.type	32;	.endef
+	.def	_open_console;	.scl	2;	.type	32;	.endef
 	.def	_asm_end_app;	.scl	2;	.type	32;	.endef
 	.def	_cons_putstr0;	.scl	2;	.type	32;	.endef
 	.def	_keywin_off;	.scl	2;	.type	32;	.endef
@@ -1497,7 +1561,6 @@ L166:
 	.def	_sheet_updown;	.scl	2;	.type	32;	.endef
 	.def	_sheet_slide;	.scl	2;	.type	32;	.endef
 	.def	_init_mouse_cursor8;	.scl	2;	.type	32;	.endef
-	.def	_open_console;	.scl	2;	.type	32;	.endef
 	.def	_init_screen8;	.scl	2;	.type	32;	.endef
 	.def	_sheet_setbuf;	.scl	2;	.type	32;	.endef
 	.def	_memman_alloc_4k;	.scl	2;	.type	32;	.endef

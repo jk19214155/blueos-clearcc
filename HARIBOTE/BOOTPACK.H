@@ -47,6 +47,7 @@ void asm_inthandler0d(void);
 void asm_inthandler20(void);
 void asm_inthandler21(void);
 void asm_inthandler2c(void);
+void asm_inthandler0e(void);
 unsigned int memtest_sub(unsigned int start, unsigned int end);
 void farjmp(int eip, int cs);
 void farcall(int eip, int cs);
@@ -61,6 +62,7 @@ void store_gdt(void* addr);
 void store_idt(void* addr);
 void sys_reboot(void);
 void sys_call(void);
+int rdrand();
 //void memset(char* s,int num,int longer);
 //void strcpy(char* s,char* t,int longer);
 //int strcmp(char* s,char* t,int longer);
@@ -168,6 +170,7 @@ int mouse_decode(struct MOUSE_DEC *mdec, unsigned char dat);
 #define SYS_CE3_ADDRESS_full 0x00269000
 #define MEMMAN_FREES		4090	/* これで約32KB */
 #define MEMMAN_ADDR			0x003c0000
+#define MEMMAN_CORE_ADDR	0x0026f014//指针位置
 struct FREEINFO {	/* あき情報 */
 	unsigned int addr, size;
 };
@@ -192,6 +195,11 @@ unsigned int memmam_link_page_32_m(struct PAGEMAN32 *man,unsigned int cr3_addres
 unsigned int memman_link_page_32(struct PAGEMAN32 *man,unsigned int cr3_address,unsigned int linear_address,unsigned int physical_address,int mode);
 unsigned int memman_alloc_page_32(struct PAGEMAN32 *man);
 unsigned int memman_free_page_32(struct PAGEMAN32 *man,unsigned physical_address);
+unsigned pageman_link_page_32(struct PAGEMAN32 *man,unsigned int linear_address,unsigned int physical_address,int mode);
+unsigned int pageman_link_page_32_m(struct PAGEMAN32 *man,unsigned int linear_address,unsigned int physical_address,int page_num,int mode);
+unsigned int pageman_unlink_page_32_m(struct PAGEMAN32 *man,unsigned int linear_address,int page_num,int mode);
+unsigned pageman_unlink_page_32(struct PAGEMAN32 *man,unsigned int linear_address,int mode);
+int inthandler0e(int cr2,int* esp);
 /* sheet.c */
 #define MAX_SHEETS		256
 struct SHEET {
@@ -261,6 +269,16 @@ struct TASK {
 	int *fat;
 	char *cmdline;
 	unsigned char langmode, langbyte1;
+	struct SHEET * task_sheet[8];
+	int task_sheet_max;
+	struct TASK* brother_task;//兄弟任务
+	struct TASK* child_task;//子任务
+	struct TASK* father_task;//父任务
+	int index;//进程识别码
+	struct MEMMAN* memman;//应用程序的内存管理器
+	struct TASKCTL* taskctl;//应用程序的多线程管理器
+	struct TIMERCTL* timerctl;//应用程序定时器管理器
+	struct SHTCTL* shtctl;//应用程序图层管理器
 };
 struct TASKLEVEL {
 	int running; /* 動作しているタスクの数 */
@@ -322,6 +340,7 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 int *inthandler0d(int *esp);
 int *inthandler0c(int *esp);
 void hrb_api_linewin(struct SHEET *sht, int x0, int y0, int x1, int y1, int col);
+void cmd_rdrand(struct CONSOLE *cons, int memtotal);
 
 /* file.c */
 struct FILEINFO {
@@ -329,6 +348,18 @@ struct FILEINFO {
 	char reserve[10];
 	unsigned short time, date, clustno;
 	unsigned int size;
+};
+struct vfs_FILEINFO{
+	int type;;/*
+	0:存在标志
+	1:系统保留文件(不可被侦测，不可通过普通手段修改)
+	2:目录标志
+	*/
+	char* name;//名称
+	int make_time;//创建时间
+	int change_time;//更改世界
+	int size_of_page;//文件页数量
+	int node;//文件识别码
 };
 void file_readfat(int *fat, unsigned char *img);
 void file_loadfile(int clustno, int size, char *buf, int *fat, char *img);
@@ -340,5 +371,22 @@ int tek_getsize(unsigned char *p);
 int tek_decomp(unsigned char *p, char *q, int size);
 
 /* bootpack.c */
+
 struct TASK *open_constask(struct SHEET *sht, unsigned int memtotal);
 struct SHEET *open_console(struct SHTCTL *shtctl, unsigned int memtotal);
+
+/*dav.c*/
+struct DAVCTL{
+	int num;//设备数量
+	struct DAV* dav_list
+};
+struct DAV{
+	int type;//0 无效设备 1 字符设备 2 块设备
+	int index;//索引号
+	void* fun;//设备驱动程序地址
+	char name[32];//设备名称
+	char bus;//总线号
+	char device;//设备号
+	char function;//功能号
+};
+void davctl_init(struct DAVCTL* ctl,int num);

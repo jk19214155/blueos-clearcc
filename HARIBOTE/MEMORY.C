@@ -175,10 +175,11 @@ void init_page(struct PAGEMAN32 *man){
 	}
 	//初始化内核4K一级页表
 	j=0;
-	for (i=0x268000;i<0x269000;i+=4){
+	for (i=0x268000;i<0x269000-4;i+=4){
 		*(int*)i=(0x400000+0x1000*j) | 7;//4k页面，可读可写,存在标志,用户可以使用
 		j++;
 	}
+	*(int*)i=0x268007;
 	//初始化内核紧急页表
 	j=0;
 	for (i=0x269000;i<0x26a000;i+=4){
@@ -281,11 +282,13 @@ unsigned int memman_link_page_32(struct PAGEMAN32 *man,unsigned int cr3_address,
 	addr=addr+index;
 	if(mode==0){//没有想要链接的地址
 		physical_address=(physical_address&0xfff)|(memman_alloc_page_32(man));
-		return *(int*)addr=physical_address;
+		*(int*)addr=physical_address;
+		return physical_address;
 	}
 	*(int*)addr=physical_address;
 	return *(int*)addr;
 }
+
 
 unsigned int memman_unlink_page_32(struct PAGEMAN32 *man,unsigned int cr3_address,unsigned int linear_address){
 	int index,addr;
@@ -305,6 +308,92 @@ unsigned int memman_unlink_page_32(struct PAGEMAN32 *man,unsigned int cr3_addres
 	return res;
 }
 
+unsigned int pageman_link_page_32_m(struct PAGEMAN32 *man,unsigned int linear_address,unsigned int physical_address,int page_num,int mode){
+	int i;
+	if(mode==0){//没有要链接的页面
+		for(i=0;i<page_num;i++){
+			pageman_link_page_32(man,linear_address+i*0x1000,physical_address,mode);
+		}
+	}
+	else{
+		for(i=0;i<page_num;i++){
+			pageman_link_page_32(man,linear_address+i*0x1000,physical_address+i*0x1000,mode);
+		}
+	}
+	*(int*)0x0026f00c=man->free_page_num;
+	
+	return physical_address;
+}
+
+
+unsigned pageman_link_page_32(struct PAGEMAN32 *man,unsigned int linear_address,unsigned int physical_address,int mode){
+	int addr,i;
+	addr=0xfffff000|((linear_address>>20)&0xfffffffc);
+	if(((*(int*)addr)&1)==0){//要链接的目标页面不存在
+		*(int*)addr=memman_alloc_page_32(man)|7;
+	}
+	addr=0xffc00000|((linear_address>>10)&0xfffffffc);
+	if(mode==0){//没有想要链接的地址
+		physical_address=(physical_address&0xfff)|(memman_alloc_page_32(man));
+		*(int*)addr=physical_address;
+		return *(int*)addr;
+	}
+	*(int*)addr=physical_address;
+	return *(int*)addr;
+}
+
+unsigned int pageman_unlink_page_32_m(struct PAGEMAN32 *man,unsigned int linear_address,int page_num,int mode){
+	int i,addr;
+	for(i=page_num-1;i>=0;i--){
+		pageman_unlink_page_32(man,linear_address+i*0x1000,mode);
+		//addr=0xfffff000|((linear_address>>20)&0xfffffffc);
+	}
+	if(mode&1){//看一下一级页表是否已经空
+		int addr_from=(linear_address)&0xffc00000;//1M对齐
+		int addr_to=((linear_address+page_num*0x1000-0x1000)+0xcfffff)&0xffc00000;//1M对齐
+		for(i=addr_to;i>=addr_from;i-=0x400000){
+			addr=0xfffff000|((linear_address>>20)&0xfffffffc);
+			if(((*(int*)addr)&1)==0){//要链接的目标页面不存在
+				continue;
+			}
+			addr=0xffc00000|((linear_address>>10)&0xfffffffc);
+			int j;
+			for(j=0;j<0x1000;j+=4){
+				if((*(int*)addr+j)&1){//只要有一个页存在就不释放一级页表
+					break;
+				}
+			}
+			if(j<0x1000){
+				continue;//不释放
+			}
+			else{
+				addr=0xfffff000|((linear_address>>20)&0xfffffffc);
+				memman_free_page_32(man,*(int*)addr);
+				*(int*)addr=0;
+			}
+		}
+	}
+	*(int*)0x0026f00c=man->free_page_num;
+	
+	return 0;
+}
+
+
+unsigned pageman_unlink_page_32(struct PAGEMAN32 *man,unsigned int linear_address,int mode){
+	int addr,i,res;
+	addr=0xfffff000|((linear_address>>20)&0xfffffffc);
+	if(((*(int*)addr)&1)==0){//要链接的目标页面不存在
+		return 0;
+	}
+	addr=0xffc00000|((linear_address>>10)&0xfffffffc);
+	res=*(int*)addr;
+	*(int*)addr=0;
+	if(mode&1){
+		memman_free_page_32(man,res);
+	}
+	return res;
+}
+
 unsigned int memman_alloc_page_32(struct PAGEMAN32 *man){
 	int i;
 	for(i=0;i<0x100000;i++){
@@ -315,7 +404,10 @@ unsigned int memman_alloc_page_32(struct PAGEMAN32 *man){
 		}
 	}
 	*(int*)0x0026f010=man->free_page_num;//记录最后一次内存请求失败的时候的free值
-	for(;;);
+	for(;;){
+		io_cli();
+		io_hlt();
+	}
 	return -1;//没有找到可用的物理内存
 }
 
@@ -337,5 +429,50 @@ unsigned int memman_free_page_32(struct PAGEMAN32 *man,unsigned physical_address
 	}
 	man->mem_map_base[index]=0;//未使用;
 	*(int*)0x0026f00c=man->free_page_num;
+	return 0;
+}
+
+void memman_copy_page_32_m(struct PAGEMAN32 *man,unsigned int cr3_address_s,int cr3_address_d,unsigned int linear_address_s,unsigned int linear_address_d,int num){
+	int addr_s,addr_d;
+	int i;
+	for(i=0;i<num;i++){
+		int index,addr;
+		index=((linear_address_s+i<<12)>>20)&0xffc;
+		addr=index+cr3_address_s;
+		if((*(int*)addr)&1==0){//要链接的目标页面不存在
+			*(int*)addr=memman_alloc_page_32(man)|7;
+		}
+		addr=(*(int*)addr)&0xfffff000;//获取页表的地址
+		index=(((linear_address_s+i<<12)>>10)&0xffc);//保留中间10位索引
+		addr_s=addr+index;
+		
+		
+		index=((linear_address_d+i<<12)>>20)&0xffc;
+		addr=index+cr3_address_d;
+		if((*(int*)addr)&1==0){//要链接的目标页面不存在
+			*(int*)addr_s=0;
+			continue;
+		}
+		addr=(*(int*)addr)&0xfffff000;//获取页表的地址
+		index=(((linear_address_d+i<<12)>>10)&0xffc);//保留中间10位索引
+		addr_d=addr+index;
+		
+		*(int*)addr_d=*(int*)addr_s;
+	}
+	return;
+}
+
+int inthandler0e(int cr2,int* esp){
+	struct PAGEMAN32 *pageman=*(struct PAGEMAN32 **)ADR_PAGEMAN;
+	if(*esp&1){//缺页故障
+		memman_link_page_32(pageman,(task_now()->tss).cr3,cr2&0xfffff000,7,0);
+		return 0;
+	}
+	else{
+		for(;;){
+			io_cli();
+			io_hlt();
+		}
+	}
 	return 0;
 }

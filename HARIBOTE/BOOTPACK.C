@@ -21,6 +21,7 @@ void HariMain(int mode,...)
 	unsigned int memtotal;
 	struct MOUSE_DEC mdec;
 	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
+	struct MEMMAN *memman_core;
 	struct PAGEMAN32 struct_pageman;
 	unsigned char *buf_back, buf_mouse[256];
 	struct SHEET *sht_back, *sht_mouse;
@@ -55,18 +56,18 @@ void HariMain(int mode,...)
 	extern char hankaku[4096];
 	struct PAGEMAN32 *pageman = &struct_pageman;
 	init_gdtidt();//初始化gdt和idt
-	
 	//memtotal = memtest(0x00900000, 0xbfffffff);//初始化内存
 	memman_init(memman);
 	//memman_free(memman, 0x00001000, 0x0009e000); /* 0x00001000 - 0x0009efff */
 	//memman_free(memman, 0x00900000, memtotal - 0xb0000000);
-	memman_free(memman, 0x00900000, 0xb0000000);//虚拟空间的地址大小
+	memman_free(memman, 0xc0200000, 0xdfffffff);//虚拟空间的地址大小
 	init_page(pageman);//初始化分页
 	memmam_link_page_32_m(pageman,0x268000,0xc0000000,0x00270007,16,1);//gdt映射到本来的位置
 	memmam_link_page_32_m(pageman,0x268000,0xc0020000,0x0026f007,1,1);//idt映射到本来的位置
 	memmam_link_page_32_m(pageman,0x268000,0xc0100000,0x00280007,128,1);//haribote.hrb映射到高地址
 	memmam_link_page_32_m(pageman,0x268000,0x07,0x07,0x900,1);//低地址映射到本来的位置
-	memmam_link_page_32_m(pageman,0x268000,0xe0000000,0xe0000007,0x20000,1);//高地址映射到本来的位置
+	memmam_link_page_32_m(pageman,0x268000,0xe0000000,0xe0000007,0x20000-1024,1);//高地址映射到本来的位置
+	//memmam_link_page_32_m(pageman,0x268000,0xfffff000,0x268007,1,1);//顶端页面映射自身
 	*((struct PAGEMAN32 **)ADR_PAGEMAN)=pageman;//保存变量
 	
 	j=load_cr0();
@@ -75,6 +76,12 @@ void HariMain(int mode,...)
 	store_cr0(j);
 	load_gdtr(0xffff,0xc0000000);//重载gdt至高位内存
 	load_idtr(0xffff,0xc0020800);//重载idt至高位内存
+	//初始化另一个内存控制器
+	//int p=memman_alloc_4k(memman,sizeof(struct MEMMAN));
+	//pageman_link_page_32_m(pageman,p,7,(sizeof(struct MEMMAN)+0xfff)&0xfffff000,0);
+	//memman_init(p);
+	//memman_free(memman, 0xc00000, 0xc0000000);//虚拟空间的地址大小
+	//*(int*)(MEMMAN_CORE_ADDR)=p;//保存变量
 	
 	if(support_apic()==1){//存在local_apic?使用local-apic?理中断
 		init_apic((void*)0xfee00000);
@@ -104,6 +111,7 @@ void HariMain(int mode,...)
 	shtctl = shtctl_init(memman,pageman, binfo->vram, binfo->scrnx, binfo->scrny);
 	//运行第一个任务
 	task_a = task_init(memman);
+	task->tss.cr3=0x268000;
 	fifo.task = task_a;
 	task_run(task_a, 1, 2);
 	*((int *) 0x0fe4) = (int) shtctl;
@@ -116,8 +124,8 @@ void HariMain(int mode,...)
 	sheet_setbuf(sht_back, buf_back, binfo->scrnx, binfo->scrny, -1); /* 透明色なし */
 	init_screen8(buf_back, binfo->scrnx, binfo->scrny);
 	/* sht_cons */
-	key_win = open_console(shtctl, memtotal);
-
+	//key_win = open_console(shtctl, memtotal);
+	key_win = 0;
 	/* sht_mouse */
 	sht_mouse = sheet_alloc(shtctl);
 	sheet_setbuf(sht_mouse, buf_mouse, 16, 16, 99);
@@ -163,6 +171,7 @@ void HariMain(int mode,...)
 		memman_free_page_32(pageman,p);
 	}
 	memman_free_4k(memman, (int) fat, 4 * 2880);
+	//for(;;);
 	for (;;) {
 		if (fifo32_status(&keycmd) > 0 && keycmd_wait < 0) {
 			/* キーボードコントローラに送るデータがあれば、送る */
@@ -405,11 +414,12 @@ struct TASK *open_constask(struct SHEET *sht, unsigned int memtotal)
 {
 	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
 	struct PAGEMAN32 *pageman=*((struct PAGEMAN32 **)ADR_PAGEMAN);
-	struct TASK *task = task_alloc();
+	struct TASK *task = task_alloc(),*task_now0=task_now();
+	int i;
 	int *cons_fifo = (int *) memman_alloc_4k(memman, 128 * 4);//内存分配!!!
 	memmam_link_page_32_m(pageman,0x268000,cons_fifo,7, 1,0);//
 	task->cons_stack = memman_alloc_4k(memman, 64 * 1024);//内存分配!!!
-	memmam_link_page_32_m(pageman,0x268000,task->cons_stack,7,0x10,0);//
+	pageman_link_page_32_m(pageman,task->cons_stack,7,0x10,0);//
 	task->tss.esp = task->cons_stack + 64 * 1024 - 12;
 	task->tss.eip = (int) &console_task;
 	task->tss.es = 1 * 8;
@@ -418,8 +428,28 @@ struct TASK *open_constask(struct SHEET *sht, unsigned int memtotal)
 	task->tss.ds = 1 * 8;
 	task->tss.fs = 1 * 8;
 	task->tss.gs = 1 * 8;
+	task->task_sheet_max=8;//最大图层数量
+	int p=memman_alloc_4k(memman,4096);
+	int pp=memman_alloc_page_32(pageman);
+	pageman_link_page_32(pageman,p,pp|7,1);
+	//memmam_link_page_32_m(pageman,p,0xfffff000,pp&7,1,1);//顶端页面映射自身
+	*(int*)(p+0xfff-3)=pp|7;
+	for(i=0xc00;i<=0xfff-4;i++){
+		*(char*)(p+i)=*(char*)(0xfffff000+i);//复制高端页表
+	}
+	for(i=0x00;i<3;i++){
+		*(int*)(p+i*4)=*(int*)(0xfffff000+i*4);//复制低端页表12M
+	}
+	task->tss.cr3=pp&0xfffff000;
+	
+	task->memman=memman_alloc_4k(memman,sizeof(struct MEMMAN));;//应用程序的内存控制器
+	memmam_link_page_32_m(pageman,0x268000,task->memman,7,(sizeof(struct MEMMAN)+0xfff)>>12,0);
+	memman_init(task->memman);
+	memman_free(task->memman,0x00c00000,0xbfffffff);
+	
 	*((int *) (task->tss.esp + 4)) = (int) sht;
 	*((int *) (task->tss.esp + 8)) = memtotal;
+	add_child_task(task_now0,task);//命令行是主进程的子进程
 	task_run(task, 2, 2); /* level=2, priority=2 */
 	fifo32_init(&task->fifo, 128, cons_fifo, task);
 	return task;
