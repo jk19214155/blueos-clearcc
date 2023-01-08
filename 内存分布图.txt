@@ -27,8 +27,8 @@
 0x0026f00c(int) last_free_page_num
 0x0026f010(int) last_err_free_page_num
 0x0026f014(int) memman_core
-0x0026f018(int) memm
-0x0026f01c(int) memma
+0x0026f018(int) shtctl[10]
+0x0026f01c(int) shtctl_num
 
 
 00:00:10.565085 0000000000000000-000000000009ffff 0000000000000000 Conventional RAM

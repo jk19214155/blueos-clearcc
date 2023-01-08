@@ -205,14 +205,16 @@ int inthandler0e(int cr2,int* esp);
 struct SHEET {
 	unsigned char *buf;
 	int bxsize, bysize, vx0, vy0, col_inv, height, flags;
-	struct SHTCTL *ctl;
+	struct SHTCTL *ctl;//属于哪一个图层管理器
 	struct TASK *task;
+	int listener;//0 监听器有效 1 监听出入操作 2 监听点击操作 3 监听滑动事件
 };
 struct SHTCTL {
 	unsigned char *vram, *map;
 	int xsize, ysize, top;
-	struct SHEET *sheets[MAX_SHEETS];
-	struct SHEET sheets0[MAX_SHEETS];
+	int sheets0_size;//公共图层数据数组包含的图层数量
+	struct SHEET *sheets[MAX_SHEETS];//本图层控制器控制的图层列表
+	struct SHEET *sheets0;//公共图层数据数组
 };
 struct SHTCTL *shtctl_init(struct MEMMAN *memman,struct PAGEMAN32 *pageman, unsigned char *vram, int xsize, int ysize);
 struct SHEET *sheet_alloc(struct SHTCTL *ctl);

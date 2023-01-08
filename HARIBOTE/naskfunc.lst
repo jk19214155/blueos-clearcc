@@ -470,3 +470,4 @@
    470 000002D2                                 _rdrand: ;int rdrand()
    471 000002D2 0F C7 F0                        	db 0x0f,0xc7,0xf0 ;rnrand eax
    472 000002D5 C3                              	ret
+   473 000002D6                                 _invlpg:

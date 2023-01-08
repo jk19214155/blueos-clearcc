@@ -112,7 +112,8 @@ void console_task(struct SHEET *sheet, int memtotal)
 					boxfill8(cons.sht->buf, cons.sht->bxsize, cons.cur_c, 
 						cons.cur_x, cons.cur_y, cons.cur_x + 7, cons.cur_y + 15);
 				}
-				sheet_refresh(cons.sht, cons.cur_x, cons.cur_y, cons.cur_x + 8, cons.cur_y + 16);
+				if((cons.sht)->ctl==*(int*)0x0fe4)//当前图层的控制器与活动图层控制器相同
+					sheet_refresh(cons.sht, cons.cur_x, cons.cur_y, cons.cur_x + 8, cons.cur_y + 16);
 			}
 		}
 	}
@@ -318,7 +319,7 @@ void cmd_exit(struct CONSOLE *cons, int *fat)
 	}
 }
 
-void cmd_start(struct CONSOLE *cons, char *cmdline, int memtotal)
+void cmd_start(struct CONSOLE *cons, char *cmdline, int memtotal)//cmd start命令调用此函数
 {
 	struct SHTCTL *shtctl = (struct SHTCTL *) *((int *) 0x0fe4);
 	struct SHEET *sht = open_console(shtctl, memtotal);
@@ -411,13 +412,17 @@ int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline)
 			for (i = 0; i < datsiz; i++) {
 				q[esp + i] = p[dathrb + i];
 			}
-			start_app(0x1b, 2 * 8 + 4, esp, 3 * 8 + 4, &(task->tss.esp0));
-			shtctl = (struct SHTCTL *) *((int *) 0x0fe4);
-			for (i = 0; i < MAX_SHEETS; i++) {
-				sht = &(shtctl->sheets0[i]);
-				if ((sht->flags & 0x11) == 0x11 && sht->task == task) {
-					/* アプリが開きっぱなしにした下じきを発見 */
-					sheet_free(sht);	/* 閉じる */
+			start_app(0x1b, 2 * 8 + 4, esp, 3 * 8 + 4, &(task->tss.esp0));/*eip,cs,esp,ss,esp0*/
+			struct SHTCTL** shtctl_base=*(int*)0x0026f018;
+			int j;
+			for(j=0;j<(*(int*)0x0026f01c);j++){//遍历所有图层控制器
+				shtctl = shtctl_base[j];//图层控制器
+				for (i = 0; i < MAX_SHEETS; i++) {
+					sht = &(shtctl->sheets0[i]);
+					if ((sht->flags & 0x11) == 0x11 && sht->task == task) {//检索所有当前任务创建的且是应用程序标签的图层
+						/* アプリが開きっぱなしにした下じきを発見 */
+						sheet_free(sht);	//释放
+					}
 				}
 			}
 			for (i = 0; i < 8; i++) {	/* クローズしてないファイルをクローズ */
@@ -485,8 +490,6 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 		int addr_from=(ebx + ds_base);
 		//int addr_to=memman_alloc_4k(memman_os,esi*edi+0x1fff);//这里需要根据窗口大小修改
 		int addr_to=0xd0000000;
-		*(int*)0x0026f018=addr_from;
-		*(int*)0x0026f01c=addr_to;
 		{
 			int i;
 			char s[30];
@@ -690,6 +693,8 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 		reg[7] = i;
 	} else if (edx == 27) {//设置语言
 		reg[7] = task->langmode;
+	} else if (edx == 28) {//获取鼠标
+		
 	}
 	return 0;
 }

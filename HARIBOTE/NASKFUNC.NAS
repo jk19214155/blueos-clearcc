@@ -470,3 +470,4 @@ _support_rand: ;int support_rand()
 _rdrand: ;int rdrand()
 	db 0x0f,0xc7,0xf0 ;rnrand eax
 	ret
+_invlpg:

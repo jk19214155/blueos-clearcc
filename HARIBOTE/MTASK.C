@@ -226,6 +226,7 @@ struct TASK *task_alloc(void)
 			task->taskctl=0;
 			task->timerctl=0;
 			task->shtctl=0;
+			//task->fifo_mouse_updown_listen_num=0;//不监听鼠标事件
 			return task;
 		}
 	}
