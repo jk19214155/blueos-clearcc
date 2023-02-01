@@ -6,7 +6,7 @@ struct BOOTINFO { /* 0x0ff0-0x0fff */
 	char vmode; /* ビデオモード  何ビットカラーか */
 	char reserve;
 	short scrnx, scrny; /* 画面解像度 */
-	char *vram;
+	void *vram;
 };
 #define ADR_BOOTINFO	0x00000ff0
 #define ADR_DISKIMG		0x00100000
@@ -82,28 +82,35 @@ int fifo32_status(struct FIFO32 *fifo);
 void init_palette(void);
 void set_palette(int start, int end, unsigned char *rgb);
 void boxfill8(unsigned char *vram, int xsize, unsigned char c, int x0, int y0, int x1, int y1);
+void boxfill32(unsigned int *vram, int xsize, unsigned int c, int x0, int y0, int x1, int y1);
 void init_screen8(char *vram, int x, int y);
+void init_screen32(int *vram, int x, int y);
 void putfont8(char *vram, int xsize, int x, int y, char c, char *font);
+void putfont32(int *vram, int xsize, int x, int y, int c, char *font);
 void putfonts8_asc(char *vram, int xsize, int x, int y, char c, unsigned char *s);
+void putfonts32_asc(int *vram, int xsize, int x, int y, int c, unsigned char *s);
 void init_mouse_cursor8(char *mouse, char bc);
+void init_mouse_cursor32(int *mouse, char bc);
 void putblock8_8(char *vram, int vxsize, int pxsize,
 	int pysize, int px0, int py0, char *buf, int bxsize);
+void putblock8_32(int *vram, int vxsize, int pxsize,
+	int pysize, int px0, int py0, int *buf, int bxsize);
 #define COL8_000000		0
-#define COL8_FF0000		1
-#define COL8_00FF00		2
-#define COL8_FFFF00		3
-#define COL8_0000FF		4
-#define COL8_FF00FF		5
-#define COL8_00FFFF		6
-#define COL8_FFFFFF		7
-#define COL8_C6C6C6		8
-#define COL8_840000		9
-#define COL8_008400		10
-#define COL8_848400		11
-#define COL8_000084		12
-#define COL8_840084		13
-#define COL8_008484		14
-#define COL8_848484		15
+#define COL8_FF0000		0x00FF0000
+#define COL8_00FF00		0x0000ff00
+#define COL8_FFFF00		0x00ffff00
+#define COL8_0000FF		0x000000ff
+#define COL8_FF00FF		0x00ff00ff
+#define COL8_00FFFF		0x0000ffff
+#define COL8_FFFFFF		0x00ffffff
+#define COL8_C6C6C6		0x00c6c6c6
+#define COL8_840000		0x00840000
+#define COL8_008400		0x00008400
+#define COL8_848400		0x00848400
+#define COL8_000084		0x00000084
+#define COL8_840084		0x00840084
+#define COL8_008484		0x00008484
+#define COL8_848484		0x00848484
 
 /* dsctbl.c */
 struct SEGMENT_DESCRIPTOR {
@@ -203,18 +210,35 @@ int inthandler0e(int cr2,int* esp);
 /* sheet.c */
 #define MAX_SHEETS		256
 struct SHEET {
-	unsigned char *buf;
+	union{
+		void *buf;
+		unsigned int *buf32;
+	};
+	void* buf4clear;//透明通透的结果
 	int bxsize, bysize, vx0, vy0, col_inv, height, flags;
+	int sid;//图层在图层控制器中的id
+	/*
+	flags:0x10 应用程序图层 0x01图层有效,0x02,锁定的图层,0x04 图层通透性开启
+	*/
 	struct SHTCTL *ctl;//属于哪一个图层管理器
+	struct SHTCTL *ctl_from;//本图层是否由另一个图层控制器生成?
 	struct TASK *task;
-	int listener;//0 监听器有效 1 监听出入操作 2 监听点击操作 3 监听滑动事件
+	struct VIEW_FUNC* func;
+};
+struct DISPLAY{
+	void (*sheet_refreshsub)(struct SHTCTL* ctl, int vx0, int vy0, int vx1, int vy1, int h0, int h1);
 };
 struct SHTCTL {
-	unsigned char *vram, *map;
+	void *vram;//图层管理器输出buff
+	void *map;//图层排布buff(总体显示情况)
+	struct SHEET* sid[256];//id分配情况
+	unsigned char* opacity;//map图层透明度
 	int xsize, ysize, top;
 	int sheets0_size;//公共图层数据数组包含的图层数量
 	struct SHEET *sheets[MAX_SHEETS];//本图层控制器控制的图层列表
-	struct SHEET *sheets0;//公共图层数据数组
+	struct View *sheets0;//公共图层数据数组
+	struct SHEET *vram4sht;//该图层控制器的输出是否接到了一个图层上
+	struct DISPLAY func;//操作函数
 };
 struct SHTCTL *shtctl_init(struct MEMMAN *memman,struct PAGEMAN32 *pageman, unsigned char *vram, int xsize, int ysize);
 struct SHEET *sheet_alloc(struct SHTCTL *ctl);
@@ -223,6 +247,71 @@ void sheet_updown(struct SHEET *sht, int height);
 void sheet_refresh(struct SHEET *sht, int bx0, int by0, int bx1, int by1);
 void sheet_slide(struct SHEET *sht, int vx0, int vy0);
 void sheet_free(struct SHEET *sht);
+void sheet_refreshsub24(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, int h0, int h1);
+void sheet_refreshsub32(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, int h0, int h1);
+
+/*view.c*/
+struct View {//由SHEET类派生而来 type：1
+	struct SHEET sht;
+	struct View* top;//上层控件
+	struct View* next;//下一个控件
+	struct View* child;//子控件
+	int background_color;//背景色
+};
+void view_init(struct View* view);
+void view_setfunc(struct View* self,struct VIEW_FUNC* func);
+void view_flush(struct View* self,int x0,int y0,int x1,int y1);//控制器刷新函数
+struct VIEW_FUNC{
+	void* (*mouse_down)(struct View* self,int x,int y);//鼠标按下事件
+	void* (*mouse_up)(struct View* self,int x,int y);//鼠标抬起事件
+	void* (*mouse_move)(struct View* self,int x1,int y1,int x2,int y2);//鼠标移动事件
+	void* (*get_sign)(struct View* self);//获取鼠标焦点
+	void* (*lost_sign)(struct View* self);//失去鼠标焦点
+};
+struct TextView{
+	struct View view;
+	char* text;//文本内容
+	int color;
+};
+void textview_init(struct TextView* self,char* text);
+void textview_settext(struct TextView* self,char* text);
+void textview_flush(struct TextView* self);
+struct Button{
+	struct View view;
+	char* text;//显示的文本
+	int color;//文本颜色
+};
+void button_init(struct Button self);
+void button_flush(struct Button* self);
+void listview_init(struct ListView self,struct List list);
+void listview_additem(struct ListView self,struct Item item);
+struct List{//列表类
+	int index;//当前选中的目录项目
+	int num;//目录项数量
+	int item_size;//目录项指针大小
+	void* list;//目录项列表
+};
+struct ListView{//列表基础类
+	struct View view;
+	struct List list;
+};
+void list_init(struct List self,int item_size);
+struct Item{//选项基础类
+	struct ListView* listview;
+	struct Item* next;
+	struct Item* up;
+	char* text;//选项文本
+	char* info;//选项描述
+};
+void item_init(struct Item self);
+void item_flush();
+struct MenuView{//菜单控件
+	struct ListView listview;
+};
+struct task_abort{//应用程序终止列表
+	struct task_abort* next;
+	struct TASK* task;//要终止的任务
+};
 
 /* timer.c */
 #define MAX_TIMER		500
@@ -281,6 +370,8 @@ struct TASK {
 	struct TASKCTL* taskctl;//应用程序的多线程管理器
 	struct TIMERCTL* timerctl;//应用程序定时器管理器
 	struct SHTCTL* shtctl;//应用程序图层管理器
+	int id_high;//任务唯一id值高位
+	int id_low;//任务唯一id值低位
 };
 struct TASKLEVEL {
 	int running; /* 動作しているタスクの数 */
@@ -290,8 +381,11 @@ struct TASKLEVEL {
 struct TASKCTL {
 	int now_lv; /* 現在動作中のレベル */
 	char lv_change; /* 次回タスクスイッチのときに、レベルも変えたほうがいいかどうか */
+	int id_high;//下一个任务id高位
+	int id_low;//下一个任务id低位
 	struct TASKLEVEL level[MAX_TASKLEVELS];
 	struct TASK tasks0[MAX_TASKS];
+	
 };
 extern struct TASKCTL *taskctl;
 extern struct TIMER *task_timer;
@@ -307,6 +401,11 @@ void putfonts8_asc_sht(struct SHEET *sht, int x, int y, int c, int b, char *s, i
 void make_textbox8(struct SHEET *sht, int x0, int y0, int sx, int sy, int c);
 void make_wtitle8(unsigned char *buf, int xsize, char *title, char act);
 void change_wtitle8(struct SHEET *sht, char act);
+void make_window32(unsigned int *buf, int xsize, int ysize, char *title, char act);
+void putfonts8_asc_sht32(struct SHEET *sht, int x, int y, int c, int b, char *s, int l);
+void make_textbox32(struct SHEET *sht, int x0, int y0, int sx, int sy, int c);
+void make_wtitle32(unsigned int *buf, int xsize, char *title, char act);
+void change_wtitle32(struct SHEET *sht, char act);
 
 /* console.c */
 struct CONSOLE {
@@ -343,7 +442,7 @@ int *inthandler0d(int *esp);
 int *inthandler0c(int *esp);
 void hrb_api_linewin(struct SHEET *sht, int x0, int y0, int x1, int y1, int col);
 void cmd_rdrand(struct CONSOLE *cons, int memtotal);
-
+void cons_set_system_task(struct TASK* task);
 /* file.c */
 struct FILEINFO {
 	unsigned char name[8], ext[3], type;
@@ -392,3 +491,9 @@ struct DAV{
 	char function;//功能号
 };
 void davctl_init(struct DAVCTL* ctl,int num);
+/*desktop.c*/
+struct SHEET* desktop_task(struct SHEET* sheet);
+struct TASK *desktop_start();
+/*system.c*/
+struct TASK* system_start();
+void system_task_abort(struct task_abort* task);

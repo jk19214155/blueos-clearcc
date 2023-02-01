@@ -3,6 +3,7 @@
 #include "bootpack.h"
 #include <stdio.h>
 #include <string.h>
+extern struct TASK* system_task;
 void console_task(struct SHEET *sheet, int memtotal)
 {
 	struct PAGEMAN32 *pageman=*(struct PAGEMAN32 **)ADR_PAGEMAN;
@@ -41,7 +42,6 @@ void console_task(struct SHEET *sheet, int memtotal)
 
 	/* プロンプト表示 */
 	cons_putchar(&cons, '>', 1);
-
 	for (;;) {
 		io_cli();
 		if (fifo32_status(&task->fifo) == 0) {
@@ -69,7 +69,7 @@ void console_task(struct SHEET *sheet, int memtotal)
 			}
 			if (i == 3) {	/* カーソルOFF */
 				if (cons.sht != 0) {
-					boxfill8(cons.sht->buf, cons.sht->bxsize, COL8_000000,
+					boxfill32(cons.sht->buf, cons.sht->bxsize, COL8_000000,
 						cons.cur_x, cons.cur_y, cons.cur_x + 7, cons.cur_y + 15);
 				}
 				cons.cur_c = -1;
@@ -109,7 +109,7 @@ void console_task(struct SHEET *sheet, int memtotal)
 			/* カーソル再表示 */
 			if (cons.sht != 0) {
 				if (cons.cur_c >= 0) {
-					boxfill8(cons.sht->buf, cons.sht->bxsize, cons.cur_c, 
+					boxfill32(cons.sht->buf, cons.sht->bxsize, cons.cur_c, 
 						cons.cur_x, cons.cur_y, cons.cur_x + 7, cons.cur_y + 15);
 				}
 				if((cons.sht)->ctl==*(int*)0x0fe4)//当前图层的控制器与活动图层控制器相同
@@ -127,7 +127,7 @@ void cons_putchar(struct CONSOLE *cons, int chr, char move)
 	if (s[0] == 0x09) {	/* タブ */
 		for (;;) {
 			if (cons->sht != 0) {
-				putfonts8_asc_sht(cons->sht, cons->cur_x, cons->cur_y, COL8_FFFFFF, COL8_000000, " ", 1);
+				putfonts8_asc_sht32(cons->sht, cons->cur_x, cons->cur_y, COL8_FFFFFF, COL8_000000, " ", 1);
 			}
 			cons->cur_x += 8;
 			if (cons->cur_x == 8 + 240) {
@@ -143,7 +143,7 @@ void cons_putchar(struct CONSOLE *cons, int chr, char move)
 		/* とりあえずなにもしない */
 	} else {	/* 普通の文字 */
 		if (cons->sht != 0) {
-			putfonts8_asc_sht(cons->sht, cons->cur_x, cons->cur_y, COL8_FFFFFF, COL8_000000, s, 1);
+			putfonts8_asc_sht32(cons->sht, cons->cur_x, cons->cur_y, COL8_FFFFFF, COL8_000000, s, 1);
 		}
 		if (move != 0) {
 			/* moveが0のときはカーソルを進めない */
@@ -168,15 +168,16 @@ void cons_newline(struct CONSOLE *cons)
 		if (sheet != 0) {
 			for (y = 28; y < 28 + 112; y++) {
 				for (x = 8; x < 8 + 240; x++) {
-					sheet->buf[x + y * sheet->bxsize] = sheet->buf[x + (y + 16) * sheet->bxsize];
+					sheet->buf32[x + y * sheet->bxsize] = sheet->buf32[x + (y + 16) * sheet->bxsize];
 				}
 			}
 			for (y = 28 + 112; y < 28 + 128; y++) {
 				for (x = 8; x < 8 + 240; x++) {
-					sheet->buf[x + y * sheet->bxsize] = COL8_000000;
+					sheet->buf32[x + y * sheet->bxsize] = COL8_000000;
 				}
 			}
-			sheet_refresh(sheet, 8, 28, 8 + 240, 28 + 128);
+			if(sheet->ctl==*(int*)0x0fe4)//当前图层的控制器与活动图层控制器相同
+				sheet_refresh(sheet, 8, 28, 8 + 240, 28 + 128);//换行以后刷新图层
 		}
 	}
 	cons->cur_x = 8;
@@ -226,6 +227,9 @@ void cons_runcmd(char *cmdline, struct CONSOLE *cons, int *fat, int memtotal)
 	} else if (strcmp(cmdline, "rdrand") ==0){
 		cmd_rdrand(cons, cmdline);
 	}
+	else if (strcmp(cmdline,"desktop") ==0){//开启桌面
+		desktop_start();
+	}
 	else if (cmdline[0] != 0) {
 		if (cmd_app(cons, fat, cmdline) == 0) {
 			/* コマンドではなく、アプリでもなく、さらに空行でもない */
@@ -257,10 +261,11 @@ void cmd_cls(struct CONSOLE *cons)
 	struct SHEET *sheet = cons->sht;
 	for (y = 28; y < 28 + 128; y++) {
 		for (x = 8; x < 8 + 240; x++) {
-			sheet->buf[x + y * sheet->bxsize] = COL8_000000;
+			sheet->buf32[x + y * sheet->bxsize] = COL8_000000;
 		}
 	}
-	sheet_refresh(sheet, 8, 28, 8 + 240, 28 + 128);
+	if(sheet->ctl==*(int*)0x0fe4)//当前图层的控制器与活动图层控制器相同
+		sheet_refresh(sheet, 8, 28, 8 + 240, 28 + 128);
 	cons->cur_y = 28;
 	return;
 }
@@ -297,23 +302,36 @@ void cmd_exit(struct CONSOLE *cons, int *fat)
 	struct MEMMAN *memman =  task_now()->memman;
 	struct TASK *task = task_now();
 	struct SHTCTL *shtctl = (struct SHTCTL *) *((int *) 0x0fe4);
-	struct FIFO32 *fifo = (struct FIFO32 *) *((int *) 0x0fec);
+	struct FIFO32 *fifo = &system_task->fifo;
+	struct task_abort struct_task_abort;
 	int i;
+	
+	char str[30];
+	sprintf(str,"sht is %x\n",cons->sht);
+	cons_putstr0(cons,str);
+	
 	if (cons->sht != 0) {
 		timer_cancel(cons->timer);
 	}
+	//释放fat
 	for(i=0;i<3;i++){
 		void* p=pageman_unlink_page_32(pageman,(int)fat+0x1000*i,1);
-		memman_free_page_32(pageman,p);
+		//memman_free_page_32(pageman,p);
 	}
 	memman_free_4k(memman, (int) fat, 4 * 2880);
-	io_cli();
+
 	if (cons->sht != 0) {
-		fifo32_put(fifo, cons->sht - shtctl->sheets0 + 768);	/* 768～1023 */
-	} else {
-		fifo32_put(fifo, task - taskctl->tasks0 + 1024);	/* 1024～2023 */
-	}
-	io_sti();
+		//释放图层
+		for(i=0;i<(256 * 165+0xfff)>>12;i++){
+			void* po=pageman_unlink_page_32(pageman,(int)(cons->sht->buf)+0x1000*i,1);
+			//memman_free_page_32(pageman,po);
+		}
+		memman_free_4k(memman, (int) cons->sht->buf, 256 * 165);
+		sheet_free(cons->sht);
+	} 
+	struct_task_abort.task=task;
+	system_task_abort(&struct_task_abort);
+	fifo32_put(fifo, 5);
 	for (;;) {
 		task_sleep(task);
 	}
@@ -425,11 +443,11 @@ int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline)
 					}
 				}
 			}
-			for (i = 0; i < 8; i++) {	/* クローズしてないファイルをクローズ */
+			for (i = 0; i < 8; i++) {	//查看打开的文件列表
 				if (task->fhandle[i].buf != 0) {
 					for(i=0;i<(task->fhandle[i].size+0xfff)>>12;i++){
 						void* po=pageman_unlink_page_32(pageman,(int)(task->fhandle[i].buf)+0x1000*i,1);
-						memman_free_page_32(pageman,po);
+						//memman_free_page_32(pageman,po);
 					}
 					memman_free_4k(memman, (int) task->fhandle[i].buf, task->fhandle[i].size);
 					task->fhandle[i].buf = 0;
@@ -438,7 +456,7 @@ int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline)
 			timer_cancelall(&task->fifo);
 			for(i=0;i<(segsiz+0xfff)>>12;i++){
 				void* po=pageman_unlink_page_32(task_now()->memman,(int)q+0x1000*i,1);
-				memman_free_page_32(pageman,po);
+				//memman_free_page_32(pageman,po);
 			}
 			memman_free_4k(memman, (int) q, segsiz);
 			task->langbyte1 = 0;
@@ -447,7 +465,7 @@ int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline)
 		}
 		for(i=0;i<((appsiz+0xfff)>>12);i++){
 			void* po=pageman_unlink_page_32(pageman,(int)p+0x1000*i,1);
-			memman_free_page_32(pageman,po);
+			//memman_free_page_32(pageman,po);
 		}
 		memman_free_4k(memman, (int) p, appsiz);
 		cons_newline(cons);
@@ -488,8 +506,8 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 	/*原来的代码分配的内存空间在用户空间，需要将这部分映射到高地址被全局访问*/
 		/*接下来链接目标页面*/
 		int addr_from=(ebx + ds_base);
-		//int addr_to=memman_alloc_4k(memman_os,esi*edi+0x1fff);//这里需要根据窗口大小修改
-		int addr_to=0xd0000000;
+		int addr_to=memman_alloc_4k(memman_os,esi*edi*4+0x1fff);//这里需要根据窗口大小修改
+		//int addr_to=0xd0000000;
 		{
 			int i;
 			char s[30];
@@ -509,15 +527,17 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 		reg[7] = (int) sht;
 	} else if (edx == 6) {//在指定窗口画一个字符
 		sht = (struct SHEET *) (ebx & 0xfffffffe);
-		putfonts8_asc(sht->buf, sht->bxsize, esi, edi, eax, (char *) ebp + ds_base);
+		putfonts32_asc(sht->buf, sht->bxsize, esi, edi, eax, (char *) ebp + ds_base);
 		if ((ebx & 1) == 0) {
-			sheet_refresh(sht, esi, edi, esi + ecx * 8, edi + 16);
+			if(sht->ctl==*(int*)0x0fe4)//当前图层的控制器与活动图层控制器相同
+				sheet_refresh(sht, esi, edi, esi + ecx * 8, edi + 16);
 		}
 	} else if (edx == 7) {//在指定窗口画一个矩形
 		sht = (struct SHEET *) (ebx & 0xfffffffe);
-		boxfill8(sht->buf, sht->bxsize, ebp, eax, ecx, esi, edi);
+		boxfill32(sht->buf, sht->bxsize, ebp, eax, ecx, esi, edi);
 		if ((ebx & 1) == 0) {
-			sheet_refresh(sht, eax, ecx, esi + 1, edi + 1);
+			if(sht->ctl==*(int*)0x0fe4)//当前图层的控制器与活动图层控制器相同
+				sheet_refresh(sht, eax, ecx, esi + 1, edi + 1);
 		}
 	} else if (edx == 8) {//应用程序用malloc_init
 		memman_init((struct MEMMAN *) (ebx + ds_base));
@@ -531,13 +551,15 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 		memman_free((struct MEMMAN *) (ebx + ds_base), eax, ecx);
 	} else if (edx == 11) {//在指定图层画一个像素
 		sht = (struct SHEET *) (ebx & 0xfffffffe);
-		sht->buf[sht->bxsize * edi + esi] = eax;
+		sht->buf32[sht->bxsize * edi + esi] = eax;
 		if ((ebx & 1) == 0) {
-			sheet_refresh(sht, esi, edi, esi + 1, edi + 1);
+			if(sht->ctl==*(int*)0x0fe4)//当前图层的控制器与活动图层控制器相同
+				sheet_refresh(sht, esi, edi, esi + 1, edi + 1);
 		}
 	} else if (edx == 12) {//强制刷新窗口
 		sht = (struct SHEET *) ebx;
-		sheet_refresh(sht, eax, ecx, esi, edi);
+		if(sht->ctl==*(int*)0x0fe4)//当前图层的控制器与活动图层控制器相同
+			sheet_refresh(sht, eax, ecx, esi, edi);
 	} else if (edx == 13) {//在指定窗口画直线
 		sht = (struct SHEET *) (ebx & 0xfffffffe);
 		hrb_api_linewin(sht, eax, ecx, esi, edi, ebp);
@@ -552,7 +574,8 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 				ecx = edi;
 				edi = i;
 			}
-			sheet_refresh(sht, eax, ecx, esi + 1, edi + 1);
+			if(sht->ctl==*(int*)0x0fe4)//当前图层的控制器与活动图层控制器相同
+				sheet_refresh(sht, eax, ecx, esi + 1, edi + 1);
 		}
 	} else if (edx == 14) {//关闭窗口(直接清楚图层)
 		sheet_free((struct SHEET *) ebx);
@@ -584,7 +607,7 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 			if (i == 4) {	/* コンソールだけを閉じる */
 				timer_cancel(cons->timer);
 				io_cli();
-				fifo32_put(sys_fifo, cons->sht - shtctl->sheets0 + 2024);	/* 2024～2279 */
+				fifo32_put(sys_fifo, cons->sht->sid + 2024);	/* 2024～2279 */
 				cons->sht = 0;
 				io_sti();
 			}
@@ -630,22 +653,25 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 			finfo = file_search((char *) ebx + ds_base,
 					(struct FILEINFO *) (ADR_DISKIMG + 0x002600), 224);
 			if (finfo != 0) {
-				reg[7] = (int) fh;
+				//reg[7] = (int) fh;
+				reg[7] = (int) i+1;
 				fh->size = finfo->size;
 				fh->pos = 0;
 				fh->buf = file_loadfile2(finfo->clustno, &fh->size, task->fat);
 			}
 		}
 	} else if (edx == 22) {//关闭文件fclose
-		fh = (struct FILEHANDLE *) eax;
-		for(i=0;i<(fh->size+0xfff)>>12;i++){
-			void* p=pageman_unlink_page_32(pageman,(int)(fh->buf)+0x1000*i,1);
-			memman_free_page_32(pageman,p);
+		fh = &task->fhandle[eax-1];
+		if(fh->buf!=0){
+			for(i=0;i<(fh->size+0xfff)>>12;i++){
+				void* p=pageman_unlink_page_32(pageman,(int)(fh->buf)+0x1000*i,1);
+				//memman_free_page_32(pageman,p);
+			}
+			memman_free_4k(memman, (int) fh->buf, fh->size);
+			fh->buf = 0;
 		}
-		memman_free_4k(memman, (int) fh->buf, fh->size);
-		fh->buf = 0;
 	} else if (edx == 23) {//文件定位fseek
-		fh = (struct FILEHANDLE *) eax;
+		fh = &task->fhandle[eax-1];
 		if (ecx == 0) {
 			fh->pos = ebx;
 		} else if (ecx == 1) {
@@ -660,7 +686,7 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 			fh->pos = fh->size;
 		}
 	} else if (edx == 24) {//获取文件大小fsize
-		fh = (struct FILEHANDLE *) eax;
+		fh = &task->fhandle[eax-1];
 		if (ecx == 0) {
 			reg[7] = fh->size;
 		} else if (ecx == 1) {
@@ -669,7 +695,7 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 			reg[7] = fh->pos - fh->size;
 		}
 	} else if (edx == 25) {//读取文件fread
-		fh = (struct FILEHANDLE *) eax;
+		fh =  &task->fhandle[eax-1];
 		for (i = 0; i < ecx; i++) {
 			if (fh->pos == fh->size) {
 				break;
@@ -764,10 +790,13 @@ void hrb_api_linewin(struct SHEET *sht, int x0, int y0, int x1, int y1, int col)
 	}
 
 	for (i = 0; i < len; i++) {
-		sht->buf[(y >> 10) * sht->bxsize + (x >> 10)] = col;
+		sht->buf32[(y >> 10) * sht->bxsize + (x >> 10)] = col;
 		x += dx;
 		y += dy;
 	}
 
 	return;
+}
+void cons_set_system_task(struct TASK* task){
+	system_task=task;
 }

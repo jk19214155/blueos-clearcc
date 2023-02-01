@@ -291,6 +291,9 @@ unsigned int memman_link_page_32(struct PAGEMAN32 *man,unsigned int cr3_address,
 
 
 unsigned int memman_unlink_page_32(struct PAGEMAN32 *man,unsigned int cr3_address,unsigned int linear_address){
+	if(linear_address>=0xfffff000){
+		return 0;
+	}
 	int index,addr;
 	unsigned int res;
 	index=(linear_address>>20)&0xffc;
@@ -380,6 +383,11 @@ unsigned int pageman_unlink_page_32_m(struct PAGEMAN32 *man,unsigned int linear_
 
 
 unsigned pageman_unlink_page_32(struct PAGEMAN32 *man,unsigned int linear_address,int mode){
+	if(linear_address>=0xfffff000){
+		io_cli();
+		for(;;);
+		return 0;
+	}
 	int addr,i,res;
 	addr=0xfffff000|((linear_address>>20)&0xfffffffc);
 	if(((*(int*)addr)&1)==0){//要链接的目标页面不存在

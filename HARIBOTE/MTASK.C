@@ -4,7 +4,7 @@
 
 struct TASKCTL *taskctl;
 struct TIMER *task_timer;
-
+int zero_task_lock;//零号任务锁
 struct TASK *task_now(void)
 {
 	struct TASKLEVEL *tl = &taskctl->level[taskctl->now_lv];
@@ -163,6 +163,9 @@ struct TASK *task_init(struct MEMMAN *memman)
 		taskctl->level[i].running = 0;
 		taskctl->level[i].now = 0;
 	}
+	taskctl->id_high=0;
+	taskctl->id_low=0;
+	zero_task_lock=0;//放开锁
 	task = task_alloc();
 	task->tss.cr3= 0x00268000;
 	task->memman=memman;
@@ -226,6 +229,8 @@ struct TASK *task_alloc(void)
 			task->taskctl=0;
 			task->timerctl=0;
 			task->shtctl=0;
+			task->id_high=taskctl->id_high++;//注册id
+			task->id_low=taskctl->id_low++;
 			//task->fifo_mouse_updown_listen_num=0;//不监听鼠标事件
 			return task;
 		}
@@ -235,6 +240,14 @@ struct TASK *task_alloc(void)
 
 void task_run(struct TASK *task, int level, int priority)
 {
+	if(task->id_high==0 && task->id_low==0){//试图添加0号任务
+		if(zero_task_lock=0){//允许操作
+			zero_task_lock=1;
+		}
+		else{//不运行该任务
+			//return;
+		}
+	}
 	if (level < 0) {
 		level = task->level; /* レベルを変更しない */
 	}

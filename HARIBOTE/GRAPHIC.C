@@ -94,6 +94,27 @@ void init_screen8(char *vram, int x, int y)
 	return;
 }
 
+void init_screen32(int *vram, int x, int y)
+{
+	boxfill32(vram, x, COL8_008484,  0,     0,      x -  1, y - 29);
+	boxfill32(vram, x, COL8_C6C6C6,  0,     y - 28, x -  1, y - 28);
+	boxfill32(vram, x, COL8_FFFFFF,  0,     y - 27, x -  1, y - 27);
+	boxfill32(vram, x, COL8_C6C6C6,  0,     y - 26, x -  1, y -  1);
+
+	//boxfill8(vram, x, COL8_FFFFFF,  3,     y - 24, 59,     y - 24);
+	//boxfill8(vram, x, COL8_FFFFFF,  2,     y - 24,  2,     y -  4);
+	//boxfill8(vram, x, COL8_848484,  3,     y -  4, 59,     y -  4);
+	//boxfill8(vram, x, COL8_848484, 59,     y - 23, 59,     y -  5);
+	//boxfill8(vram, x, COL8_000000,  2,     y -  3, 59,     y -  3);
+	//boxfill8(vram, x, COL8_000000, 60,     y - 24, 60,     y -  3);
+
+	//boxfill8(vram, x, COL8_848484, x - 47, y - 24, x -  4, y - 24);
+	//boxfill8(vram, x, COL8_848484, x - 47, y - 23, x - 47, y -  4);
+	//boxfill8(vram, x, COL8_FFFFFF, x - 47, y -  3, x -  4, y -  3);
+	//boxfill8(vram, x, COL8_FFFFFF, x -  3, y - 24, x -  3, y -  3);
+	return;
+}
+
 void putfont8(char *vram, int xsize, int x, int y, char c, char *font)
 {
 	int i;
@@ -112,10 +133,11 @@ void putfont8(char *vram, int xsize, int x, int y, char c, char *font)
 	}
 	return;
 }
-void putfont32(char *vram, int xsize, int x, int y, int c, char *font)
+void putfont32(int *vram, int xsize, int x, int y, int c, char *font)
 {
 	int i;
-	int *p, d /* data */;
+	int *p;
+	char d /* data */;
 	for (i = 0; i < 16; i++) {
 		p = vram + (y + i) * xsize + x;
 		d = font[i];
@@ -196,7 +218,110 @@ void putfonts8_asc(char *vram, int xsize, int x, int y, char c, unsigned char *s
 	return;
 }
 
+void putfonts32_asc(int *vram, int xsize, int x, int y, int c, unsigned char *s)
+{
+	extern char hankaku[4096];
+	struct TASK *task = task_now();
+	char *nihongo = (char *) *((int *) 0x0fe8), *font;
+	int k, t;
+
+	if (task->langmode == 0) {
+		for (; *s != 0x00; s++) {
+			putfont32(vram, xsize, x, y, c, hankaku + *s * 16);
+			x += 8;
+		}
+	}
+	if (task->langmode == 1) {
+		for (; *s != 0x00; s++) {
+			if (task->langbyte1 == 0) {
+				if ((0x81 <= *s && *s <= 0x9f) || (0xe0 <= *s && *s <= 0xfc)) {
+					task->langbyte1 = *s;
+				} else {
+					putfont32(vram, xsize, x, y, c, nihongo + *s * 16);
+				}
+			} else {
+				if (0x81 <= task->langbyte1 && task->langbyte1 <= 0x9f) {
+					k = (task->langbyte1 - 0x81) * 2;
+				} else {
+					k = (task->langbyte1 - 0xe0) * 2 + 62;
+				}
+				if (0x40 <= *s && *s <= 0x7e) {
+					t = *s - 0x40;
+				} else if (0x80 <= *s && *s <= 0x9e) {
+					t = *s - 0x80 + 63;
+				} else {
+					t = *s - 0x9f;
+					k++;
+				}
+				task->langbyte1 = 0;
+				font = nihongo + 256 * 16 + (k * 94 + t) * 32;
+				putfont32(vram, xsize, x - 8, y, c, font     );	/* 左半分 */
+				putfont32(vram, xsize, x    , y, c, font + 16);	/* 右半分 */
+			}
+			x += 8;
+		}
+	}
+	if (task->langmode == 2) {
+		for (; *s != 0x00; s++) {
+			if (task->langbyte1 == 0) {
+				if (0x81 <= *s && *s <= 0xfe) {
+					task->langbyte1 = *s;
+				} else {
+					putfont32(vram, xsize, x, y, c, nihongo + *s * 16);
+				}
+			} else {
+				k = task->langbyte1 - 0xa1;
+				t = *s - 0xa1;
+				task->langbyte1 = 0;
+				font = nihongo + 256 * 16 + (k * 94 + t) * 32;
+				putfont32(vram, xsize, x - 8, y, c, font     );	/* 左半分 */
+				putfont32(vram, xsize, x    , y, c, font + 16);	/* 右半分 */
+			}
+			x += 8;
+		}
+	}
+	return;
+}
+
 void init_mouse_cursor8(char *mouse, char bc)
+/* マウスカーソルを準備（16x16） */
+{
+	static char cursor[16][16] = {
+		"*O*.............",
+		"*OO*............",
+		"*OOO*...........",
+		"*OOOO*..........",
+		"*OOOOO*.........",
+		"*OOOOOO*........",
+		"*OOOOOOO*.......",
+		"*OOOOOOOOO*.....",
+		"*OOOOOOOOOO*....",
+		"*OOO*OOO*****...",
+		"*OO**OOO*.......",
+		"*O*.. *OO*......",
+		"**... *OO*......",
+		"...... *OO*.....",
+		"...... *OO*.....",
+		".......***......",
+	};
+	int x, y;
+
+	for (y = 0; y < 16; y++) {
+		for (x = 0; x < 16; x++) {
+			if (cursor[y][x] == '*') {
+				mouse[y * 16 + x] = COL8_000000;
+			}
+			if (cursor[y][x] == 'O') {
+				mouse[y * 16 + x] = COL8_FFFFFF;
+			}
+			if (cursor[y][x] == '.') {
+				mouse[y * 16 + x] = bc;
+			}
+		}
+	}
+	return;
+}
+void init_mouse_cursor32(int *mouse, char bc)
 /* マウスカーソルを準備（16x16） */
 {
 	static char cursor[16][16] = {
@@ -237,6 +362,18 @@ void init_mouse_cursor8(char *mouse, char bc)
 
 void putblock8_8(char *vram, int vxsize, int pxsize,
 	int pysize, int px0, int py0, char *buf, int bxsize)
+{
+	int x, y;
+	for (y = 0; y < pysize; y++) {
+		for (x = 0; x < pxsize; x++) {
+			vram[(py0 + y) * vxsize + (px0 + x)] = buf[y * bxsize + x];
+		}
+	}
+	return;
+}
+
+void putblock8_32(int *vram, int vxsize, int pxsize,
+	int pysize, int px0, int py0, int *buf, int bxsize)
 {
 	int x, y;
 	for (y = 0; y < pysize; y++) {

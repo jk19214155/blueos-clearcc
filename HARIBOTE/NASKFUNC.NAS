@@ -1,8 +1,8 @@
 ; naskfunc
 ; TAB=4
 
-[FORMAT "WCOFF"]				; オブジェクトファイルを作るモード	
-[INSTRSET "i486p"]				; 486の命令まで使いたいという記述
+[FORMAT "WCOFF"]				; オブジェクトファイルを作るモーチE
+[INSTRSET "i486p"]				; 486の命令まで使ぁE��ぁE��ぁE��記述
 [BITS 32]						; 32ビットモード用の機械語を作らせる
 [FILE "naskfunc.nas"]			; ソースファイル名情報
 
@@ -83,14 +83,14 @@ _io_out32:	; void io_out32(int port, int data);
 		RET
 
 _io_load_eflags:	; int io_load_eflags(void);
-		PUSHFD		; PUSH EFLAGS という意味
+		PUSHFD		; PUSH EFLAGS とぁE��意味
 		POP		EAX
 		RET
 
 _io_store_eflags:	; void io_store_eflags(int eflags);
 		MOV		EAX,[ESP+4]
 		PUSH	EAX
-		POPFD		; POP EFLAGS という意味
+		POPFD		; POP EFLAGS とぁE��意味
 		RET
 
 _load_gdtr:		; void load_gdtr(int limit, int addr);
@@ -194,7 +194,7 @@ _asm_inthandler0c:
 		POPAD
 		POP		DS
 		POP		ES
-		ADD		ESP,4			; INT 0x0c でも、これが必要
+		ADD		ESP,4			; INT 0x0c でも、これが忁E��E
 		IRETD
 
 _asm_inthandler0d:
@@ -208,13 +208,13 @@ _asm_inthandler0d:
 		MOV		DS,AX
 		MOV		ES,AX
 		CALL	_inthandler0d
-		CMP		EAX,0			; ここだけ違う
-		JNE		_asm_end_app	; ここだけ違う
+		CMP		EAX,0			; ここだけ違ぁE
+		JNE		_asm_end_app	; ここだけ違ぁE
 		POP		EAX
 		POPAD
 		POP		DS
 		POP		ES
-		ADD		ESP,4			; INT 0x0d では、これが必要
+		ADD		ESP,4			; INT 0x0d では、これが忁E��E
 		IRETD
 
 _asm_inthandler0e:
@@ -232,7 +232,7 @@ _asm_inthandler0e:
 		CALL	_inthandler0e
 		CMP		EAX,0
 		JNE		_asm_end_app
-		ADD 	ESP,4 ;清除栈中的cr2
+		ADD 	ESP,4 ;渁E��栈中皁Er2
 		POP		EAX
 		POPAD
 		POP		DS
@@ -240,7 +240,7 @@ _asm_inthandler0e:
 		ADD		ESP,4
 		IRETD
 _memtest_sub:	; unsigned int memtest_sub(unsigned int start, unsigned int end)
-		PUSH	EDI						; （EBX, ESI, EDI も使いたいので）
+		PUSH	EDI						; �E�EBX, ESI, EDI も使ぁE��ぁE�Eで�E�E
 		PUSH	ESI
 		PUSH	EBX
 		MOV		ESI,0xaa55aa55			; pat0 = 0xaa55aa55;
@@ -284,13 +284,13 @@ _asm_hrb_api:
 		STI
 		PUSH	DS
 		PUSH	ES
-		PUSHAD		; 保存のためのPUSH
-		PUSHAD		; hrb_apiにわたすためのPUSH
+		PUSHAD		; 保存�EためのPUSH
+		PUSHAD		; hrb_apiにわたすため�EPUSH
 		MOV		AX,SS
-		MOV		DS,AX		; OS用のセグメントをDSとESにも入れる
+		MOV		DS,AX		; OS用のセグメントをDSとESにも�Eれる
 		MOV		ES,AX
 		CALL	_hrb_api
-		CMP		EAX,0		; EAXが0でなければアプリ終了処理
+		CMP		EAX,0		; EAXぁEでなければアプリ終亁E�E琁E
 		JNE		_asm_end_app
 		ADD		ESP,32
 		POPAD
@@ -302,23 +302,23 @@ _asm_end_app:
 		MOV		ESP,[EAX]
 		MOV		DWORD [EAX+4],0
 		POPAD
-		RET					; cmd_appへ帰る
+		RET					; cmd_appへ帰めE
 
 _start_app:		; void start_app(int eip, int cs, int esp, int ds, int *tss_esp0);
-		PUSHAD		; 32ビットレジスタを全部保存しておく
+		PUSHAD		; 32ビットレジスタを�E部保存しておく
 		MOV		EDX,[ESP+36]	; アプリ用のEIP
 		MOV		EAX,[ESP+40]	; アプリ用のCS
 		MOV		ECX,[ESP+44]	; アプリ用のESP
 		MOV		EBX,[ESP+48]	; アプリ用のDS/SS
 		MOV		EBP,[ESP+52]	; tss.esp0の番地
-		MOV		[EBP  ],ESP		; OS用のESPを保存
-		MOV		[EBP+4],SS		; OS用のSSを保存
+		MOV		[EBP  ],ESP		; OS用のESPを保孁E
+		MOV		[EBP+4],SS		; OS用のSSを保孁E
 		MOV		ES,BX
 		MOV		DS,BX
 		MOV		FS,BX
 		MOV		GS,BX
 		;db 0x0f,0x35;sys_ret
-;	以下はRETFでアプリに行かせるためのスタック調整
+;	以下�ERETFでアプリに行かせるためのスタチE��調整
 		OR		EAX,3			; アプリ用のセグメント番号に3をORする
 		OR		EBX,3			; アプリ用のセグメント番号に3をORする
 		PUSH	EBX				; アプリのSS
@@ -326,7 +326,7 @@ _start_app:		; void start_app(int eip, int cs, int esp, int ds, int *tss_esp0);
 		PUSH	EAX				; アプリのCS
 		PUSH	EDX				; アプリのEIP
 		RETF
-;	アプリが終了してもここには来ない
+;	アプリが終亁E��てもここには来なぁE
 _strcmp:	;int strcmp(char* s,char* t,int longer);
 	push esi;
 	push edi;
@@ -334,7 +334,7 @@ _strcmp:	;int strcmp(char* s,char* t,int longer);
 	mov esi,[esp+4]
 	mov edi,[esp+8]
 	mov ecx,[esp+12]
-	repne cmpsb
+	repne cmpsd
 	mov eax,ecx
 	pop ecx
 	pop edi
@@ -347,7 +347,7 @@ _strcpy:	;void strcpy(char* s,char* t,int longer);
 	mov esi,[esp+4]
 	mov edi,[esp+8]
 	mov ecx,[esp+12]
-	rep movsb
+	db 0xf3,0xa5;rep movsb
 	pop ecx
 	pop edi
 	pop esi

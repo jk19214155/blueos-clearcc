@@ -1,4 +1,4 @@
-/* ƒ}ƒEƒX‚âƒEƒBƒ“ƒhƒE‚Ìd‚Ë‡‚í‚¹ˆ— */
+/* ãƒã‚¦ã‚¹ã‚„ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®é‡ã­åˆã‚ã›å‡¦ç† */
 
 #include "bootpack.h"
 
@@ -14,16 +14,21 @@ struct SHTCTL *shtctl_init(struct MEMMAN *memman, struct PAGEMAN32 *pageman, uns
 	if (ctl == 0) {
 		goto err;
 	}
-	ctl->map = (unsigned char *) memman_alloc_4k(memman, xsize * ysize);
-	memmam_link_page_32_m(pageman,0x268000,ctl->map,0x07,(xsize * ysize+0xfff)>>12,0);
+	ctl->map = (unsigned char *) memman_alloc_4k(memman, xsize * ysize * 4);
+	memmam_link_page_32_m(pageman,0x268000,ctl->map,0x07,(xsize * ysize * 4+0xfff)>>12,0);
 	if (ctl->map == 0) {
 		memman_free_4k(memman, (int) ctl, sizeof (struct SHTCTL));
 		goto err;
 	}
+	for(i=0;i<256;i++){
+		ctl->sid[i]=0;//æ‰€æœ‰??idéƒ½å¯ç”¨
+	}
 	ctl->vram = vram;
 	ctl->xsize = xsize;
 	ctl->ysize = ysize;
-	ctl->top = -1; /* ƒV[ƒg‚Íˆê–‡‚à‚È‚¢ */
+	ctl->top = -1; /* ã‚·ãƒ¼ãƒˆã¯ä¸€æšã‚‚ãªã„ */
+	ctl->vram4sht=0;//??æ§åˆ¶å™¨çš„?å‡ºä¸????
+	(ctl->func).sheet_refreshsub=sheet_refreshsub24;
 	/*for (i = 0; i < MAX_SHEETS; i++) {
 		ctl->sheets0[i].flags = 0; 
 		ctl->sheets0[i].ctl = ctl; 
@@ -37,16 +42,18 @@ struct SHEET *sheet_alloc(struct SHTCTL *ctl)
 	struct SHEET *sht;
 	int i;
 	for (i = 0; i < ctl->sheets0_size; i++) {
-		if (ctl->sheets0[i].flags == 0) {
-			sht = &ctl->sheets0[i];
-			sht->flags = SHEET_USE; /* g—p’†ƒ}[ƒN */
-			sht->height = -1; /* ”ñ•\¦’† */
-			sht->task = 0;	/* ©“®‚Å•Â‚¶‚é‹@”\‚ğg‚í‚È‚¢ */
-			sht->ctl=ctl;//??“IŠÇ—Ší
+		sht = &ctl->sheets0[i];
+		if (sht->flags == 0) {
+			sht->flags = SHEET_USE; /* ä½¿ç”¨ä¸­ãƒãƒ¼ã‚¯ */
+			sht->height = -1; /* éè¡¨ç¤ºä¸­ */
+			sht->task = 0;	/* è‡ªå‹•ã§é–‰ã˜ã‚‹æ©Ÿèƒ½ã‚’ä½¿ã‚ãªã„ */
+			sht->ctl=ctl;//??çš„ç®¡ç†å™¨æ˜¯è‡ªå·±
+			sht->ctl_from=0;//??ä¸ç”±æ§åˆ¶å™¨ç”Ÿæˆ
+			//sht->alpha_map=0;//æ²¡æœ‰é€æ˜åº¦å›¾å±‚
 			return sht;
 		}
 	}
-	return 0;	/* ‘S‚Ä‚ÌƒV[ƒg‚ªg—p’†‚¾‚Á‚½ */
+	return 0;	/* å…¨ã¦ã®ã‚·ãƒ¼ãƒˆãŒä½¿ç”¨ä¸­ã ã£ãŸ */
 }
 
 void sheet_setbuf(struct SHEET *sht, unsigned char *buf, int xsize, int ysize, int col_inv)
@@ -58,21 +65,22 @@ void sheet_setbuf(struct SHEET *sht, unsigned char *buf, int xsize, int ysize, i
 	return;
 }
 
-void sheet_refreshmap(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, int h0)//map‹Ç•”üV”Ÿ”w’è?nh0
+void sheet_refreshmap(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, int h0)//mapå±€éƒ¨åˆ·æ–°å‡½æ•°æŒ‡å®š?å§‹h0
 {
 	int h, bx, by, vx, vy, bx0, by0, bx1, by1, sid4, *p;
 	unsigned char *buf, sid, *map = ctl->map;
 	struct SHEET *sht;
-	//”˜C³
+	//æ•°æ®ä¿®æ­£
 	if (vx0 < 0) { vx0 = 0; }
 	if (vy0 < 0) { vy0 = 0; }
 	if (vx1 > ctl->xsize) { vx1 = ctl->xsize; }
 	if (vy1 > ctl->ysize) { vy1 = ctl->ysize; }
-	for (h = h0; h <= ctl->top; h++) {//˜¸h0‚“x?n—R‰º“ãüV
-		sht = ctl->sheets[h];//?æ–{Ÿ—vüV“I??
-		sid = sht - ctl->sheets0; //w?‘Š??“¾id
-		buf = sht->buf;//??”˜M‘§
-		//?ZüV¿?“IZ–@
+	for (h = h0; h <= ctl->top; h++) {//ä»h0é«˜åº¦?å§‹ç”±ä¸‹åˆ°ä¸Šåˆ·æ–°
+		sht = ctl->sheets[h];//?å–æœ¬æ¬¡è¦åˆ·æ–°çš„??
+		//sid = sht - ctl->sheets0; //æŒ‡?ç›¸??å¾—id
+		sid=sht->sid;
+		buf = sht->buf;//??æ•°æ®ä¿¡æ¯
+		//?ç®—åˆ·æ–°å?çš„ç®—æ³•
 		bx0 = vx0 - sht->vx0;
 		by0 = vy0 - sht->vy0;
 		bx1 = vx1 - sht->vx0;
@@ -81,19 +89,19 @@ void sheet_refreshmap(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, in
 		if (by0 < 0) { by0 = 0; }
 		if (bx1 > sht->bxsize) { bx1 = sht->bxsize; }
 		if (by1 > sht->bysize) { by1 = sht->bysize; }
-		if (sht->col_inv == -1) {//–v—Lg—p“§–¾F
-			if ((sht->vx0 & 3) == 0 && (bx0 & 3) == 0 && (bx1 & 3) == 0) {//’nš¬4š???g—p‚‘¬Z–@
-				bx1 = (bx1 - bx0) / 4; //‰¡¿?œ4
-				sid4 = sid | sid << 8 | sid << 16 | sid << 24;
-				for (by = by0; by < by1; by++) {//s”¥z?–Ú?
+		if (sht->col_inv == -1) {//æ²¡æœ‰ä½¿ç”¨é€æ˜è‰²
+			if ((sht->vx0 & 3) == 0 && (bx0 & 3) == 0 && (bx1 & 3) == 0) {//åœ°å€4å­—???ä½¿ç”¨é«˜é€Ÿç®—æ³•
+				bx1 = (bx1 - bx0) / 4; //æ¨ªå?é™¤4
+				sid4 = sid | sid << 8 | sid << 16 | sid << 24;//å°†8ä½id?å±•åˆ°32ä½
+				for (by = by0; by < by1; by++) {//è¡Œæ•°æ˜¯å¾ª?ç›®?
 					vy = sht->vy0 + by;
 					vx = sht->vx0 + bx0;
-					p = (int *) &map[vy * ctl->xsize + vx];//?Z’nš¬
-					for (bx = 0; bx < bx1; bx++) {//‰¡¿?¥z?–Ú?
+					p = (int *) &map[vy * ctl->xsize + vx];//?ç®—åœ°å€
+					for (bx = 0; bx < bx1; bx++) {//æ¨ªå?æ˜¯å¾ª?ç›®?
 						p[bx] = sid4;
 					}
 				}
-			} else {//’nš¬•s??g—p•’ÊZ–@
+			} else {//åœ°å€ä¸??ä½¿ç”¨æ™®é€šç®—æ³•
 				for (by = by0; by < by1; by++) {
 					vy = sht->vy0 + by;
 					for (bx = bx0; bx < bx1; bx++) {
@@ -102,7 +110,7 @@ void sheet_refreshmap(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, in
 					}
 				}
 			}
-		} else {//—L“§–¾Fg—pˆê”ÊZ–@
+		} else {//æœ‰é€æ˜è‰²ä½¿ç”¨ä¸€èˆ¬ç®—æ³•
 			for (by = by0; by < by1; by++) {
 				vy = sht->vy0 + by;
 				for (bx = bx0; bx < bx1; bx++) {
@@ -117,12 +125,50 @@ void sheet_refreshmap(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, in
 	return;
 }
 
-void sheet_refreshsub(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, int h0, int h1)//› –‹‹Ç•”üV”Ÿ”Cw’èh0˜ah1(üVãŠE˜aüV‰ºŠE)
+void sheet_refreshmap32(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, int h0)//mapå±€éƒ¨åˆ·æ–°å‡½æ•°æŒ‡å®š?å§‹h0
+{
+	int h, bx, by, vx, vy, bx0, by0, bx1, by1, sid4, *p;
+	unsigned int *buf, sid, *map = ctl->map;
+	struct SHEET *sht;
+	//æ•°æ®ä¿®æ­£
+	if (vx0 < 0) { vx0 = 0; }
+	if (vy0 < 0) { vy0 = 0; }
+	if (vx1 > ctl->xsize) { vx1 = ctl->xsize; }
+	if (vy1 > ctl->ysize) { vy1 = ctl->ysize; }
+	for (h = h0; h <= ctl->top; h++) {//ä»h0é«˜åº¦?å§‹ç”±ä¸‹åˆ°ä¸Šåˆ·æ–°
+		sht = ctl->sheets[h];//?å–æœ¬æ¬¡è¦åˆ·æ–°çš„??
+		//sid = sht - ctl->sheets0; //æŒ‡?ç›¸??å¾—id
+		sid=sht->sid;
+		buf = sht->buf;//??æ•°æ®ä¿¡æ¯
+		//?ç®—åˆ·æ–°å?çš„ç®—æ³•
+		bx0 = vx0 - sht->vx0;
+		by0 = vy0 - sht->vy0;
+		bx1 = vx1 - sht->vx0;
+		by1 = vy1 - sht->vy0;
+		if (bx0 < 0) { bx0 = 0; }
+		if (by0 < 0) { by0 = 0; }
+		if (bx1 > sht->bxsize) { bx1 = sht->bxsize; }
+		if (by1 > sht->bysize) { by1 = sht->bysize; }
+		//ä¸€èˆ¬ç®—æ³•(32ä½?è‰²?ç¤ºä¸æ”¯æŒé«˜é€Ÿç®—æ³•)
+		for (by = by0; by < by1; by++) {
+			vy = sht->vy0 + by;
+			for (bx = bx0; bx < bx1; bx++) {
+				vx = sht->vx0 + bx;
+				if (buf[by * sht->bxsize + bx] != sht->col_inv) {
+					map[vy * ctl->xsize + vx] = sid;
+				}
+			}
+		}
+	}
+	return;
+}
+
+void sheet_refreshsub(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, int h0, int h1)//å±å¹•å±€éƒ¨åˆ·æ–°å‡½æ•°ï¼ŒæŒ‡å®šh0å’Œh1(åˆ·æ–°ä¸Šç•Œå’Œåˆ·æ–°ä¸‹ç•Œ)
 {
 	int h, bx, by, vx, vy, bx0, by0, bx1, by1, bx2, sid4, i, i1, *p, *q, *r;
 	unsigned char *buf, *vram = ctl->vram, *map = ctl->map, sid;
 	struct SHEET *sht;
-	//”˜C³
+	//æ•°æ®ä¿®æ­£
 	if (vx0 < 0) { vx0 = 0; }
 	if (vy0 < 0) { vy0 = 0; }
 	if (vx1 > ctl->xsize) { vx1 = ctl->xsize; }
@@ -130,8 +176,9 @@ void sheet_refreshsub(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, in
 	for (h = h0; h <= h1; h++) {
 		sht = ctl->sheets[h];
 		buf = sht->buf;
-		sid = sht - ctl->sheets0;
-		//?ZüV¿?“IZ–@
+		//sid = sht - ctl->sheets0;
+		sid=sht->sid;
+		//?ç®—åˆ·æ–°å?çš„ç®—æ³•
 		bx0 = vx0 - sht->vx0;
 		by0 = vy0 - sht->vy0;
 		bx1 = vx1 - sht->vx0;
@@ -141,14 +188,14 @@ void sheet_refreshsub(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, in
 		if (bx1 > sht->bxsize) { bx1 = sht->bxsize; }
 		if (by1 > sht->bysize) { by1 = sht->bysize; }
 		if ((sht->vx0 & 3) == 0) {
-			/* 4ƒoƒCƒgŒ^ */
-			i  = (bx0 + 3) / 4; /* bx0‚ğ4‚ÅŠ„‚Á‚½‚à‚Ìi’[”Ø‚èã‚°j */
-			i1 =  bx1      / 4; /* bx1‚ğ4‚ÅŠ„‚Á‚½‚à‚Ìi’[”Ø‚èÌ‚Äj */
+			/* 4ãƒã‚¤ãƒˆå‹ */
+			i  = (bx0 + 3) / 4; /* bx0ã‚’4ã§å‰²ã£ãŸã‚‚ã®ï¼ˆç«¯æ•°åˆ‡ã‚Šä¸Šã’ï¼‰ */
+			i1 =  bx1      / 4; /* bx1ã‚’4ã§å‰²ã£ãŸã‚‚ã®ï¼ˆç«¯æ•°åˆ‡ã‚Šæ¨ã¦ï¼‰ */
 			i1 = i1 - i;
 			sid4 = sid | sid << 8 | sid << 16 | sid << 24;
 			for (by = by0; by < by1; by++) {
 				vy = sht->vy0 + by;
-				for (bx = bx0; bx < bx1 && (bx & 3) != 0; bx++) {	/* ‘O‚Ì’[”‚ğ1ƒoƒCƒg‚¸‚Â */
+				for (bx = bx0; bx < bx1 && (bx & 3) != 0; bx++) {	/* å‰ã®ç«¯æ•°ã‚’1ãƒã‚¤ãƒˆãšã¤ */
 					vx = sht->vx0 + bx;
 					if (map[vy * ctl->xsize + vx] == sid) {
 						vram[vy * ctl->xsize + vx] = buf[by * sht->bxsize + bx];
@@ -158,7 +205,7 @@ void sheet_refreshsub(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, in
 				p = (int *) &map[vy * ctl->xsize + vx];
 				q = (int *) &vram[vy * ctl->xsize + vx];
 				r = (int *) &buf[by * sht->bxsize + bx];
-				for (i = 0; i < i1; i++) {//4“I”{”“I•”•ª
+				for (i = 0; i < i1; i++) {//4çš„å€æ•°çš„éƒ¨åˆ†
 					if (p[i] == sid4) {
 						q[i] = r[i];
 					} else {
@@ -178,7 +225,7 @@ void sheet_refreshsub(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, in
 						}
 					}
 				}
-				for (bx += i1 * 4; bx < bx1; bx++) {				/* Œã‚ë‚Ì’[”‚ğ1ƒoƒCƒg‚¸‚Â */
+				for (bx += i1 * 4; bx < bx1; bx++) {				/* å¾Œã‚ã®ç«¯æ•°ã‚’1ãƒã‚¤ãƒˆãšã¤ */
 					vx = sht->vx0 + bx;
 					if (map[vy * ctl->xsize + vx] == sid) {
 						vram[vy * ctl->xsize + vx] = buf[by * sht->bxsize + bx];
@@ -186,7 +233,7 @@ void sheet_refreshsub(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, in
 				}
 			}
 		} else {
-			/* 1ƒoƒCƒgŒ^ */
+			/* 1ãƒã‚¤ãƒˆå‹ */
 			for (by = by0; by < by1; by++) {
 				vy = sht->vy0 + by;
 				for (bx = bx0; bx < bx1; bx++) {
@@ -201,89 +248,213 @@ void sheet_refreshsub(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, in
 	return;
 }
 
-void sheet_updown(struct SHEET *sht, int height)//??ãˆÚ‰ºˆÚ”Ÿ”
+void sheet_refreshsub24(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, int h0, int h1)//å±å¹•å±€éƒ¨åˆ·æ–°å‡½æ•°ï¼ŒæŒ‡å®šh0å’Œh1(åˆ·æ–°ä¸Šç•Œå’Œåˆ·æ–°ä¸‹ç•Œ)
+{
+	int h, bx, by, vx, vy, bx0, by0, bx1, by1, bx2, sid4, i, i1, *p, *q, *r;
+	unsigned int *buf;
+	unsigned char *vram = ctl->vram;
+	unsigned int *map = ctl->map, sid;
+	struct SHEET *sht;
+	union{
+		int int32;
+		unsigned char char8[4];
+	}color;
+	//æ•°æ®ä¿®æ­£
+	if (vx0 < 0) { vx0 = 0; }
+	if (vy0 < 0) { vy0 = 0; }
+	if (vx1 > ctl->xsize) { vx1 = ctl->xsize; }
+	if (vy1 > ctl->ysize) { vy1 = ctl->ysize; }
+	for (h = h0; h <= h1; h++) {
+		sht = ctl->sheets[h];
+		buf = sht->buf;//ä½¿ç”¨åŸå§‹å›¾å±‚
+		//sid = sht - ctl->sheets0;
+		sid=sht->sid;
+		//?ç®—åˆ·æ–°å?çš„ç®—æ³•
+		bx0 = vx0 - sht->vx0;
+		by0 = vy0 - sht->vy0;
+		bx1 = vx1 - sht->vx0;
+		by1 = vy1 - sht->vy0;
+		if (bx0 < 0) { bx0 = 0; }
+		if (by0 < 0) { by0 = 0; }
+		if (bx1 > sht->bxsize) { bx1 = sht->bxsize; }
+		if (by1 > sht->bysize) { by1 = sht->bysize; }
+		//æ²¡æœ‰å¿«é€Ÿç®—æ³•
+		for (by = by0; by < by1; by++) {
+			vy = sht->vy0 + by;
+			for (bx = bx0; bx < bx1; bx++) {
+				vx = sht->vx0 + bx;
+				if (map[vy * ctl->xsize + vx] == sid || 1) {
+					color.int32= buf[by * sht->bxsize + bx];
+					unsigned char a=color.char8[3];//é€šé€æ€§æ•°æ®
+					unsigned int r=color.char8[0];
+					unsigned int g=color.char8[1];
+					unsigned int b=color.char8[2];
+					unsigned int r0=vram[(vy * ctl->xsize + vx)*3+0];
+					unsigned int g0=vram[(vy * ctl->xsize + vx)*3+1];
+					unsigned int b0=vram[(vy * ctl->xsize + vx)*3+2];
+					r=(r*(255-a)+r0*a)/255;
+					g=(g*(255-a)+g0*a)/255;
+					b=(b*(255-a)+b0*a)/255;
+					vram[(vy * ctl->xsize + vx)*3+0]= r;
+					vram[(vy * ctl->xsize + vx)*3+1]= g;
+					vram[(vy * ctl->xsize + vx)*3+2]= b;
+				}
+			}
+		}
+	}
+	return;
+}
+
+void sheet_refreshsub32(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, int h0, int h1)//å±å¹•å±€éƒ¨åˆ·æ–°å‡½æ•°ï¼ŒæŒ‡å®šh0å’Œh1(åˆ·æ–°ä¸Šç•Œå’Œåˆ·æ–°ä¸‹ç•Œ)
+{
+	int h, bx, by, vx, vy, bx0, by0, bx1, by1, bx2, sid4, i, i1, *p, *q, *r;
+	unsigned int *buf;
+	char *vram = ctl->vram;
+	unsigned int *map = ctl->map, sid;
+	struct SHEET *sht;
+	union{
+		int int32;
+		char char8[4];
+	}color;
+	//æ•°æ®ä¿®æ­£
+	if (vx0 < 0) { vx0 = 0; }
+	if (vy0 < 0) { vy0 = 0; }
+	if (vx1 > ctl->xsize) { vx1 = ctl->xsize; }
+	if (vy1 > ctl->ysize) { vy1 = ctl->ysize; }
+	for (h = h0; h <= h1; h++) {
+		sht = ctl->sheets[h];
+		buf = sht->buf;
+		//sid = sht - ctl->sheets0;
+		sid=sht->sid;
+		//?ç®—åˆ·æ–°å?çš„ç®—æ³•
+		bx0 = vx0 - sht->vx0;
+		by0 = vy0 - sht->vy0;
+		bx1 = vx1 - sht->vx0;
+		by1 = vy1 - sht->vy0;
+		if (bx0 < 0) { bx0 = 0; }
+		if (by0 < 0) { by0 = 0; }
+		if (bx1 > sht->bxsize) { bx1 = sht->bxsize; }
+		if (by1 > sht->bysize) { by1 = sht->bysize; }
+		//æ²¡æœ‰å¿«é€Ÿç®—æ³•
+		for (by = by0; by < by1; by++) {
+			vy = sht->vy0 + by;
+			for (bx = bx0; bx < bx1; bx++) {
+				vx = sht->vx0 + bx;
+				if (map[vy * ctl->xsize + vx] == sid) {
+					color.int32= buf[by * sht->bxsize + bx];
+					vram[(vy * ctl->xsize + vx)*4+0]= color.char8[0];
+					vram[(vy * ctl->xsize + vx)*4+1]= color.char8[1];
+					vram[(vy * ctl->xsize + vx)*4+2]= color.char8[2];
+				}
+			}
+		}
+	}
+	return;
+}
+
+void sheet_updown(struct SHEET *sht, int height)//??ä¸Šç§»ä¸‹ç§»å‡½æ•°
 {
 	struct SHTCTL *ctl = sht->ctl;
-	int h, old = sht->height; //?’è‘O“I‚“x
-
-	/* w’è‚ª’á‚·‚¬‚â‚‚·‚¬‚¾‚Á‚½‚çAC³‚·‚é */
+	int h, old = sht->height; //?å®šå‰çš„é«˜åº¦
+	void (*sheet_refreshsub32)(struct SHTCTL* ctl, int vx0, int vy0, int vx1, int vy1, int h0, int h1)=(ctl->func).sheet_refreshsub;
+	
+	/* æŒ‡å®šãŒä½ã™ãã‚„é«˜ã™ãã ã£ãŸã‚‰ã€ä¿®æ­£ã™ã‚‹ */
 	if (height > ctl->top + 1) {
 		height = ctl->top + 1;
 	}
 	if (height < -1) {
 		height = -1;
 	}
-	sht->height = height; //‚“x?’è
+	sht->height = height; //é«˜åº¦?å®š
 
-	if (old > height) {	//”äˆÈ‘O’á
+	if (old > height) {	//æ¯”ä»¥å‰ä½
 		if (height >= 0) {
-			for (h = old; h > height; h--) {//Š—L”˜ˆÚ?ˆÊ’u
+			for (h = old; h > height; h--) {//æ‰€æœ‰æ•°æ®ç§»?ä½ç½®
 				ctl->sheets[h] = ctl->sheets[h - 1];
 				ctl->sheets[h]->height = h;
 			}
-			ctl->sheets[height] = sht;//??‡“ü
-			sheet_refreshmap(ctl, sht->vx0, sht->vy0, sht->vx0 + sht->bxsize, sht->vy0 + sht->bysize, height + 1);//üVmap
-			sheet_refreshsub(ctl, sht->vx0, sht->vy0, sht->vx0 + sht->bxsize, sht->vy0 + sht->bysize, height + 1, old);//üV??
-		} else {	//???åU
+			ctl->sheets[height] = sht;//??æ’å…¥
+			sheet_refreshmap32(ctl, sht->vx0, sht->vy0, sht->vx0 + sht->bxsize, sht->vy0 + sht->bysize, height + 1);//åˆ·æ–°map
+			sheet_refreshsub32(ctl, sht->vx0, sht->vy0, sht->vx0 + sht->bxsize, sht->vy0 + sht->bysize, height + 1, old);//åˆ·æ–°??
+		} else {	//???è—
 			if (ctl->top > old) {
 				for (h = old; h < ctl->top; h++) {
 					ctl->sheets[h] = ctl->sheets[h + 1];
 					ctl->sheets[h]->height = h;
 				}
 			}
-			ctl->top--; //?‚“x?­
-			sheet_refreshmap(ctl, sht->vx0, sht->vy0, sht->vx0 + sht->bxsize, sht->vy0 + sht->bysize, 0);
-			sheet_refreshsub(ctl, sht->vx0, sht->vy0, sht->vx0 + sht->bxsize, sht->vy0 + sht->bysize, 0, old - 1);
+			ctl->top--; //?é«˜åº¦?å°‘
+			sheet_refreshmap32(ctl, sht->vx0, sht->vy0, sht->vx0 + sht->bxsize, sht->vy0 + sht->bysize, 0);
+			sheet_refreshsub32(ctl, sht->vx0, sht->vy0, sht->vx0 + sht->bxsize, sht->vy0 + sht->bysize, 0, old - 1);
+			//???è—åidè¢«?æ”¾
+			sht->ctl->sid[sht->sid]=0;
 		}
-	} else if (old < height) {	//”äˆÈ‘O‚
+	} else if (old < height) {	//æ¯”ä»¥å‰é«˜
 		if (old >= 0) {
 			for (h = old; h < height; h++) {
 				ctl->sheets[h] = ctl->sheets[h + 1];
 				ctl->sheets[h]->height = h;
 			}
 			ctl->sheets[height] = sht;
-		} else {	//˜¸?åU?????¦??
+		} else {	//ä»?è—?????ç¤º??
+			int i;
+			for(i=0;i<256;i++){//æ˜¯å¦æœ‰ç©º?idå¯ç”¨åˆ†é…
+				if(sht->ctl->sid[i]==0){
+					sht->ctl->sid[i]=sht;
+					sht->sid=i;//æ³¨å†Œsid
+					break;
+				}
+			}
+			if(i>=256){//å¤±?ï¼Œ??æ§åˆ¶å™¨æ— æ³•å®¹?æ›´å¤š??
+				return;//ä»€?ä¹Ÿä¸åš
+			}
 			for (h = ctl->top; h >= height; h--) {
 				ctl->sheets[h + 1] = ctl->sheets[h];
 				ctl->sheets[h + 1]->height = h + 1;
 			}
 			ctl->sheets[height] = sht;
-			ctl->top++; //?‚“xú‰Á
+			ctl->top++; //?é«˜åº¦å¢åŠ 
 		}
-		sheet_refreshmap(ctl, sht->vx0, sht->vy0, sht->vx0 + sht->bxsize, sht->vy0 + sht->bysize, height);
-		sheet_refreshsub(ctl, sht->vx0, sht->vy0, sht->vx0 + sht->bxsize, sht->vy0 + sht->bysize, height, height);
+		sheet_refreshmap32(ctl, sht->vx0, sht->vy0, sht->vx0 + sht->bxsize, sht->vy0 + sht->bysize, height);
+		sheet_refreshsub32(ctl, sht->vx0, sht->vy0, sht->vx0 + sht->bxsize, sht->vy0 + sht->bysize, height, height);
 	}
 	return;
 }
 
-void sheet_refresh(struct SHEET *sht, int bx0, int by0, int bx1, int by1)//??‹Ç•”?¶‰ü?üV
+void sheet_refresh(struct SHEET *sht, int bx0, int by0, int bx1, int by1)//??å±€éƒ¨?ç”Ÿæ”¹?åˆ·æ–°
 {
-	if (sht->height >= 0) { //?¦’†H
-		sheet_refreshsub(sht->ctl, sht->vx0 + bx0, sht->vy0 + by0, sht->vx0 + bx1, sht->vy0 + by1, sht->height, sht->height);
+	void (*sheet_refreshsub32)(struct SHTCTL* ctl, int vx0, int vy0, int vx1, int vy1, int h0, int h1)=(sht->ctl->func).sheet_refreshsub;
+	if (sht->height >= 0) { //?ç¤ºä¸­ï¼Ÿ
+		sheet_refreshsub32(sht->ctl, sht->vx0 + bx0, sht->vy0 + by0, sht->vx0 + bx1, sht->vy0 + by1, sht->height, sht->height);
 	}
 	return;
 }
 
-void sheet_slide(struct SHEET *sht, int vx0, int vy0)//??ˆÚ?“VˆÊ’u
+void sheet_slide(struct SHEET *sht, int vx0, int vy0)//??ç§»?åˆ°æ–°ä½ç½®
 {
 	struct SHTCTL *ctl = sht->ctl;
+	void (*sheet_refreshsub32)(struct SHTCTL* ctl, int vx0, int vy0, int vx1, int vy1, int h0, int h1)=(ctl->func).sheet_refreshsub;
 	int old_vx0 = sht->vx0, old_vy0 = sht->vy0;
 	sht->vx0 = vx0;
 	sht->vy0 = vy0;
-	if (sht->height >= 0) { //?¦’†üV‰æ–Ê
-		sheet_refreshmap(ctl, old_vx0, old_vy0, old_vx0 + sht->bxsize, old_vy0 + sht->bysize, 0);
-		sheet_refreshmap(ctl, vx0, vy0, vx0 + sht->bxsize, vy0 + sht->bysize, sht->height);
-		sheet_refreshsub(ctl, old_vx0, old_vy0, old_vx0 + sht->bxsize, old_vy0 + sht->bysize, 0, sht->height - 1);
-		sheet_refreshsub(ctl, vx0, vy0, vx0 + sht->bxsize, vy0 + sht->bysize, sht->height, sht->height);
+	if (sht->height >= 0) { //?ç¤ºä¸­åˆ·æ–°ç”»é¢
+		sheet_refreshmap32(ctl, old_vx0, old_vy0, old_vx0 + sht->bxsize, old_vy0 + sht->bysize, 0);
+		sheet_refreshmap32(ctl, vx0, vy0, vx0 + sht->bxsize, vy0 + sht->bysize, sht->height);
+		sheet_refreshsub32(ctl, old_vx0, old_vy0, old_vx0 + sht->bxsize, old_vy0 + sht->bysize, 0, sht->height - 1);
+		sheet_refreshsub32(ctl, vx0, vy0, vx0 + sht->bxsize, vy0 + sht->bysize, sht->height, sht->height);
 	}
 	return;
 }
 
-void sheet_free(struct SHEET *sht)//?•ú??
+void sheet_free(struct SHEET *sht)//?æ”¾??
 {
 	if (sht->height >= 0) {
-		sheet_updown(sht, -1); //???åUó?
+		sheet_updown(sht, -1); //???è—çŠ¶?
 	}
-	sht->flags = 0; //•sg—p
+	sht->flags = 0; //ä¸ä½¿ç”¨
+	return;
+}
+
+void sheet_init4ctl(){
 	return;
 }

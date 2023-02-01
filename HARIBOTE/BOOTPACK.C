@@ -26,8 +26,8 @@ void HariMain(int mode,...)
 	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
 	struct MEMMAN *memman_core;
 	struct PAGEMAN32 struct_pageman;
-	unsigned char *buf_back, buf_mouse[256];
-	struct SHEET *sht_back[10], *sht_mouse[10];
+	unsigned int *buf_back, buf_mouse[256];
+	struct SHEET *sht_back[10], *sht_mouse;
 	struct TASK *task_a, *task;
 	struct SHEET* sheet_mouse_on=0;//当前鼠标锁定的图层
 	int mouse_on_header=0;//鼠标抓取了标题栏吗？
@@ -92,12 +92,6 @@ void HariMain(int mode,...)
 	store_cr0(j);
 	load_gdtr(0xffff,0xc0000000);//重载gdt至高位内存
 	load_idtr(0xffff,0xc0020800);//重载idt至高位内存
-	//初始化另一个内存控制器
-	//int p=memman_alloc_4k(memman,sizeof(struct MEMMAN));
-	//pageman_link_page_32_m(pageman,p,7,(sizeof(struct MEMMAN)+0xfff)&0xfffff000,0);
-	//memman_init(p);
-	//memman_free(memman, 0xc00000, 0xc0000000);//虚拟空间的地址大小
-	//*(int*)(MEMMAN_CORE_ADDR)=p;//保存变量
 	
 	if(support_apic()==1){//存在local_apic?使用local-apic?理中断
 		init_apic((void*)0xfee00000);
@@ -107,10 +101,10 @@ void HariMain(int mode,...)
 	}
 	io_sti(); //中断初始化完成
 	fifo32_init(&fifo, 128, fifobuf, 0);
-	*((int *) 0x0fec) = (int) &fifo;
+	*((int *) 0x0fec) = (int) &fifo;//系统fifo
 	init_pit();
-	init_keyboard(&fifo, 256);
-	enable_mouse(&fifo, 512, &mdec);
+	init_keyboard(&fifo, 256);//键盘从25开始
+	enable_mouse(&fifo, 512, &mdec);//鼠标从512开始
 	if(support_apic()==0){//使用apic时执行此代码
 		io_out8(PIC0_IMR, 0xf8); /* PITとPIC1とキーボードを許可(11111000) */
 		io_out8(PIC1_IMR, 0xef); /* マウスを許可(11101111) */
@@ -123,21 +117,20 @@ void HariMain(int mode,...)
 	//io_wrmsr(0,0+4,0x174);
 	//io_wrmsr(0,&(sys_call),0x176);
 	//io_wrmsr(0,4096,0x175);
-	init_palette();//设置调色板
+	//init_palette();//设置调色板
 	//创建公共图层数组
-	{
-		struct SHEET* p=(unsigned char *) memman_alloc_4k(memman, sizeof(struct SHEET [512]));//内存分配!!!
-		memmam_link_page_32_m(pageman,0x268000,p,7,(sizeof(struct SHEET [512])+0xfff)>>12,0);//没有目的链接地址
-		//准备两个图层控制器
-		*(int*)0x0026f01c=2;//两个内存控制器
-		for(i=0;i<(*(int*)0x0026f01c);i++){
-			shtctl[i] = shtctl_init(memman,pageman, binfo->vram, binfo->scrnx, binfo->scrny);
-			shtctl[i]->sheets0=p;
-			shtctl[i]->sheets0_size=512;
-		}
+	struct View* p=(unsigned char *) memman_alloc_4k(memman, sizeof(struct View [512]));//内存分配!!!
+	memmam_link_page_32_m(pageman,0x268000,p,7,(sizeof(struct View [512])+0xfff)>>12,0);//没有目的链接地址
+	//准备两个图层控制器
+	*(int*)0x0026f01c=2;//两个桌面图层控制器
+	for(i=0;i<2;i++){//10个图层管理器
+		shtctl[i] = shtctl_init(memman,pageman, binfo->vram, binfo->scrnx, binfo->scrny);
+		shtctl[i]->sheets0=p;
+		shtctl[i]->sheets0_size=512;
 	}
 	//运行第一个任务
 	task_a = task_init(memman);
+	task_a->memman=memman;//注册内存控制器
 	task->tss.cr3=0x268000;
 	fifo.task = task_a;
 	task_run(task_a, 1, 2);
@@ -147,50 +140,49 @@ void HariMain(int mode,...)
 	/* sht_back */
 	//第一屏幕背景
 	sht_back[0]  = sheet_alloc(shtctl[0]);
-	buf_back  = (unsigned char *) memman_alloc_4k(memman, binfo->scrnx * binfo->scrny);//内存分配!!!
-	memmam_link_page_32_m(pageman,0x268000,buf_back,7,((binfo->scrnx * binfo->scrny)+0xfff)>>12,0);//没有目的链接地址
+	buf_back  = (unsigned int *) memman_alloc_4k(memman, binfo->scrnx * binfo->scrny * 4);//内存分配!!!
+	memmam_link_page_32_m(pageman,0x268000,buf_back,7,((binfo->scrnx * binfo->scrny * 4)+0xfff)>>12,0);//没有目的链接地址
 	////
 	sheet_setbuf(sht_back[0], buf_back, binfo->scrnx, binfo->scrny, -1); /* 透明色なし */
-	init_screen8(buf_back, binfo->scrnx, binfo->scrny);
+	init_screen32(buf_back, binfo->scrnx, binfo->scrny);
+	
+	//sht_back[0]=desktop_task(sht_back[0]);//调用测试
+	
 	//第二屏幕背景
 	sht_back[1]  = sheet_alloc(shtctl[1]);
-	buf_back  = (unsigned char *) memman_alloc_4k(memman, binfo->scrnx * binfo->scrny);//内存分配!!!
-	memmam_link_page_32_m(pageman,0x268000,buf_back,7,((binfo->scrnx * binfo->scrny)+0xfff)>>12,0);//没有目的链接地址
+	buf_back  = (unsigned int *) memman_alloc_4k(memman, binfo->scrnx * binfo->scrny * 4);//内存分配!!!
+	memmam_link_page_32_m(pageman,0x268000,buf_back,7,((binfo->scrnx * binfo->scrny * 4)+0xfff)>>12,0);//没有目的链接地址
 	////
 	sheet_setbuf(sht_back[1], buf_back, binfo->scrnx, binfo->scrny, -1); /* 透明色なし */
-	init_screen8(buf_back, binfo->scrnx, binfo->scrny);
+	init_screen32(buf_back, binfo->scrnx, binfo->scrny);
 	/* sht_cons */
-	key_win = open_console(shtctl[0], memtotal);
-	//key_win = 0;
+	//key_win = open_console(shtctl[0], memtotal);
+	key_win = 0;
 	/* sht_mouse */
 	//第一屏幕鼠标
-	sht_mouse[0] = sheet_alloc(shtctl[0]);
-	sheet_setbuf(sht_mouse[0], buf_mouse, 16, 16, 99);
-	init_mouse_cursor8(buf_mouse, 99);
-	//第二屏幕鼠标
-	sht_mouse[1] = sheet_alloc(shtctl[1]);
-	sheet_setbuf(sht_mouse[1], buf_mouse, 16, 16, 99);
-	init_mouse_cursor8(buf_mouse, 99);
+	sht_mouse = sheet_alloc(shtctl[0]);
+	sheet_setbuf(sht_mouse, buf_mouse, 16, 16, 99);
+	init_mouse_cursor32(buf_mouse, 99);
 	
 	mx = (binfo->scrnx - 16) / 2; /* 画面中央になるように座標計算 */
 	my = (binfo->scrny - 28 - 16) / 2;
 	
-	sheet_slide(sht_back[0],  0,  0);
-	sheet_slide(key_win,   32, 4);
-	sheet_slide(sht_mouse[0], mx, my);
-	sheet_updown(sht_back[0],  0);
-	sheet_updown(key_win,   1);
-	sheet_updown(sht_mouse[0], 2);
-	
+	//排布第二控制器
 	sheet_slide(sht_back[1],  0,  0);
-	sheet_slide(key_win,   32, 4);
-	sheet_slide(sht_mouse[1], mx, my);
+	//sheet_slide(key_win,   32, 4);
+	//sheet_slide(sht_mouse[1], mx, my);
 	sheet_updown(sht_back[1],  0);
-	sheet_updown(key_win,   1);
-	sheet_updown(sht_mouse[1], 2);
+	//sheet_updown(key_win,   1);
+	//sheet_updown(sht_mouse[1], 2);
+	//keywin_on(key_win);
+	//排布第一控制器
+	sheet_slide(sht_back[0],  0,  0);
+	//sheet_slide(key_win,   32, 4);
+	sheet_slide(sht_mouse, mx, my);
+	sheet_updown(sht_back[0],  0);
+	//sheet_updown(key_win,   1);
+	sheet_updown(sht_mouse, 1);
 	
-	keywin_on(key_win);
-
 	/* 最初にキーボード状態との食い違いがないように、設定しておくことにする */
 	fifo32_put(&keycmd, KEYCMD_LED);
 	fifo32_put(&keycmd, key_leds);
@@ -216,25 +208,26 @@ void HariMain(int mode,...)
 			nihongo[i] = 0xff; /* フォントがなかったので全角部分を0xffで埋め尽くす */
 		}
 	}
-	*((int *) 0x0fe8) = (int) nihongo;
+	*((int *) 0x0fe8) = (int) nihongo;//字库数据位置
 	for(i=0;i<3;i++){
-		void* p=memman_unlink_page_32(pageman,0x268000,(int)fat+0x1000*i);
-		memman_free_page_32(pageman,p);
+		void* p=pageman_unlink_page_32(pageman,(int)fat+0x1000*i,1);
+		//memman_free_page_32(pageman,p);
 	}
 	memman_free_4k(memman, (int) fat, 4 * 2880);
+	system_start();//启动系统进程
 	for (;;) {
 		if (fifo32_status(&keycmd) > 0 && keycmd_wait < 0) {
-			/* キーボードコントローラに送るデータがあれば、送る */
+			// キーボードコントローラに送るデータがあれば、送る 
 			keycmd_wait = fifo32_get(&keycmd);
 			wait_KBC_sendready();
 			io_out8(PORT_KEYDAT, keycmd_wait);
 		}
 		io_cli();
 		if (fifo32_status(&fifo) == 0) {
-			/* FIFOがからっぽになったので、保留している描画があれば実行する */
+			// FIFOがからっぽになったので、保留している描画があれば実行する 
 			if (new_mx >= 0) {
 				io_sti();
-				sheet_slide(sht_mouse[shtctl_point], new_mx, new_my);
+				sheet_slide(sht_mouse, new_mx, new_my);
 				new_mx = -1;
 			} else if (new_wx != 0x7fffffff) {
 				io_sti();
@@ -246,6 +239,7 @@ void HariMain(int mode,...)
 			}
 		} else {
 			i = fifo32_get(&fifo);
+			//i = get_a_key(&fifo);
 			io_sti();
 			if (key_win != 0 && key_win->flags == 0) {	/* ウィンドウが閉じられた */
 				if (shtctl[shtctl_point]->top == 1) {	/* もうマウスと背景しかない */
@@ -330,27 +324,26 @@ void HariMain(int mode,...)
 					int index=i-0x3b-256;//0~8
 					if(index<*(int*)0x0026f01c){//正确的切换范围
 						if(sheet_mouse_on!=0){//有一个窗口被选择
-							//sheet_temp=*sheet_mouse_on;//保存数据
-							sheet_free(sheet_mouse_on);//释放原图层
-							//sheet_mouse_on=sheet_alloc(shtctl[index]);//在新的图层控制器申请图层
-							//*sheet_mouse_on=sheet_temp;//恢复数据
+							sheet_updown(sheet_mouse_on,-1);//隐藏原图层
 							sheet_mouse_on->ctl=shtctl[index];//链接到新的图层控制器
-							sheet_mouse_on->height=-1;//保持-1
-							//sheet_refreshmap(*(int*)0x0fe4,sheet_mouse_on->vx0,sheet_mouse_on->vy0,sheet_mouse_on->vx0+sheet_mouse_on->bxsize,sheet_mouse_on->vy0+sheet_mouse_on->bysize,0);
-							//sheet_refreshmap(shtctl[index],sheet_mouse_on->vx0,sheet_mouse_on->vy0,sheet_mouse_on->vx0+sheet_mouse_on->bxsize,sheet_mouse_on->vy0+sheet_mouse_on->bysize,0);
-							sheet_updown(sheet_mouse_on,shtctl[index]->top);//移到顶端
-							sheet_slide(sht_mouse[index],sht_mouse[shtctl_point]->vx0,sht_mouse[shtctl_point]->vy0);//同步鼠标位置
+							sheet_mouse_on->height=-1;//保持-1;
+							sheet_updown(sheet_mouse_on,shtctl[index]->top+1);//移到顶端
+							sheet_updown(sht_mouse,-1);//隐藏鼠标
+							sht_mouse->ctl=shtctl[index];//链接到新的图层控制器
+							sheet_updown(sht_mouse,255);//移到顶端
 						}
 						else{//没有选中图层就切换
 							if (key_win != 0) {//释放窗口焦点
 								keywin_off(key_win);
 							}
 							key_win=0;//当前没有窗口被选中
-							sheet_slide(sht_mouse[index],sht_mouse[shtctl_point]->vx0,sht_mouse[shtctl_point]->vy0);//同步鼠标位置
+							sheet_updown(sht_mouse,-1);
+							sht_mouse->ctl=shtctl[index];//链接到新的图层控制器
+							sheet_updown(sht_mouse,255);//移到顶端
 						}
 						*(int*)0x0fe4=shtctl[index];
 						shtctl_point=index;
-						sheet_refreshsub(shtctl[index], 0, 0, shtctl[index]->xsize, shtctl[index]->ysize, 0, shtctl[index]->top);//刷新整个页面
+						shtctl[index]->func.sheet_refreshsub(shtctl[index], 0, 0, shtctl[index]->xsize, shtctl[index]->ysize, 0, shtctl[index]->top);//刷新整个页面
 					}
 				}
 				if (i == 256 + 0x3b && key_shift != 0 && key_win != 0) {	/* Shift+F1 */
@@ -412,22 +405,24 @@ void HariMain(int mode,...)
 						if (mmx < 0) {
 							/* 通常モードの場合 */
 							/* 上の下じきから順番にマウスが指している下じきを探す */
-							for (j = shtctl[shtctl_point]->top - 1; j > 0; j--) {//遍历所有图层
+							for (j = shtctl[shtctl_point]->top - 1; j > 0; j--) {//遍历当前控制器所有图层,除了鼠标图层和背景图层
 								sht = shtctl[shtctl_point]->sheets[j];//获取图层
 								x = mx - sht->vx0;//基于图层的x坐标
 								y = my - sht->vy0;//基于图层的y坐标
 								if (0 <= x && x < sht->bxsize && 0 <= y && y < sht->bysize) {//鼠标位于其范围内
-									if (sht->buf[y * sht->bxsize + x] != sht->col_inv) {//透明色判断，点击区域不是透明色
+									if (sht->buf32[y * sht->bxsize + x] != sht->col_inv) {//透明色判断，点击区域不是透明色
 										if(sheet_mouse_on!=sht && sheet_mouse_on!=0){//不是同一个图层,且鼠标当前有图层选择
 											break;//放弃操作
 										}
-										sheet_updown(sht, shtctl[shtctl_point]->top - 1);//当前图层上移
+										//if((sht->flags)&0x02!=0x02){//图层锁定位没有生效
+											sheet_updown(sht, shtctl[shtctl_point]->top - 1);//当前图层上移
+										//}
 										if (sht != key_win) {
 											keywin_off(key_win);
 											key_win = sht;
 											keywin_on(key_win);
 										}
-										if (3 <= x && x < sht->bxsize - 3 && 3 <= y && y < 21 && mouse_on_header==0) {//鼠标位于标题栏区域进入窗口移动移动模式
+										if (3 <= x && x < sht->bxsize - 3 && 3 <= y && y < 21 && mouse_on_header==0) {//鼠标没有命中锁定图层位于标题栏区域进入窗口移动移动模式
 											mmx = mx;	/* ウィンドウ移動モードへ */
 											mmy = my;
 											mmx2 = sht->vx0;
@@ -435,9 +430,9 @@ void HariMain(int mode,...)
 										}else{
 											mouse_on_header=-1;//禁用窗口移动模式
 										}
-										if (sht->bxsize - 21 <= x && x < sht->bxsize - 5 && 5 <= y && y < 19) {//鼠标位于X按钮位置强制结束程序
+										if (sht->ctl->vram4sht==0 && sht->bxsize - 21 <= x && x < sht->bxsize - 5 && 5 <= y && y < 19) {//图层是基础图层鼠标位于X按钮位置强制结束程序
 											/* 「×」ボタンクリック */
-											if ((sht->flags & 0x10) != 0) {		/* アプリが作ったウィンドウか？ */
+											if ((sht->flags & 0x10) != 0) {		//应用程序的窗口
 												task = sht->task;
 												cons_putstr0(task->cons, "\nBreak(mouse) :\n");
 												io_cli();	/* 強制終了処理中にタスクが変わると困るから */
@@ -445,12 +440,12 @@ void HariMain(int mode,...)
 												task->tss.eip = (int) asm_end_app;
 												io_sti();
 												task_run(task, -1, 0);
-											} else {	/* コンソール */
+											} else {	//是一个命令行窗口，向其发送终止信号
 												task = sht->task;
-												sheet_updown(sht, -1); /* とりあえず非表示にしておく */
-												keywin_off(key_win);
-												key_win = shtctl[shtctl_point]->sheets[shtctl[shtctl_point]->top - 1];
-												keywin_on(key_win);
+												//sheet_updown(sht, -1); /* とりあえず非表示にしておく */
+												//keywin_off(key_win);
+												//key_win = shtctl[shtctl_point]->sheets[shtctl[shtctl_point]->top - 1];
+												//keywin_on(key_win);
 												io_cli();
 												fifo32_put(&task->fifo, 4);
 												io_sti();
@@ -481,15 +476,15 @@ void HariMain(int mode,...)
 						}
 					}
 				}
-			} else if (768 <= i && i <= 1023) {	/* コンソール終了処理 */
-				close_console(shtctl[shtctl_point]->sheets0 + (i - 768));
+			} else if (768 <= i && i <= 1023) {	/* 命令行关闭 */
+				close_console(shtctl[shtctl_point]->sid[i - 768]);
 			} else if (1024 <= i && i <= 2023) {
 				close_constask(taskctl->tasks0 + (i - 1024));
-			} else if (2024 <= i && i <= 2279) {	/* コンソールだけを閉じる */
-				sht2 = shtctl[shtctl_point]->sheets0 + (i - 2024);
+			} else if (2024 <= i && i <= 2279) {	/* 仅关闭命令行 */
+				sht2 = shtctl[shtctl_point]->sid[i - 2024];
 				for(i=0;i<(256 * 165+0xfff)>>12;i++){
-					void* po=memman_unlink_page_32(pageman,0x268000,(int)(sht2->buf)+0x1000*i);
-					memman_free_page_32(pageman,po);
+					void* po=pageman_unlink_page_32(pageman,(int)(sht2->buf)+0x1000*i,1);
+					//memman_free_page_32(pageman,po);
 				}
 				memman_free_4k(memman, (int) sht2->buf, 256 * 165);
 				sheet_free(sht2);
@@ -498,9 +493,21 @@ void HariMain(int mode,...)
 	}
 }
 
+int get_a_key(struct FIFO32* fifo){
+	io_cli();
+	if (fifo32_status(fifo) == 0) {
+		io_sti();
+		task_sleep(task_now());
+	}
+	else{
+		io_sti();
+		return fifo32_get(fifo);
+	}
+}
+
 void keywin_off(struct SHEET *key_win)
 {
-	change_wtitle8(key_win, 0);
+	change_wtitle32(key_win, 0);
 	if ((key_win->flags & 0x20) != 0) {
 		fifo32_put(&key_win->task->fifo, 3); /* コンソールのカーソルOFF */
 	}
@@ -509,7 +516,7 @@ void keywin_off(struct SHEET *key_win)
 
 void keywin_on(struct SHEET *key_win)
 {
-	change_wtitle8(key_win, 1);
+	change_wtitle32(key_win, 1);
 	if ((key_win->flags & 0x20) != 0) {
 		fifo32_put(&key_win->task->fifo, 2); /* コンソールのカーソルON */
 	}
@@ -553,6 +560,7 @@ struct TASK *open_constask(struct SHEET *sht, unsigned int memtotal)
 	memman_init(task->memman);
 	memman_free(task->memman,0x00c00000,0xbfffffff);
 	
+	
 	*((int *) (task->tss.esp + 4)) = (int) sht;
 	*((int *) (task->tss.esp + 8)) = memtotal;
 	add_child_task(task_now0,task);//命令行是主进程的子进程
@@ -566,11 +574,11 @@ struct SHEET *open_console(struct SHTCTL *shtctl, unsigned int memtotal)
 	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
 	struct PAGEMAN32 *pageman=*((struct PAGEMAN32 **)ADR_PAGEMAN);
 	struct SHEET *sht = sheet_alloc(shtctl);
-	unsigned char *buf = (unsigned char *) memman_alloc_4k(memman, 256 * 165);//内存分配!!!
-	memmam_link_page_32_m(pageman,0x268000,buf,7,0x0b,0);//
+	unsigned char *buf = (unsigned char *) memman_alloc_4k(memman, 256 * 165 *4);//内存分配!!!
+	memmam_link_page_32_m(pageman,0x268000,buf,7,42,0);//
 	sheet_setbuf(sht, buf, 256, 165, -1); /* 透明色なし */
-	make_window8(buf, 256, 165, "console", 0);
-	make_textbox8(sht, 8, 28, 240, 128, COL8_000000);
+	make_window32(buf, 256, 165, "console", 0);
+	make_textbox32(sht, 8, 28, 240, 128, COL8_000000);
 	sht->task = open_constask(sht, memtotal);
 	sht->flags |= 0x20;	/* カーソルあり */
 	return sht;
@@ -582,14 +590,19 @@ void close_constask(struct TASK *task)
 	struct PAGEMAN32 *pageman=*(struct PAGEMAN32 **)ADR_PAGEMAN;
 	int i;
 	task_sleep(task);
+	for(i=0;i<((int)(sizeof(struct MEMMAN))+0xfff)>>12;i++){
+		void* po=pageman_unlink_page_32(pageman,(int)(task->memman)+0x1000*i,1);
+		//memman_free_page_32(pageman,po);
+	}
+	memman_free_4k(memman,task->memman,sizeof(struct MEMMAN));//释放应用程序的内存控制器占用的内存
 	for(i=0;i<(64 * 1024+0xfff)>>12;i++){
-		void* po=memman_unlink_page_32(pageman,0x268000,(int)(task->cons_stack)+0x1000*i);
-		memman_free_page_32(pageman,po);
+		void* po=pageman_unlink_page_32(pageman,(int)(task->cons_stack)+0x1000*i,1);
+		//memman_free_page_32(pageman,po);
 	}
 	memman_free_4k(memman, task->cons_stack, 64 * 1024);
 	for(i=0;i<(128 * 4+0xfff)>>12;i++){
-		void* po=memman_unlink_page_32(pageman,0x268000,(int)(task->fifo.buf)+0x1000*i);
-		memman_free_page_32(pageman,po);
+		void* po=pageman_unlink_page_32(pageman,(int)(task->fifo.buf)+0x1000*i,1);
+		//memman_free_page_32(pageman,po);
 	}
 	memman_free_4k(memman, (int) task->fifo.buf, 128 * 4);
 	task->flags = 0; /* task_free(task); の代わり */
@@ -603,8 +616,8 @@ void close_console(struct SHEET *sht)
 	int i;
 	struct TASK *task = sht->task;
 	for(i=0;i<(256 * 165+0xfff)>>12;i++){
-		void* po=memman_unlink_page_32(pageman,0x268000,(int)(sht->buf)+0x1000*i);
-		memman_free_page_32(pageman,po);
+		void* po=pageman_unlink_page_32(pageman,(int)(sht->buf)+0x1000*i,1);
+		//memman_free_page_32(pageman,po);
 	}
 	memman_free_4k(memman, (int) sht->buf, 256 * 165);
 	sheet_free(sht);
