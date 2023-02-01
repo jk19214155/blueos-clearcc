@@ -154,8 +154,9 @@ void sheet_refreshmap32(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, 
 			vy = sht->vy0 + by;
 			for (bx = bx0; bx < bx1; bx++) {
 				vx = sht->vx0 + bx;
-				if (buf[by * sht->bxsize + bx] != sht->col_inv) {
-					map[vy * ctl->xsize + vx] = sid;
+				if (buf[by * sht->bxsize + bx] != sht->col_inv) {//不是透明色
+					if((buf[by * sht->bxsize + bx]&0xff000000)==0)
+						map[vy * ctl->xsize + vx] = sid;
 				}
 			}
 		}
@@ -283,9 +284,14 @@ void sheet_refreshsub24(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, 
 			vy = sht->vy0 + by;
 			for (bx = bx0; bx < bx1; bx++) {
 				vx = sht->vx0 + bx;
-				if (map[vy * ctl->xsize + vx] == sid || 1) {
-					color.int32= buf[by * sht->bxsize + bx];
-					unsigned char a=color.char8[3];//通透性数据
+				color.int32= buf[by * sht->bxsize + bx];
+				unsigned char a=color.char8[3];//通透性数据
+				/*
+				两个条件满足其一即可描绘:
+				1.本像素属于map指示的图层(本图层)
+				2.本像素是透明像素且高于map指示的图层(透明叠加层)
+				*/
+				if (map[vy * ctl->xsize + vx] == sid ||( a!=0 && (sht->height >= (ctl->sid[map[vy * ctl->xsize + vx]]->height)))) {
 					unsigned int r=color.char8[0];
 					unsigned int g=color.char8[1];
 					unsigned int b=color.char8[2];
@@ -426,6 +432,15 @@ void sheet_refresh(struct SHEET *sht, int bx0, int by0, int bx1, int by1)//??局
 	void (*sheet_refreshsub32)(struct SHTCTL* ctl, int vx0, int vy0, int vx1, int vy1, int h0, int h1)=(sht->ctl->func).sheet_refreshsub;
 	if (sht->height >= 0) { //?示中？
 		sheet_refreshsub32(sht->ctl, sht->vx0 + bx0, sht->vy0 + by0, sht->vx0 + bx1, sht->vy0 + by1, sht->height, sht->height);
+	}
+	return;
+}
+void sheet_refresh_all(struct SHEET *sht, int bx0, int by0, int bx1, int by1)//??局部?生改?刷新
+{
+	void (*sheet_refreshsub32)(struct SHTCTL* ctl, int vx0, int vy0, int vx1, int vy1, int h0, int h1)=(sht->ctl->func).sheet_refreshsub;
+	if (sht->height >= 0) { //?示中？
+		sheet_refreshmap32(sht->ctl, sht->vx0 + bx0, sht->vy0 + by0, sht->vx0 + bx1, sht->vy0 + by1, 0);
+		sheet_refreshsub32(sht->ctl, sht->vx0 + bx0, sht->vy0 + by0, sht->vx0 + bx1, sht->vy0 + by1, 0, sht->height);
 	}
 	return;
 }
