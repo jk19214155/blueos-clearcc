@@ -1,7 +1,7 @@
-TOOLPATH = ./tolset/z_tools/
-INCPATH  = ./tolset/z_tools/haribote/
-APILIBPATH   = ./apilib/
-HARIBOTEPATH = ./haribote/
+TOOLPATH = ../tolset/z_tools/
+INCPATH  = ../tolset/z_tools/haribote/
+APILIBPATH   = ../apilib/
+HARIBOTEPATH = ../haribote/
 
 MAKE     = $(TOOLPATH)make.exe -r
 NASK     = $(TOOLPATH)nask.exe

@@ -512,7 +512,7 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 		{
 			int i;
 			char s[30];
-			for(i=0;i<((esi*edi+0xfff+(addr_from&0xfff))>>12);i++){
+			for(i=0;i<((esi*edi*4+0x1fff+(addr_from&0xfff))>>12);i++){
 				int paddr_from=0xffc00000|(((addr_from+i*0x1000)>>10)&0xfffffffc);//获取目标页面的链接地址
 				int paddr_to=0xffc00000|(((addr_to+i*0x1000)>>10)&0xfffffffc);//获取目标页面的链接地址
 				*(int*)paddr_to=*(int*)paddr_from;
@@ -522,7 +522,7 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 		sht->task = task;
 		sht->flags |= 0x10;
 		sheet_setbuf(sht, addr_to+(addr_from&0xfff), esi, edi, eax);
-		make_window8((char *) ebx + ds_base, esi, edi, (char *) ecx + ds_base, 0);
+		make_window32((char *) ebx + ds_base, esi, edi, (char *) ecx + ds_base, 0);
 		sheet_slide(sht, ((shtctl->xsize - esi) / 2) & ~3, (shtctl->ysize - edi) / 2);
 		sheet_updown(sht, shtctl->top); /* 今のマウスと同じ高さになるように指定： マウスはこの上になる */
 		reg[7] = (int) sht;

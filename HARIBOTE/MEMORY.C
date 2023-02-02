@@ -217,7 +217,7 @@ void init_page(struct PAGEMAN32 *man){
 				a=0;
 			}
 			else{//不可用内存
-				a=255;
+				a=128;
 			}
 			
 			for(j=addr_from;j<=addr_to;j++){
@@ -228,7 +228,7 @@ void init_page(struct PAGEMAN32 *man){
 				man->total_page_num++;//总内存计数
 			}
 		}
-		else{//信息校验失败
+		else{//信息校验失败(内存探测完成)
 			*(int*)0x0026f004=man->total_page_num;
 			*(int*)0x0026f008=man->free_page_num;
 			break;

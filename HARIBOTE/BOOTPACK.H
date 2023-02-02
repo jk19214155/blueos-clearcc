@@ -513,7 +513,7 @@ struct ACPI_RSDP {
 	unsigned char Reserved[3];
 };
 
-struct ACPISDTHeader {
+struct ACPISDTHeader {//SDT表头部
   char Signature[4];
   unsigned int Length;
   unsigned char Revision;
@@ -539,33 +539,33 @@ typedef struct
   unsigned int Address[2];
 } GenericAddressStructure;
 
-struct ACPI_FADT
+struct ACPI_FADT//FADT表的格式
 {
     struct   ACPISDTHeader h;
     unsigned int FirmwareCtrl;
-    unsigned int Dsdt;
+    unsigned int Dsdt;//DSDT表格的位置
  
     // field used in ACPI 1.0; no longer in use, for compatibility only
     unsigned char  Reserved;
  
-    unsigned char  PreferredPowerManagementProfile;
-    unsigned short SCI_Interrupt;
-    unsigned int SMI_CommandPort;
-    unsigned char  AcpiEnable;
-    unsigned char  AcpiDisable;
+    unsigned char  PreferredPowerManagementProfile;//标识OME?
+    unsigned short SCI_Interrupt;//开关机按钮的中断号
+    unsigned int SMI_CommandPort;//启用ACPI或者禁用ACPI的端口号
+    unsigned char  AcpiEnable;//把这个字段里的内容发送到偏移47字段指示的端口上就可以启用ACPI
+    unsigned char  AcpiDisable;// 把这个字段里的内容发送到偏移47字段指示的端口上就可以禁用ACPI
     unsigned char  S4BIOS_REQ;
     unsigned char  PSTATE_Control;
-    unsigned int PM1aEventBlock;
-    unsigned int PM1bEventBlock;
-    unsigned int PM1aControlBlock;
-    unsigned int PM1bControlBlock;
+    unsigned int PM1aEventBlock;// 事件寄存器1a (包括状态寄存器1a和使能寄存器1a)
+    unsigned int PM1bEventBlock;//事件寄存器1b (包括状态寄存器1b和使能寄存器1b)
+    unsigned int PM1aControlBlock;//控制寄存器1a
+    unsigned int PM1bControlBlock;//控制寄存器1b
     unsigned int PM2ControlBlock;
     unsigned int PMTimerBlock;
     unsigned int GPE0Block;
     unsigned int GPE1Block;
-    unsigned char  PM1EventLength;
-    unsigned char  PM1ControlLength;
-    unsigned char  PM2ControlLength;
+    unsigned char  PM1EventLength;//事件寄存器1的大小
+    unsigned char  PM1ControlLength;//事件寄存器1的长度?
+    unsigned char  PM2ControlLength;//事件寄存器2的长度?
     unsigned char  PMTimerLength;
     unsigned char  GPE0Length;
     unsigned char  GPE1Length;
@@ -588,9 +588,9 @@ struct ACPI_FADT
     unsigned int Flags;
  
     // 12 byte structure; see below for details
-    GenericAddressStructure ResetReg;
+    GenericAddressStructure ResetReg;//计算机重启端口
  
-    unsigned char  ResetValue;
+    unsigned char  ResetValue;//重启命令，写到上面端口可用重启计算机
     unsigned char  Reserved3[3];
  
     // 64bit pointers - Available on ACPI 2.0+

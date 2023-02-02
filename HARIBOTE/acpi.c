@@ -53,11 +53,11 @@ unsigned int acpi_find_table(char *Signature)
 
 void init_acpi(void)
 {
-	RSDP = (struct ACPI_RSDP *)acpi_find_rsdp();
+	RSDP = (struct ACPI_RSDP *)acpi_find_rsdp();//在内存指定区域寻找RSDP
 	if (RSDP == 0) return;
-	RSDT = (struct ACPI_RSDT *)RSDP->RsdtAddress;
+	RSDT = (struct ACPI_RSDT *)RSDP->RsdtAddress;//读出RSDP中RSDT的地址
 	// checksum(RSDT, RSDT->header.Length);
-	if (!checksum((unsigned char *)RSDT, RSDT->header.Length)) return;
+	if (!checksum((unsigned char *)RSDT, RSDT->header.Length)) return;//校验数据完整性
 	
 	FADT = (struct ACPI_FADT *)acpi_find_table("FACP");
 	if (!checksum((unsigned char *)FADT, FADT->h.Length)) return;
@@ -71,7 +71,7 @@ void init_acpi(void)
 			for (i = 0; i < 300; i++)
 			{
 				if (io_in16(FADT->PM1aControlBlock) & 1) break;
-                for (j = 0; j < 1000000; j++){
+                for (j = 0; j < 1000000; j++){//延时作用
 					io_sti();
 				}
 			}
@@ -80,7 +80,7 @@ void init_acpi(void)
 				for (; i < 300; i++)
 				{
 					if (io_in16(FADT->PM1bControlBlock) & 1) break;
-                for (j = 0; j < 1000000; j++){
+                for (j = 0; j < 1000000; j++){//延时作用
 					io_sti();
 				}
 				}
