@@ -223,7 +223,8 @@ void cons_runcmd(char *cmdline, struct CONSOLE *cons, int *fat, int memtotal)
 	} else if (strcmp(cmdline, "reload") == 0) {
 		sys_reboot();
 	} else if (strcmp(cmdline, "shutdown") == 0) {
-		io_out8(0x0805,0x3c);//intel南桥的关机方法
+		struct FIFO32 *fifo = &system_task->fifo;//intel南桥的关机方法
+		fifo32_put(fifo,8);
 	} else if (strcmp(cmdline, "rdrand") ==0){
 		cmd_rdrand(cons, cmdline);
 	}

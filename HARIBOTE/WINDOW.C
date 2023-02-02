@@ -104,7 +104,7 @@ void make_wtitle32(unsigned int *buf, int xsize, char *title, char act)
 		tbc = COL8_000084+0x80000000;
 	} else {
 		tc = COL8_C6C6C6;
-		tbc = COL8_848484+0x10000000;
+		tbc = COL8_848484+0xa0000000;
 	}
 	boxfill32(buf, xsize, tbc, 3, 3, xsize - 4, 20);
 	putfonts32_asc(buf, xsize, 24, 4, tc, title);
@@ -234,10 +234,10 @@ void change_wtitle32(struct SHEET *sht, char act)
 		tc_new  = COL8_FFFFFF;
 		tbc_new = 0x80000000+COL8_000084;
 		tc_old  = COL8_C6C6C6;
-		tbc_old = 0x10000000+COL8_848484;
+		tbc_old = 0xa0000000+COL8_848484;
 	} else {
 		tc_new  = COL8_C6C6C6;
-		tbc_new = 0x10000000+COL8_848484;
+		tbc_new = 0xa0000000+COL8_848484;
 		tc_old  = COL8_FFFFFF;
 		tbc_old = 0x80000000+COL8_000084;
 	}

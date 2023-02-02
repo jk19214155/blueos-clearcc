@@ -424,16 +424,17 @@ _HariMain:
 	movl	$0, -2060(%ebp)
 	movl	$0, -2064(%ebp)
 	call	_init_gdtidt
+	call	_init_acpi
 	pushl	$3932160
 	call	_memman_init
 	pushl	$-536870913
 	pushl	$-1071644672
 	pushl	$3932160
 	call	_memman_free
-	leal	-908(%ebp), %ecx
+	leal	-1980(%ebp), %ecx
 	pushl	%ecx
 	call	_init_page
-	leal	-908(%ebp), %eax
+	leal	-1980(%ebp), %eax
 	pushl	$1
 	pushl	$16
 	pushl	$2555911
@@ -441,7 +442,7 @@ _HariMain:
 	pushl	$2523136
 	pushl	%eax
 	call	_memmam_link_page_32_m
-	leal	-908(%ebp), %edx
+	leal	-1980(%ebp), %edx
 	addl	$44, %esp
 	pushl	$1
 	pushl	$1
@@ -450,7 +451,7 @@ _HariMain:
 	pushl	$2523136
 	pushl	%edx
 	call	_memmam_link_page_32_m
-	leal	-908(%ebp), %ecx
+	leal	-1980(%ebp), %ecx
 	pushl	$1
 	pushl	$128
 	pushl	$2621447
@@ -458,7 +459,7 @@ _HariMain:
 	pushl	$2523136
 	pushl	%ecx
 	call	_memmam_link_page_32_m
-	leal	-908(%ebp), %eax
+	leal	-1980(%ebp), %eax
 	addl	$48, %esp
 	pushl	$1
 	pushl	$2304
@@ -467,7 +468,7 @@ _HariMain:
 	pushl	$2523136
 	pushl	%eax
 	call	_memmam_link_page_32_m
-	leal	-908(%ebp), %edx
+	leal	-1980(%ebp), %edx
 	pushl	$1
 	pushl	$130048
 	pushl	$-536870905
@@ -476,7 +477,7 @@ _HariMain:
 	pushl	%edx
 	call	_memmam_link_page_32_m
 	addl	$48, %esp
-	leal	-908(%ebp), %ecx
+	leal	-1980(%ebp), %ecx
 	movl	%ecx, 2551808
 	call	_load_cr0
 	movl	%eax, %edi
@@ -543,7 +544,7 @@ L4:
 	movl	%eax, %edi
 	pushl	$7
 	pushl	%eax
-	leal	-908(%ebp), %eax
+	leal	-1980(%ebp), %eax
 	pushl	$2523136
 	pushl	%eax
 	call	_memmam_link_page_32_m
@@ -553,7 +554,7 @@ L4:
 L9:
 	movswl	4086,%eax
 	pushl	%eax
-	leal	-908(%ebp), %edx
+	leal	-1980(%ebp), %edx
 	movswl	4084,%eax
 	pushl	%eax
 	pushl	4088
@@ -590,7 +591,7 @@ L9:
 	pushl	-60(%ebp)
 	call	_sheet_alloc
 	movswl	4086,%edx
-	movl	%eax, -1980(%ebp)
+	movl	%eax, -1964(%ebp)
 	movswl	4084,%eax
 	imull	%edx, %eax
 	sall	$2, %eax
@@ -602,7 +603,7 @@ L9:
 	movl	%eax, %ebx
 	movswl	4084,%eax
 	imull	%edx, %eax
-	leal	-908(%ebp), %edx
+	leal	-1980(%ebp), %edx
 	leal	4095(,%eax,4), %eax
 	sarl	$12, %eax
 	pushl	%eax
@@ -618,7 +619,7 @@ L9:
 	movswl	4084,%eax
 	pushl	%eax
 	pushl	%ebx
-	pushl	-1980(%ebp)
+	pushl	-1964(%ebp)
 	call	_sheet_setbuf
 	movswl	4086,%eax
 	pushl	%eax
@@ -630,14 +631,14 @@ L9:
 	pushl	-56(%ebp)
 	call	_sheet_alloc
 	movswl	4086,%edx
-	movl	%eax, -1976(%ebp)
+	movl	%eax, -1960(%ebp)
 	movswl	4084,%eax
 	imull	%edx, %eax
 	sall	$2, %eax
 	pushl	%eax
 	pushl	$3932160
 	call	_memman_alloc_4k
-	leal	-908(%ebp), %ecx
+	leal	-1980(%ebp), %ecx
 	pushl	$0
 	movl	%eax, %ebx
 	movswl	4086,%edx
@@ -658,14 +659,14 @@ L9:
 	movswl	4084,%eax
 	pushl	%eax
 	pushl	%ebx
-	pushl	-1976(%ebp)
+	pushl	-1960(%ebp)
 	call	_sheet_setbuf
 	movswl	4086,%eax
 	pushl	%eax
 	movswl	4084,%eax
 	pushl	%eax
 	pushl	%ebx
-	leal	-1932(%ebp), %ebx
+	leal	-1916(%ebp), %ebx
 	call	_init_screen32
 	addl	$32, %esp
 	pushl	-60(%ebp)
@@ -696,16 +697,16 @@ L9:
 	movl	%ecx, %eax
 	cltd
 	idivl	%ebx
-	pushl	-1976(%ebp)
+	pushl	-1960(%ebp)
 	movl	%eax, -1996(%ebp)
 	leal	-236(%ebp), %ebx
 	call	_sheet_slide
 	pushl	$0
-	pushl	-1976(%ebp)
+	pushl	-1960(%ebp)
 	call	_sheet_updown
 	pushl	$0
 	pushl	$0
-	pushl	-1980(%ebp)
+	pushl	-1964(%ebp)
 	call	_sheet_slide
 	addl	$32, %esp
 	pushl	-1996(%ebp)
@@ -713,7 +714,7 @@ L9:
 	pushl	-2020(%ebp)
 	call	_sheet_slide
 	pushl	$0
-	pushl	-1980(%ebp)
+	pushl	-1964(%ebp)
 	call	_sheet_updown
 	pushl	$1
 	pushl	-2020(%ebp)
@@ -728,7 +729,7 @@ L9:
 	pushl	$11520
 	pushl	$3932160
 	call	_memman_alloc_4k
-	leal	-908(%ebp), %edx
+	leal	-1980(%ebp), %edx
 	pushl	$0
 	movl	%eax, %esi
 	pushl	$3
@@ -768,7 +769,7 @@ L26:
 	pushl	$1
 	leal	(%eax,%esi), %eax
 	pushl	%eax
-	leal	-908(%ebp), %eax
+	leal	-1980(%ebp), %eax
 	pushl	%eax
 	call	_pageman_unlink_page_32
 	movl	-1984(%ebp), %eax
@@ -849,7 +850,7 @@ L115:
 	pushl	$1
 	addl	(%ebx), %eax
 	pushl	%eax
-	leal	-908(%ebp), %eax
+	leal	-1980(%ebp), %eax
 	pushl	%eax
 	call	_pageman_unlink_page_32
 	movl	-1984(%ebp), %eax
@@ -1444,7 +1445,7 @@ L10:
 	pushl	$145472
 	pushl	$3932160
 	call	_memman_alloc_4k
-	leal	-908(%ebp), %ecx
+	leal	-1980(%ebp), %ecx
 	pushl	$0
 	movl	%eax, %ebx
 	pushl	$22841
@@ -1952,4 +1953,5 @@ L226:
 	.def	_init_page;	.scl	2;	.type	32;	.endef
 	.def	_memman_free;	.scl	2;	.type	32;	.endef
 	.def	_memman_init;	.scl	2;	.type	32;	.endef
+	.def	_init_acpi;	.scl	2;	.type	32;	.endef
 	.def	_init_gdtidt;	.scl	2;	.type	32;	.endef

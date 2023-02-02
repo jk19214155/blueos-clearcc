@@ -330,30 +330,66 @@ L87:
 	movl	$0, 4(%edx)
 	movl	$0, (%edx)
 	xorl	%ebx, %ebx
-	xorl	%edi, %edi
-L105:
-	cmpl	%ebx, 2531348(%edi)
+	xorl	%esi, %esi
+L106:
+	cmpl	%ebx, 2531348(%esi)
 	jne	L92
-	cmpl	$0, 2531332(%edi)
-	jle	L125
+	cmpl	$0, 2531332(%esi)
+	jne	L90
+	cmpl	$0, 2531340(%esi)
+	jne	L90
+	movl	2531328(%esi), %eax
+	movl	%eax, %edx
+	addl	2531336(%esi), %edx
+	cmpl	$1, 2531344(%esi)
+	je	L95
+	andl	$-4096, %eax
+	addl	$4095, %edx
+L125:
+	shrl	$12, %eax
+	andl	$-4096, %edx
+	shrl	$12, %edx
+	cmpl	$1, 2531344(%esi)
+	je	L126
+	movl	$255, -20(%ebp)
+L98:
+	movl	%eax, %ecx
+	cmpl	%edx, %eax
+	jg	L90
+L104:
+	movl	8(%ebp), %edi
+	movb	-20(%ebp), %al
+	movl	8(%edi), %edi
+	movb	%al, (%ecx,%edi)
+	cmpl	$0, -20(%ebp)
+	jne	L103
+	movl	8(%ebp), %edi
+	incl	(%edi)
+L103:
+	movl	8(%ebp), %eax
+	incl	%ecx
+	incl	4(%eax)
+	cmpl	%edx, %ecx
+	jle	L104
 L90:
 	incl	%ebx
-	addl	$32, %edi
+	addl	$32, %esi
 	cmpl	$127, %ebx
-	jle	L105
+	jle	L106
 L89:
+	movl	%ebx, 2551840
 	movl	$1, %ebx
-L111:
-	movl	8(%ebp), %esi
-	movl	8(%esi), %eax
+L112:
+	movl	8(%ebp), %edi
+	movl	8(%edi), %eax
 	cmpb	$0, (%ebx,%eax)
-	jne	L110
-	decl	(%esi)
-L110:
+	jne	L111
+	decl	(%edi)
+L111:
 	movb	$-1, (%ebx,%eax)
 	incl	%ebx
 	cmpl	$2303, %ebx
-	jle	L111
+	jle	L112
 	popl	%ecx
 	popl	%ebx
 	popl	%ebx
@@ -361,45 +397,13 @@ L110:
 	popl	%edi
 	popl	%ebp
 	ret
-L125:
-	movl	2531328(%edi), %edx
-	movl	%edx, %ecx
-	addl	2531336(%edi), %ecx
-	cmpl	$1, 2531344(%edi)
-	je	L94
-	andl	$-4096, %edx
-	addl	$4095, %ecx
-L124:
-	andl	$-4096, %ecx
-	xorl	%eax, %eax
-	sarl	$12, %ecx
-	cmpl	$1, 2531344(%edi)
-	sete	%al
-	sarl	$12, %edx
-	decl	%eax
-	movl	%eax, -20(%ebp)
-	cmpl	%ecx, %edx
-	jg	L90
-L103:
-	movl	8(%ebp), %esi
-	movb	-20(%ebp), %al
-	movl	8(%esi), %esi
-	movb	%al, (%edx,%esi)
-	cmpl	$0, -20(%ebp)
-	jne	L102
-	movl	8(%ebp), %esi
-	incl	(%esi)
-L102:
-	movl	8(%ebp), %eax
-	incl	%edx
-	incl	4(%eax)
-	cmpl	%ecx, %edx
-	jle	L103
-	jmp	L90
-L94:
-	addl	$4095, %edx
-	andl	$-4096, %edx
-	jmp	L124
+L126:
+	movl	$0, -20(%ebp)
+	jmp	L98
+L95:
+	addl	$4095, %eax
+	andl	$-4096, %eax
+	jmp	L125
 L92:
 	movl	8(%ebp), %edx
 	movl	4(%edx), %eax
@@ -418,12 +422,12 @@ _memmam_link_page_32_m:
 	pushl	%ebx
 	movl	24(%ebp), %edi
 	cmpl	$0, 28(%ebp)
-	jne	L127
+	jne	L128
 	xorl	%esi, %esi
 	cmpl	%edi, %esi
-	jge	L133
+	jge	L134
 	movl	16(%ebp), %ebx
-L132:
+L133:
 	pushl	28(%ebp)
 	pushl	20(%ebp)
 	pushl	%ebx
@@ -434,8 +438,8 @@ L132:
 	call	_memman_link_page_32
 	addl	$20, %esp
 	cmpl	%edi, %esi
-	jl	L132
-L133:
+	jl	L133
+L134:
 	movl	8(%ebp), %edx
 	movl	(%edx), %eax
 	movl	%eax, 2551820
@@ -446,12 +450,12 @@ L133:
 	popl	%edi
 	popl	%ebp
 	ret
-L127:
+L128:
 	testl	%edi, %edi
-	jle	L133
+	jle	L134
 	xorl	%ebx, %ebx
 	movl	%edi, %esi
-L138:
+L139:
 	movl	20(%ebp), %eax
 	pushl	28(%ebp)
 	addl	%ebx, %eax
@@ -465,8 +469,8 @@ L138:
 	call	_memman_link_page_32
 	addl	$20, %esp
 	decl	%esi
-	jne	L138
-	jmp	L133
+	jne	L139
+	jmp	L134
 	.balign 2
 .globl _memman_link_page_32
 	.def	_memman_link_page_32;	.scl	2;	.type	32;	.endef
@@ -487,8 +491,8 @@ _memman_link_page_32:
 	andl	$-4096, %esi
 	addl	%eax, %esi
 	cmpl	$0, 24(%ebp)
-	je	L144
-L143:
+	je	L145
+L144:
 	movl	%edx, (%esi)
 	movl	%edx, %eax
 	leal	-8(%ebp), %esp
@@ -496,14 +500,14 @@ L143:
 	popl	%esi
 	popl	%ebp
 	ret
-L144:
+L145:
 	pushl	8(%ebp)
 	movl	%edx, %ebx
 	call	_memman_alloc_page_32
 	andl	$4095, %ebx
 	movl	%eax, %edx
 	orl	%ebx, %edx
-	jmp	L143
+	jmp	L144
 	.balign 2
 .globl _memman_unlink_page_32
 	.def	_memman_unlink_page_32;	.scl	2;	.type	32;	.endef
@@ -513,7 +517,7 @@ _memman_unlink_page_32:
 	movl	%esp, %ebp
 	movl	16(%ebp), %ecx
 	cmpl	$-4097, %ecx
-	ja	L145
+	ja	L146
 	movl	%ecx, %eax
 	movl	12(%ebp), %edx
 	shrl	$20, %eax
@@ -526,7 +530,7 @@ _memman_unlink_page_32:
 	movl	(%eax), %edx
 	movl	$0, (%eax)
 	movl	%edx, %eax
-L145:
+L146:
 	popl	%ebp
 	ret
 	.balign 2
@@ -540,12 +544,12 @@ _pageman_link_page_32_m:
 	pushl	%ebx
 	movl	20(%ebp), %edi
 	cmpl	$0, 24(%ebp)
-	jne	L149
+	jne	L150
 	xorl	%esi, %esi
 	cmpl	%edi, %esi
-	jge	L155
+	jge	L156
 	movl	12(%ebp), %ebx
-L154:
+L155:
 	pushl	24(%ebp)
 	pushl	16(%ebp)
 	pushl	%ebx
@@ -555,8 +559,8 @@ L154:
 	call	_pageman_link_page_32
 	addl	$16, %esp
 	cmpl	%edi, %esi
-	jl	L154
-L155:
+	jl	L155
+L156:
 	movl	8(%ebp), %edx
 	movl	(%edx), %eax
 	movl	%eax, 2551820
@@ -567,12 +571,12 @@ L155:
 	popl	%edi
 	popl	%ebp
 	ret
-L149:
+L150:
 	testl	%edi, %edi
-	jle	L155
+	jle	L156
 	xorl	%ebx, %ebx
 	movl	%edi, %esi
-L160:
+L161:
 	movl	16(%ebp), %eax
 	pushl	24(%ebp)
 	addl	%ebx, %eax
@@ -585,8 +589,8 @@ L160:
 	call	_pageman_link_page_32
 	addl	$16, %esp
 	decl	%esi
-	jne	L160
-	jmp	L155
+	jne	L161
+	jmp	L156
 	.balign 2
 .globl _pageman_link_page_32
 	.def	_pageman_link_page_32;	.scl	2;	.type	32;	.endef
@@ -603,15 +607,15 @@ _pageman_link_page_32:
 	andl	$-4, %ebx
 	orl	$-4096, %ebx
 	testb	$1, (%ebx)
-	je	L166
-L164:
+	je	L167
+L165:
 	movl	%edi, %ebx
 	shrl	$10, %ebx
 	andl	$-4, %ebx
 	orl	$-4194304, %ebx
 	cmpl	$0, 20(%ebp)
-	je	L167
-L165:
+	je	L168
+L166:
 	movl	%esi, (%ebx)
 	movl	%esi, %eax
 	leal	-12(%ebp), %esp
@@ -620,19 +624,19 @@ L165:
 	popl	%edi
 	popl	%ebp
 	ret
-L167:
+L168:
 	pushl	8(%ebp)
 	andl	$4095, %esi
 	call	_memman_alloc_page_32
 	orl	%eax, %esi
-	jmp	L165
-L166:
+	jmp	L166
+L167:
 	pushl	8(%ebp)
 	call	_memman_alloc_page_32
 	orl	$7, %eax
 	movl	%eax, (%ebx)
 	popl	%eax
-	jmp	L164
+	jmp	L165
 	.balign 2
 .globl _pageman_unlink_page_32_m
 	.def	_pageman_unlink_page_32_m;	.scl	2;	.type	32;	.endef
@@ -646,12 +650,12 @@ _pageman_unlink_page_32_m:
 	movl	16(%ebp), %edi
 	movl	%edi, %esi
 	decl	%esi
-	js	L190
+	js	L191
 	movl	%esi, %eax
 	movl	12(%ebp), %edx
 	sall	$12, %eax
 	leal	(%edx,%eax), %ebx
-L173:
+L174:
 	pushl	20(%ebp)
 	pushl	%ebx
 	subl	$4096, %ebx
@@ -659,10 +663,10 @@ L173:
 	call	_pageman_unlink_page_32
 	addl	$12, %esp
 	decl	%esi
-	jns	L173
-L190:
+	jns	L174
+L191:
 	testl	$1, 20(%ebp)
-	je	L174
+	je	L175
 	sall	$12, %edi
 	movl	12(%ebp), %edx
 	movl	12(%ebp), %eax
@@ -671,28 +675,28 @@ L190:
 	andl	$-4194304, %esi
 	movl	%eax, -16(%ebp)
 	cmpl	%eax, %esi
-	jl	L174
-L188:
+	jl	L175
+L189:
 	movl	12(%ebp), %eax
 	shrl	$20, %eax
 	andl	$-4, %eax
 	orl	$-4096, %eax
 	testb	$1, (%eax)
-	je	L177
+	je	L178
 	movl	12(%ebp), %ebx
 	xorl	%edx, %edx
 	shrl	$10, %ebx
 	andl	$-4, %ebx
 	orl	$-4194304, %ebx
-L185:
+L186:
 	movl	(%ebx), %eax
 	addl	%edx, %eax
 	andl	$1, %eax
-	jne	L181
+	jne	L182
 	addl	$4, %edx
 	cmpl	$4095, %edx
-	jle	L185
-L193:
+	jle	L186
+L194:
 	movl	12(%ebp), %ebx
 	shrl	$20, %ebx
 	andl	$-4, %ebx
@@ -703,11 +707,11 @@ L193:
 	movl	$0, (%ebx)
 	popl	%eax
 	popl	%edx
-L177:
+L178:
 	subl	$4194304, %esi
 	cmpl	-16(%ebp), %esi
-	jge	L188
-L174:
+	jge	L189
+L175:
 	movl	8(%ebp), %edx
 	movl	(%edx), %eax
 	movl	%eax, 2551820
@@ -718,10 +722,10 @@ L174:
 	popl	%edi
 	popl	%ebp
 	ret
-L181:
+L182:
 	cmpl	$4095, %edx
-	jle	L177
-	jmp	L193
+	jle	L178
+	jmp	L194
 	.balign 2
 .globl _pageman_unlink_page_32
 	.def	_pageman_unlink_page_32;	.scl	2;	.type	32;	.endef
@@ -731,19 +735,19 @@ _pageman_unlink_page_32:
 	pushl	%ebx
 	movl	12(%ebp), %edx
 	cmpl	$-4097, %edx
-	ja	L201
+	ja	L202
 	movl	%edx, %eax
 	shrl	$20, %eax
 	andl	$-4, %eax
 	orl	$-4096, %eax
 	testb	$1, (%eax)
-	jne	L199
+	jne	L200
 	xorl	%eax, %eax
-L194:
+L195:
 	movl	-4(%ebp), %ebx
 	leave
 	ret
-L199:
+L200:
 	movl	%edx, %eax
 	shrl	$10, %eax
 	andl	$-4, %eax
@@ -751,21 +755,21 @@ L199:
 	movl	(%eax), %ebx
 	movl	$0, (%eax)
 	testl	$1, 16(%ebp)
-	jne	L202
-L200:
+	jne	L203
+L201:
 	movl	%ebx, %eax
-	jmp	L194
-L202:
+	jmp	L195
+L203:
 	pushl	%ebx
 	pushl	8(%ebp)
 	call	_memman_free_page_32
 	popl	%eax
 	popl	%edx
-	jmp	L200
-L201:
+	jmp	L201
+L202:
 	call	_io_cli
-L196:
-	jmp	L196
+L197:
+	jmp	L197
 	.balign 2
 .globl _memman_alloc_page_32
 	.def	_memman_alloc_page_32;	.scl	2;	.type	32;	.endef
@@ -774,20 +778,20 @@ _memman_alloc_page_32:
 	xorl	%eax, %eax
 	movl	%esp, %ebp
 	movl	8(%ebp), %ecx
-L209:
+L210:
 	movl	8(%ecx), %edx
 	cmpb	$0, (%eax,%edx)
-	je	L213
+	je	L214
 	incl	%eax
 	cmpl	$1048575, %eax
-	jle	L209
+	jle	L210
 	movl	(%ecx), %eax
 	movl	%eax, 2551824
-L210:
+L211:
 	call	_io_cli
 	call	_io_hlt
-	jmp	L210
-L213:
+	jmp	L211
+L214:
 	movb	$1, (%eax,%edx)
 	sall	$12, %eax
 	decl	(%ecx)
@@ -808,27 +812,27 @@ _memman_free_page_32_m:
 	movl	8(%ebp), %esi
 	shrl	$12, %ebx
 	cmpl	%edi, %ecx
-	jge	L224
-L222:
+	jge	L225
+L223:
 	movl	8(%esi), %edx
 	leal	(%ecx,%ebx), %eax
 	cmpb	$1, (%eax,%edx)
-	je	L225
-L221:
+	je	L226
+L222:
 	incl	%ecx
 	movb	$0, (%eax,%edx)
 	cmpl	%edi, %ecx
-	jl	L222
-L224:
+	jl	L223
+L225:
 	popl	%ebx
 	xorl	%eax, %eax
 	popl	%esi
 	popl	%edi
 	popl	%ebp
 	ret
-L225:
+L226:
 	incl	(%esi)
-	jmp	L221
+	jmp	L222
 	.balign 2
 .globl _memman_free_page_32
 	.def	_memman_free_page_32;	.scl	2;	.type	32;	.endef
@@ -840,17 +844,17 @@ _memman_free_page_32:
 	shrl	$12, %edx
 	movl	8(%eax), %ecx
 	cmpb	$1, (%edx,%ecx)
-	je	L228
-L227:
+	je	L229
+L228:
 	movb	$0, (%edx,%ecx)
 	movl	(%eax), %eax
 	movl	%eax, 2551820
 	xorl	%eax, %eax
 	popl	%ebp
 	ret
-L228:
+L229:
 	incl	(%eax)
-	jmp	L227
+	jmp	L228
 	.balign 2
 .globl _memman_copy_page_32_m
 	.def	_memman_copy_page_32_m;	.scl	2;	.type	32;	.endef
@@ -863,7 +867,7 @@ _memman_copy_page_32_m:
 	pushl	%ebx
 	movl	28(%ebp), %edx
 	testl	%edx, %edx
-	jle	L238
+	jle	L239
 	movl	24(%ebp), %eax
 	movl	%edx, %ebx
 	movl	%eax, %edi
@@ -871,7 +875,7 @@ _memman_copy_page_32_m:
 	sall	$12, %edi
 	movl	%eax, %esi
 	sall	$12, %esi
-L236:
+L237:
 	movl	%esi, %eax
 	movl	12(%ebp), %edx
 	shrl	$20, %eax
@@ -898,8 +902,8 @@ L236:
 	addl	$4096, %edi
 	decl	%ebx
 	movl	%edx, (%eax,%ecx)
-	jne	L236
-L238:
+	jne	L237
+L239:
 	popl	%ecx
 	popl	%ebx
 	popl	%esi
@@ -917,7 +921,7 @@ _inthandler0e:
 	movl	12(%ebp), %eax
 	movl	8(%ebp), %edx
 	testb	$1, (%eax)
-	je	L242
+	je	L243
 	pushl	$0
 	andl	$-4096, %edx
 	pushl	$7
@@ -930,10 +934,10 @@ _inthandler0e:
 	xorl	%eax, %eax
 	leave
 	ret
-L242:
+L243:
 	call	_io_cli
 	call	_io_hlt
-	jmp	L242
+	jmp	L243
 	.def	_task_now;	.scl	2;	.type	32;	.endef
 	.def	_io_hlt;	.scl	2;	.type	32;	.endef
 	.def	_io_cli;	.scl	2;	.type	32;	.endef

@@ -155,8 +155,9 @@ void sheet_refreshmap32(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, 
 			for (bx = bx0; bx < bx1; bx++) {
 				vx = sht->vx0 + bx;
 				if (buf[by * sht->bxsize + bx] != sht->col_inv) {//不是透明色
-					if((buf[by * sht->bxsize + bx]&0xff000000)==0)
+					if((buf[by * sht->bxsize + bx]&0xff000000)==0){//没有透明元素
 						map[vy * ctl->xsize + vx] = sid;
+					}
 				}
 			}
 		}

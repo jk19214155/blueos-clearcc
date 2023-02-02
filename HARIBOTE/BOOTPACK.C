@@ -10,8 +10,11 @@ void close_console(struct SHEET *sht);
 void close_constask(struct TASK *task);
 
 
+
 void HariMain(int mode,...)
 {
+	//init_acpi();
+	//acpi_shutdown();
 	struct BOOTINFO *binfo = (struct BOOTINFO *) ADR_BOOTINFO;
 	struct SHTCTL *shtctl[10];//图层管理器
 	struct SHEET sheet_temp;//临时图层
@@ -25,12 +28,12 @@ void HariMain(int mode,...)
 	struct MOUSE_DEC mdec;
 	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
 	struct MEMMAN *memman_core;
-	struct PAGEMAN32 struct_pageman;
 	unsigned int *buf_back, buf_mouse[256];
 	struct SHEET *sht_back[10], *sht_mouse;
 	struct TASK *task_a, *task;
 	struct SHEET* sheet_mouse_on=0;//当前鼠标锁定的图层
 	int mouse_on_header=0;//鼠标抓取了标题栏吗？
+	struct PAGEMAN32 struct_pageman;
 	//void* sys_esp;
 	static char keytable0[0x80] = {//基本码表
 		0,   0,   '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '^', 0x08, 0,
@@ -72,6 +75,7 @@ void HariMain(int mode,...)
 	extern char hankaku[4096];
 	struct PAGEMAN32 *pageman = &struct_pageman;
 	init_gdtidt();//初始化gdt和idt
+	init_acpi();//初始化acpi
 	//memtotal = memtest(0x00900000, 0xbfffffff);//初始化内存
 	memman_init(memman);
 	//memman_free(memman, 0x00001000, 0x0009e000); /* 0x00001000 - 0x0009efff */

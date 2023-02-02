@@ -163,7 +163,7 @@ int memman_free_4k(struct MEMMAN *man, unsigned int addr, unsigned int size)
 void init_page(struct PAGEMAN32 *man){
 	int i;
 	int j=0;
-	int a;
+	unsigned int a;
 	int addr_from,addr_to;
 	struct MEMINFO* meminfo=(struct MEMINFO*)0x26a000;//ADR_MEMINFO;
 	j=0;
@@ -196,7 +196,7 @@ void init_page(struct PAGEMAN32 *man){
 	man->free_page_num=0;
 	for(i=0;i<128;i++){
 		if(meminfo[i].index==i){//区?信息完整
-			if(meminfo[i].base_addr_high>0){//属于高4G内存
+			if(meminfo[i].base_addr_high!=0 || meminfo[i].length_high!=0){//属于高4G内存
 				continue;//不处理
 			}
 			addr_from=meminfo[i].base_addr_low;
@@ -211,11 +211,13 @@ void init_page(struct PAGEMAN32 *man){
 			}
 			addr_from>>=12;
 			addr_to>>=12;
+			addr_from&=0x000fffff;//符号问题
+			addr_to&=0x000fffff;//符号问题
 			if(meminfo[i].type==1){//可用内存
 				a=0;
 			}
 			else{//不可用内存
-				a=-1;
+				a=255;
 			}
 			
 			for(j=addr_from;j<=addr_to;j++){
@@ -232,6 +234,7 @@ void init_page(struct PAGEMAN32 *man){
 			break;
 		}
 	}
+	*(int*)0x26f020=i;
 	for(i=0x01;i<0x00900;i++){//0x900000之前没有可用内存
 		if(man->mem_map_base[i]==0){
 			man->free_page_num--;
@@ -241,6 +244,7 @@ void init_page(struct PAGEMAN32 *man){
 	//for(i=0xc0000;i<=0xfffff;i++){//0xc00000之后没有可用内存
 	//	man->mem_map_base[i]=0xff;
 	//}
+
 	return;
 }
 

@@ -15,14 +15,14 @@ struct EBOOTINFO{
 	int cpu_num;
 };
 struct MEMINFO {
-	int base_addr_low;
-	int base_addr_high;
-	int length_low;
-	int length_high;
-	int type;
-	int index;
-	int undefind1;
-	int undifind2;
+	unsigned int base_addr_low;
+	unsigned int base_addr_high;
+	unsigned int length_low;
+	unsigned int length_high;
+	unsigned int type;
+	unsigned int index;
+	unsigned int undefind1;
+	unsigned int undifind2;
 };
 #define ADR_MEMINFO		0x0026a000
 #define ADR_PAGEMAN 	0x0026f000
@@ -33,6 +33,8 @@ void io_sti(void);
 void io_stihlt(void);
 int io_in8(int port);
 void io_out8(int port, int data);
+int io_in16(int port);
+void io_out16(int port, int data);
 int io_load_eflags(void);
 void io_store_eflags(int eflags);
 void load_gdtr(int limit, int addr);
@@ -498,3 +500,112 @@ struct TASK *desktop_start();
 /*system.c*/
 struct TASK* system_start();
 void system_task_abort(struct task_abort* task);
+/* acpi.c */
+struct ACPI_RSDP {
+	char Signature[8];
+	unsigned char Checksum;
+	char OEMID[6];
+	unsigned char Revision;
+	unsigned int RsdtAddress;
+	unsigned int Length;
+	unsigned int XsdtAddress[2];
+	unsigned char ExtendedChecksum;
+	unsigned char Reserved[3];
+};
+
+struct ACPISDTHeader {
+  char Signature[4];
+  unsigned int Length;
+  unsigned char Revision;
+  unsigned char Checksum;
+  char OEMID[6];
+  char OEMTableID[8];
+  unsigned int OEMRevision;
+  unsigned int CreatorID;
+  unsigned int CreatorRevision;
+};
+
+struct ACPI_RSDT {
+	struct ACPISDTHeader header;
+	unsigned int Entry;
+};
+
+typedef struct
+{
+  unsigned char AddressSpace;
+  unsigned char BitWidth;
+  unsigned char BitOffset;
+  unsigned char AccessSize;
+  unsigned int Address[2];
+} GenericAddressStructure;
+
+struct ACPI_FADT
+{
+    struct   ACPISDTHeader h;
+    unsigned int FirmwareCtrl;
+    unsigned int Dsdt;
+ 
+    // field used in ACPI 1.0; no longer in use, for compatibility only
+    unsigned char  Reserved;
+ 
+    unsigned char  PreferredPowerManagementProfile;
+    unsigned short SCI_Interrupt;
+    unsigned int SMI_CommandPort;
+    unsigned char  AcpiEnable;
+    unsigned char  AcpiDisable;
+    unsigned char  S4BIOS_REQ;
+    unsigned char  PSTATE_Control;
+    unsigned int PM1aEventBlock;
+    unsigned int PM1bEventBlock;
+    unsigned int PM1aControlBlock;
+    unsigned int PM1bControlBlock;
+    unsigned int PM2ControlBlock;
+    unsigned int PMTimerBlock;
+    unsigned int GPE0Block;
+    unsigned int GPE1Block;
+    unsigned char  PM1EventLength;
+    unsigned char  PM1ControlLength;
+    unsigned char  PM2ControlLength;
+    unsigned char  PMTimerLength;
+    unsigned char  GPE0Length;
+    unsigned char  GPE1Length;
+    unsigned char  GPE1Base;
+    unsigned char  CStateControl;
+    unsigned short WorstC2Latency;
+    unsigned short WorstC3Latency;
+    unsigned short FlushSize;
+    unsigned short FlushStride;
+    unsigned char  DutyOffset;
+    unsigned char  DutyWidth;
+    unsigned char  DayAlarm;
+    unsigned char  MonthAlarm;
+    unsigned char  Century;
+ 
+    // reserved in ACPI 1.0; used since ACPI 2.0+
+    unsigned short BootArchitectureFlags;
+ 
+    unsigned char  Reserved2;
+    unsigned int Flags;
+ 
+    // 12 byte structure; see below for details
+    GenericAddressStructure ResetReg;
+ 
+    unsigned char  ResetValue;
+    unsigned char  Reserved3[3];
+ 
+    // 64bit pointers - Available on ACPI 2.0+
+    unsigned int                X_FirmwareControl[2];
+    unsigned int                X_Dsdt[2];
+ 
+    GenericAddressStructure X_PM1aEventBlock;
+    GenericAddressStructure X_PM1bEventBlock;
+    GenericAddressStructure X_PM1aControlBlock;
+    GenericAddressStructure X_PM1bControlBlock;
+    GenericAddressStructure X_PM2ControlBlock;
+    GenericAddressStructure X_PMTimerBlock;
+    GenericAddressStructure X_GPE0Block;
+    GenericAddressStructure X_GPE1Block;
+};
+
+void init_acpi(void);
+int acpi_shutdown(void);
