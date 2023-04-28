@@ -147,3 +147,53 @@ int acpi_shutdown(void)
 	}
     return 1;
 }
+
+unsigned int read_pci_config8(unsigned char bus, unsigned char dev, unsigned char func, unsigned char reg_offset) {
+    unsigned int addr = (bus << 16) | (dev << 11) | (func << 8) | (reg_offset & 0xfc) | ((unsigned int)0x80000000);
+    io_out32(0xcf8,addr);
+    unsigned int val = io_in32(0xcfc);
+    return (val >> ((reg_offset & 0x03) * 8)) & 0xff;
+}
+unsigned int read_pci_config32(unsigned char bus, unsigned char dev, unsigned char func, unsigned char reg_offset) {
+    unsigned int addr = (bus << 16) | (dev << 11) | (func << 8) | (reg_offset & 0xfc) | ((unsigned int)0x80000000);
+    io_out32(0xcf8,addr);
+    unsigned int val = io_in32(0xcfc);
+    return val;
+}
+
+void init_pci(){
+	unsigned int bus, device, function, address;
+    unsigned int vendor_id, device_id;
+    unsigned char header_type, class_code, subclass;
+
+    // 遍历每一个PCI总线
+    for (bus = 0; bus < 256; bus++) {
+        // 遍历每一个PCI设备
+        for (device = 0; device < 32; device++) {
+            // 遍历每一个PCI设备的功能
+            for (function = 0; function < 8; function++) {
+                // 计算当前PCI设备的配置空间地址
+                address = (bus << 16) | (device << 11) | (function << 8);
+
+                // 向PCI配置地址端口发送配置地址
+                io_out32(0xcf8, address);
+
+                // 读取PCI配置数据
+                unsigned int data = io_in32(0xcfc);
+
+                // 解析PCI配置数据
+                vendor_id = data & 0xFFFF;
+                device_id = (data >> 16) & 0xFFFF;
+                class_code = (data >> 24) & 0xFF;
+                subclass = (data >> 16) & 0xFF;
+                header_type = (data >> 16) & 0xFF;
+
+                // 判断当前PCI设备是否存在
+                if (vendor_id != 0xFFFF && vendor_id != 0x0000) {
+                    // 处理当前PCI设备
+                    // ...
+                }
+            }
+        }
+    }
+}

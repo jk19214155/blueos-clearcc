@@ -28,7 +28,8 @@ struct SHTCTL *shtctl_init(struct MEMMAN *memman, struct PAGEMAN32 *pageman, uns
 	ctl->ysize = ysize;
 	ctl->top = -1; /* シートは一枚もない */
 	ctl->vram4sht=0;//??控制器的?出不????
-	(ctl->func).sheet_refreshsub=sheet_refreshsub24;
+	//(ctl->func).sheet_refreshsub=sheet_refreshsub24;//24位彩色
+	(ctl->func).sheet_refreshsub=sheet_refreshsub32;//32位彩色
 	/*for (i = 0; i < MAX_SHEETS; i++) {
 		ctl->sheets0[i].flags = 0; 
 		ctl->sheets0[i].ctl = ctl; 
@@ -299,9 +300,9 @@ void sheet_refreshsub24(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, 
 					unsigned int r0=vram[(vy * ctl->xsize + vx)*3+0];
 					unsigned int g0=vram[(vy * ctl->xsize + vx)*3+1];
 					unsigned int b0=vram[(vy * ctl->xsize + vx)*3+2];
-					r=(r*(255-a)+r0*a)/255;
-					g=(g*(255-a)+g0*a)/255;
-					b=(b*(255-a)+b0*a)/255;
+					r=((unsigned int)r*(255-a)+r0*a);
+					g=((unsigned int)g*(255-a)+g0*a);
+					b=((unsigned int)b*(255-a)+b0*a);
 					vram[(vy * ctl->xsize + vx)*3+0]= r;
 					vram[(vy * ctl->xsize + vx)*3+1]= g;
 					vram[(vy * ctl->xsize + vx)*3+2]= b;
@@ -347,11 +348,35 @@ void sheet_refreshsub32(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, 
 			vy = sht->vy0 + by;
 			for (bx = bx0; bx < bx1; bx++) {
 				vx = sht->vx0 + bx;
-				if (map[vy * ctl->xsize + vx] == sid) {
-					color.int32= buf[by * sht->bxsize + bx];
-					vram[(vy * ctl->xsize + vx)*4+0]= color.char8[0];
-					vram[(vy * ctl->xsize + vx)*4+1]= color.char8[1];
-					vram[(vy * ctl->xsize + vx)*4+2]= color.char8[2];
+				color.int32= buf[by * sht->bxsize + bx];
+				unsigned char a=color.char8[3];//通透性数据
+				/*
+				两个条件满足其一即可描绘:
+				1.本像素属于map指示的图层(本图层)
+				2.本像素是透明像素且高于map指示的图层(透明叠加层)
+				*/
+				if (map[vy * ctl->xsize + vx] == sid){//底板图层直接复制原始数据
+					unsigned int r=color.char8[0];
+					unsigned int g=color.char8[1];
+					unsigned int b=color.char8[2];
+					vram[(vy * ctl->xsize + vx)*4+0]= r;
+					vram[(vy * ctl->xsize + vx)*4+1]= g;
+					vram[(vy * ctl->xsize + vx)*4+2]= b;
+				}
+				else if ( a!=0 && (sht->height >= (ctl->sid[map[vy * ctl->xsize + vx]]->height))) {//透明层描绘
+					unsigned int r=color.char8[0];
+					unsigned int g=color.char8[1];
+					unsigned int b=color.char8[2];
+					unsigned int r0=vram[(vy * ctl->xsize + vx)*4+0];
+					unsigned int g0=vram[(vy * ctl->xsize + vx)*4+1];
+					unsigned int b0=vram[(vy * ctl->xsize + vx)*4+2];
+					r=(r*(255-a)+r0*a)/255;
+					g=(g*(255-a)+g0*a)/255;
+					b=(b*(255-a)+b0*a)/255;
+					vram[(vy * ctl->xsize + vx)*4+0]= r;
+					vram[(vy * ctl->xsize + vx)*4+1]= g;
+					vram[(vy * ctl->xsize + vx)*4+2]= b;
+					vram[(vy * ctl->xsize + vx)*4+3]=0;
 				}
 			}
 		}
@@ -373,7 +398,6 @@ void sheet_updown(struct SHEET *sht, int height)//??上移下移函数
 		height = -1;
 	}
 	sht->height = height; //高度?定
-
 	if (old > height) {	//比以前低
 		if (height >= 0) {
 			for (h = old; h > height; h--) {//所有数据移?位置
@@ -383,17 +407,17 @@ void sheet_updown(struct SHEET *sht, int height)//??上移下移函数
 			ctl->sheets[height] = sht;//??插入
 			sheet_refreshmap32(ctl, sht->vx0, sht->vy0, sht->vx0 + sht->bxsize, sht->vy0 + sht->bysize, height + 1);//刷新map
 			sheet_refreshsub32(ctl, sht->vx0, sht->vy0, sht->vx0 + sht->bxsize, sht->vy0 + sht->bysize, height + 1, old);//刷新??
-		} else {	//???藏
+		} else {	//进入隐藏状态
 			if (ctl->top > old) {
 				for (h = old; h < ctl->top; h++) {
 					ctl->sheets[h] = ctl->sheets[h + 1];
 					ctl->sheets[h]->height = h;
 				}
 			}
-			ctl->top--; //?高度?少
+			ctl->top--; //总高度减少
 			sheet_refreshmap32(ctl, sht->vx0, sht->vy0, sht->vx0 + sht->bxsize, sht->vy0 + sht->bysize, 0);
 			sheet_refreshsub32(ctl, sht->vx0, sht->vy0, sht->vx0 + sht->bxsize, sht->vy0 + sht->bysize, 0, old - 1);
-			//???藏后id被?放
+			//释放图层管理信息
 			sht->ctl->sid[sht->sid]=0;
 		}
 	} else if (old < height) {	//比以前高
@@ -403,17 +427,17 @@ void sheet_updown(struct SHEET *sht, int height)//??上移下移函数
 				ctl->sheets[h]->height = h;
 			}
 			ctl->sheets[height] = sht;
-		} else {	//从?藏?????示??
+		} else {	//从隐藏到显示
 			int i;
-			for(i=0;i<256;i++){//是否有空?id可用分配
+			for(i=0;i<256;i++){//是否有空sid可用分配
 				if(sht->ctl->sid[i]==0){
 					sht->ctl->sid[i]=sht;
 					sht->sid=i;//注册sid
 					break;
 				}
 			}
-			if(i>=256){//失?，??控制器无法容?更多??
-				return;//什?也不做
+			if(i>=256){//失败，无法进入显示状态
+				return;
 			}
 			for (h = ctl->top; h >= height; h--) {
 				ctl->sheets[h + 1] = ctl->sheets[h];

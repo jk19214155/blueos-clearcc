@@ -3,14 +3,33 @@
 #include "bootpack.h"
 #include <stdio.h>
 #include <string.h>
+void cmd_fdir(struct CONSOLE *cons);
 extern struct TASK* system_task;
+char text_buff[100];
+unsigned int _cons_read_file(char* buff,unsigned int* size,unsigned int fat32_addr,unsigned part_base_lba,FAT32_HEADER* mbr,unsigned int start_lba_low,unsigned int start_lba_high){
+	unsigned int i;
+	for(i=0;;i++){
+		//如果多读一个簇就会超过size设定的大小
+		if((i+1)*(mbr->BPB_SecPerClus)*512>size){
+			*size=i*(mbr->BPB_SecPerClus)*512;//设定已读内容数量
+			return 0;
+		}
+		//扇区位置:逻辑分区基地址+保留分区+FAT所占的分区*FAT数量+(簇号-2)*簇大小
+		dmg_read(buff+i*512*(mbr->BPB_SecPerClus),part_base_lba+mbr->BPB_ResvdSecCnt+(mbr->BPB_FATSz32)*(mbr->BPB_NumFATs)+(start_lba_low-2)*(mbr->BPB_SecPerClus),mbr->BPB_SecPerClus,0);
+		if(*((unsigned int*)fat32_addr+start_lba_low)==0x0fffffff){
+			break;
+		}
+		start_lba_low=((int*)fat32_addr)[start_lba_low];
+	}
+	return 0;
+}
 void console_task(struct SHEET *sheet, int memtotal)
 {
 	struct PAGEMAN32 *pageman=*(struct PAGEMAN32 **)ADR_PAGEMAN;
 	struct TASK *task = task_now();
 	struct MEMMAN *memman = task_now()->memman;
-	int i, *fat = (int *) memman_alloc_4k(memman, 4 * 2880);//内存分配!!!
-	pageman_link_page_32_m(pageman,fat,7,3,0);//
+	int i, *fat = *(int**)0x0026f028;//(int *) memman_alloc_4k(memman, 4 * 2880);//内存分配!!!
+	//pageman_link_page_32_m(pageman,fat,7,3,0);//
 	struct CONSOLE cons;
 	struct FILEHANDLE fhandle[8];
 	char cmdline[30];
@@ -27,19 +46,37 @@ void console_task(struct SHEET *sheet, int memtotal)
 		timer_init(cons.timer, &task->fifo, 1);
 		timer_settime(cons.timer, 50);
 	}
-	file_readfat(fat, (unsigned char *) (ADR_DISKIMG + 0x000200));
+	//file_readfat(fat, (unsigned char *) (ADR_DISKIMG + 0x000200));
 	for (i = 0; i < 8; i++) {
 		fhandle[i].buf = 0;	/* 未使用マーク */
 	}
 	task->fhandle = fhandle;
 	task->fat = fat;
 	if (nihongo[4096] != 0xff) {	/* 日本語フォントファイルを読み込めたか？ */
-		task->langmode = 1;
+		task->langmode = 0;
 	} else {
 		task->langmode = 0;
 	}
 	task->langbyte1 = 0;
-
+	//打开文件根目录
+	if(*(unsigned int*)0x0026f030!=0){
+		FAT32_HEADER* mbr=*(unsigned int*)0x0026f024;
+		unsigned int fat32_addr=*(unsigned int*)0x0026f028;
+		unsigned int part_base_lba=*(unsigned int*)0x0026f030;
+		unsigned int root_lba=mbr->BPB_Root;
+		//task_now()->root_dir_addr=memman_alloc_4k(memman,8192);//4k页就够了
+		//pageman_link_page_32_m(pageman,task_now()->root_dir_addr,7,2,0);
+		unsigned int size=8192;
+		//_cons_read_file(task_now()->root_dir_addr,&size,fat32_addr, part_base_lba,mbr, mbr->BPB_Root,0);
+		task_now()->root_dir_addr=file_loadfile2(mbr->BPB_Root, &size, fat32_addr);
+		*(unsigned int*)0x0026f038=task_now()->root_dir_addr;
+	}
+	else{
+		task_now()->root_dir_addr=0;
+	}
+	/*接下来获取文件夹里的文件数量*/
+	//int num=_get_file_number(root_dir_addr,8192);
+	//(int*)(0x0026f038)=num;
 	/* プロンプト表示 */
 	cons_putchar(&cons, '>', 1);
 	for (;;) {
@@ -124,32 +161,32 @@ void cons_putchar(struct CONSOLE *cons, int chr, char move)
 	char s[2];
 	s[0] = chr;
 	s[1] = 0;
-	if (s[0] == 0x09) {	/* タブ */
+	if (s[0] == 0x09) {	/* 空格 */
 		for (;;) {
 			if (cons->sht != 0) {
 				putfonts8_asc_sht32(cons->sht, cons->cur_x, cons->cur_y, COL8_FFFFFF, COL8_000000, " ", 1);
 			}
 			cons->cur_x += 8;
-			if (cons->cur_x == 8 + 240) {
+			if (cons->cur_x >= 8 + 1024) {
 				cons_newline(cons);
 			}
-			if (((cons->cur_x - 8) & 0x1f) == 0) {
+			if (((cons->cur_x - 8) & 0x1f) == 0) { 
 				break;	/* 32で割り切れたらbreak */
 			}
 		}
-	} else if (s[0] == 0x0a) {	/* 改行 */
+	} else if (s[0] == 0x0a) {	/* 换行 */
 		cons_newline(cons);
-	} else if (s[0] == 0x0d) {	/* 復帰 */
-		/* とりあえずなにもしない */
-	} else {	/* 普通の文字 */
+	} else if (s[0] == 0x0d) {	/* 回车 */
+		/* 不进行任何处理 */
+	} else {	/* 普通文字 */
 		if (cons->sht != 0) {
 			putfonts8_asc_sht32(cons->sht, cons->cur_x, cons->cur_y, COL8_FFFFFF, COL8_000000, s, 1);
 		}
 		if (move != 0) {
 			/* moveが0のときはカーソルを進めない */
 			cons->cur_x += 8;
-			if (cons->cur_x == 8 + 240) {
-				cons_newline(cons);
+			if (cons->cur_x >= 8 + 1024) {//输出超界
+				cons_newline(cons);//换行
 			}
 		}
 	}
@@ -161,10 +198,10 @@ void cons_newline(struct CONSOLE *cons)
 	int x, y;
 	struct SHEET *sheet = cons->sht;
 	struct TASK *task = task_now();
-	if (cons->cur_y < 28 + 112) {
-		cons->cur_y += 16; /* 次の行へ */
+	if (cons->cur_y < 28 + 700) {//如果在界限内则直接换行
+		cons->cur_y += 16;
 	} else {
-		/* スクロール */
+		//滚动屏幕
 		if (sheet != 0) {
 			for (y = 28; y < 28 + 112; y++) {
 				for (x = 8; x < 8 + 240; x++) {
@@ -177,7 +214,7 @@ void cons_newline(struct CONSOLE *cons)
 				}
 			}
 			if(sheet->ctl==*(int*)0x0fe4)//当前图层的控制器与活动图层控制器相同
-				sheet_refresh(sheet, 8, 28, 8 + 240, 28 + 128);//换行以后刷新图层
+				sheet_refresh(sheet, 8, 28, 8 + 1024, 28 + 768);//换行以后刷新图层
 		}
 	}
 	cons->cur_x = 8;
@@ -203,6 +240,7 @@ void cons_putstr1(struct CONSOLE *cons, char *s, int l)
 	}
 	return;
 }
+void cmd_cd(struct CONSOLE *cons,char* cmdline);
 
 void cons_runcmd(char *cmdline, struct CONSOLE *cons, int *fat, int memtotal)
 {
@@ -231,6 +269,15 @@ void cons_runcmd(char *cmdline, struct CONSOLE *cons, int *fat, int memtotal)
 	else if (strcmp(cmdline,"desktop") ==0){//开启桌面
 		desktop_start();
 	}
+	else if (strcmp(cmdline,"fdir") ==0){//显示所有文件
+		cmd_fdir(cons);
+	}
+	else if (strncmp(cmdline,"cd ",3) ==0){//切换目录
+		cmd_cd(cons,cmdline);
+	}
+	else if (strncmp(cmdline,"task ",4) ==0){//切换目录
+		cmd_task(cons,cmdline);
+	}
 	else if (cmdline[0] != 0) {
 		if (cmd_app(cons, fat, cmdline) == 0) {
 			/* コマンドではなく、アプリでもなく、さらに空行でもない */
@@ -239,11 +286,100 @@ void cons_runcmd(char *cmdline, struct CONSOLE *cons, int *fat, int memtotal)
 	}
 	return;
 }
+void cmd_task(struct CONSOLE *cons,char* cmdline){
+	int i,j;
+	struct TASKCTL* taskctl=task_ctl_now();
+	for(i=0;i<MAX_TASKS;i++){
+		if(taskctl->tasks0[i].flags!=0){
+			sprintf(text_buff,"%s id: %d mem: %d\n",taskctl->tasks0[i].name,taskctl->tasks0[i].id_low,taskctl->tasks0[i].mem_use);
+			cons_putstr0(cons,text_buff);
+		}
+	}
+	cons_putstr0(cons,"\n");
+	int lvl=0;//当前等级
+	struct TASK* task=&(taskctl->tasks0[0]);//获取初始任务
+	for(;;){
+		for(i=0;i<lvl;i++){
+			cons_putstr0(cons,"-");
+		}
+		sprintf(text_buff,"%s id: %d mem: %d\n",task->name,task->id_low,task->mem_use);
+		cons_putstr0(cons,text_buff);
+		if(task->child_task!=0){//有孩子
+			task=task->child_task;//进入孩子进程
+			lvl++;
+			continue;
+		}
+		else if(task->brother_task!=task){//有兄弟进程
+			task=task->brother_task;//进入兄弟进程
+		}
+		else{//既没有子进程也没有兄弟进程了，需要返回
+			for(;;){//找到下一个可以处理的位置
+				if(task->father_task!=0){//返回父进程
+					task=task->father_task;//进入父进程
+					lvl--;
+					task=task->brother_task;//进入兄弟进程
+					if(task->father_task!=0){
+						if(task->father_task->child_task==task){//父进程的子进程是自己
+							continue;//当前循环已经完成
+						}
+						else{//继续
+							break;
+						}
+					}
+					else{//是创世任务
+						task=0;
+						break;
+					}
+				}
+				else{
+					task=0;
+					break;
+				}
+			}
+			if(task==0){//没有进程了
+				break;
+			}
+		}
+	}
+}
+void find_intel_gpu(struct CONSOLE *cons){
+    // PCI配置空间基地址
+    unsigned int pci_config_space = 0xCF8; 
+    int bus,dev,func;
+    // 枚举PCIe根桥下的所有总线
+    for(bus = 0; bus < 256; bus++){
+        // 枚举每一总线上的所有设备
+        for(dev = 0; dev < 32; dev++){
+			for(func=0;func<8;func++){
+				// 选择要访问的总线和设备
+				unsigned int id = (bus<<16) | (dev<<11) | (1<<31) | (func<<8);
+				io_out32(pci_config_space,id); 
+				
+				// 读取PCI类代码,判断是否是显卡
+				unsigned int u = io_in32(pci_config_space+4);
+				unsigned short vendor_id =u&0xffff;
+				if(vendor_id==0xffff){//设备不存在
+					continue;
+				}
+				sprintf(text_buff,"Found DEVICE %d-%d-%d: %x\n", bus,dev,func, u);
+				cons_putstr0(cons,text_buff);
+				//判断是不是显卡
+				io_out32(pci_config_space,id|0x08);
+				u = io_in32(pci_config_space+4);
+				sprintf(text_buff,"Found DEVICE class %x\n", u);
+				cons_putstr0(cons,text_buff);
+				
+			}
+        }
+    }
+}
+
 void cmd_rdrand(struct CONSOLE *cons, int memtotal){
 	char s[60];
 	int i=rdrand();
 	sprintf(s,"rdrand is %d %x\n",i,i);
 	cons_putstr0(cons, s);
+	find_intel_gpu(cons);
 }
 void cmd_mem(struct CONSOLE *cons, int memtotal)
 {
@@ -260,22 +396,27 @@ void cmd_cls(struct CONSOLE *cons)
 {
 	int x, y;
 	struct SHEET *sheet = cons->sht;
-	for (y = 28; y < 28 + 128; y++) {
-		for (x = 8; x < 8 + 240; x++) {
+	for (y = 28; y <  768 - 8; y++) {
+		for (x = 8; x < 1024-8; x++) {
 			sheet->buf32[x + y * sheet->bxsize] = COL8_000000;
 		}
 	}
 	if(sheet->ctl==*(int*)0x0fe4)//当前图层的控制器与活动图层控制器相同
-		sheet_refresh(sheet, 8, 28, 8 + 240, 28 + 128);
+		sheet_refresh(sheet, 8, 28, 8 + 1024, 28 + 768);
 	cons->cur_y = 28;
 	return;
 }
 
 void cmd_dir(struct CONSOLE *cons)
 {
-	struct FILEINFO *finfo = (struct FILEINFO *) (ADR_DISKIMG + 0x002600);
+	//struct FILEINFO *finfo = (struct FILEINFO *) (ADR_DISKIMG + 0x002600);
+	struct FILEINFO *finfo=task_now()->root_dir_addr;
 	int i, j;
 	char s[30];
+	if(task_now()->root_dir_addr==0){//文件系统没有准备好
+		cons_putstr0(cons, "file system not ready\n");
+		return;
+	}
 	for (i = 0; i < 224; i++) {
 		if (finfo[i].name[0] == 0x00) {
 			break;
@@ -297,6 +438,73 @@ void cmd_dir(struct CONSOLE *cons)
 	return;
 }
 
+void cmd_fdir(struct CONSOLE *cons)
+{
+	//struct FILEINFO *finfo = (struct FILEINFO *) (ADR_DISKIMG + 0x002600);
+	struct FILEINFO *finfo=task_now()->root_dir_addr;
+	int i, j;
+	char s[50];
+	if(task_now()->root_dir_addr==0){//文件系统没有准备好
+		cons_putstr0(cons, "file system not ready\n");
+		return;
+	}
+	for (i = 0; i < 224; i++) {
+		if (finfo[i].name[0] == 0x00) {
+			break;
+		}
+		if (finfo[i].name[0] != 0xe5) {
+			if (finfo[i].type  != 0x0f) {
+				sprintf(s, "filename.ext   %7d:%5d:%5x\n", finfo[i].size,finfo[i].clustno,finfo[i].type);
+				for (j = 0; j < 8; j++) {
+					s[j] = finfo[i].name[j];
+				}
+				s[ 9] = finfo[i].ext[0];
+				s[10] = finfo[i].ext[1];
+				s[11] = finfo[i].ext[2];
+				cons_putstr0(cons, s);
+			}
+		}
+	}
+	cons_newline(cons);
+	return;
+}
+
+void cmd_cd(struct CONSOLE *cons,char* cmdline){
+	struct PAGEMAN32 *pageman=*(struct PAGEMAN32 **)ADR_PAGEMAN;
+	struct MEMMAN *memman =  task_now()->memman;
+	int i;
+	if(*(unsigned int*)0x0026f030!=0){
+		struct FILEINFO* finfo = file_full_search(cmdline+3, task_now()->root_dir_addr, 0x10,0x08,224);//查找文件夹并且不是系统文件
+		if(finfo==0){
+			cons_putstr0(cons,"file not found\n");
+		}
+		else{
+			FAT32_HEADER* mbr=*(unsigned int*)0x0026f024;
+			unsigned int fat32_addr=*(unsigned int*)0x0026f028;
+			unsigned int part_base_lba=*(unsigned int*)0x0026f030;
+			unsigned int dir_lba=finfo->clustno;
+			if(task_now()->root_dir_addr!=0){
+				void* po=pageman_unlink_page_32_m(pageman,task_now()->root_dir_addr,2,1);
+			}
+			task_now()->root_dir_addr=memman_alloc_4k(memman,8192);//4k页就够了
+			pageman_link_page_32_m(pageman,task_now()->root_dir_addr,7,2,0);
+			for(i=0;i<8192/4;i+=4){//清零
+				((int*)(task_now()->root_dir_addr))[i]=0;
+			}
+			unsigned int size=8192;
+			if(dir_lba!=0){//如果不是0的话就打开目录
+				_cons_read_file(task_now()->root_dir_addr,&size,fat32_addr, part_base_lba,mbr, dir_lba,0);
+			}
+			else{//否则打开根目录
+				_cons_read_file(task_now()->root_dir_addr,&size,fat32_addr, part_base_lba,mbr, mbr->BPB_Root,0);
+			}
+		}
+	}
+	else{
+		cons_putstr0(cons,"file system not ready\n");
+	}
+}
+
 void cmd_exit(struct CONSOLE *cons, int *fat)
 {
 	struct PAGEMAN32 *pageman=*(struct PAGEMAN32 **)ADR_PAGEMAN;
@@ -306,28 +514,23 @@ void cmd_exit(struct CONSOLE *cons, int *fat)
 	struct FIFO32 *fifo = &system_task->fifo;
 	struct task_abort struct_task_abort;
 	int i;
-	
-	char str[30];
-	sprintf(str,"sht is %x\n",cons->sht);
-	cons_putstr0(cons,str);
-	
 	if (cons->sht != 0) {
 		timer_cancel(cons->timer);
 	}
 	//释放fat
-	for(i=0;i<3;i++){
-		void* p=pageman_unlink_page_32(pageman,(int)fat+0x1000*i,1);
-		//memman_free_page_32(pageman,p);
-	}
-	memman_free_4k(memman, (int) fat, 4 * 2880);
+	//for(i=0;i<3;i++){
+	//	void* p=pageman_unlink_page_32(pageman,(int)fat+0x1000*i,1);
+	//	//memman_free_page_32(pageman,p);
+	//}
+	//memman_free_4k(memman, (int) fat, 4 * 2880);
 
 	if (cons->sht != 0) {
 		//释放图层
-		for(i=0;i<(256 * 165+0xfff)>>12;i++){
+		for(i=0;i<(1024*768*4+0xfff)>>12;i++){
 			void* po=pageman_unlink_page_32(pageman,(int)(cons->sht->buf)+0x1000*i,1);
 			//memman_free_page_32(pageman,po);
 		}
-		memman_free_4k(memman, (int) cons->sht->buf, 256 * 165);
+		memman_free_4k(memman, (int) cons->sht->buf, 1024*768*4);
 		sheet_free(cons->sht);
 	} 
 	struct_task_abort.task=task;
@@ -392,7 +595,10 @@ int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline)
 	int i, segsiz, datsiz, esp, dathrb, appsiz;
 	struct SHTCTL *shtctl;
 	struct SHEET *sht;
-	
+	if(task_now()->root_dir_addr==0){//文件系统没有准备好
+		cons_putstr0(cons, "file system not ready\n");
+		return 0;
+	}
 	/* コマンドラインからファイル名を生成 */
 	for (i = 0; i < 13; i++) {
 		if (cmdline[i] <= ' ') {
@@ -403,7 +609,7 @@ int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline)
 	name[i] = 0; /* とりあえずファイル名の後ろを0にする */
 
 	/* ファイルを探す */
-	finfo = file_search(name, (struct FILEINFO *) (ADR_DISKIMG + 0x002600), 224);
+	finfo = file_search(name, task_now()->root_dir_addr, 224);
 	if (finfo == 0 && name[i - 1] != '.') {
 		/* 見つからなかったので後ろに".HRB"をつけてもう一度探してみる */
 		name[i    ] = '.';
@@ -411,13 +617,14 @@ int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline)
 		name[i + 2] = 'R';
 		name[i + 3] = 'B';
 		name[i + 4] = 0;
-		finfo = file_search(name, (struct FILEINFO *) (ADR_DISKIMG + 0x002600), 224);
+		finfo = file_search(name, task_now()->root_dir_addr, 224);
 	}
-
+	
 	if (finfo != 0) {
 		/* ファイルが見つかった場合 */
 		appsiz = finfo->size;
-		p = file_loadfile2(finfo->clustno, &appsiz, fat);
+		//*(unsigned int*)0x0026f03c=finfo;
+		p = file_loadfile2(finfo->clustno, &appsiz, task_now()->fat);
 		if (appsiz >= 36 && strncmp(p + 4, "Hari", 4) == 0 && *p == 0x00) {
 			segsiz = *((int *) (p + 0x0000));
 			esp    = *((int *) (p + 0x000c));
@@ -430,6 +637,9 @@ int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline)
 			set_segmdesc(task->ldt + 3, segsiz - 1, (int) q, AR_DATA32_RW + 0x60);
 			for (i = 0; i < datsiz; i++) {
 				q[esp + i] = p[dathrb + i];
+			}
+			for (i = 0; i < 8; i++) {//清空文件记录缓存
+				task->fhandle[i].buf = 0;
 			}
 			start_app(0x1b, 2 * 8 + 4, esp, 3 * 8 + 4, &(task->tss.esp0));/*eip,cs,esp,ss,esp0*/
 			struct SHTCTL** shtctl_base=*(int*)0x0026f018;
@@ -446,6 +656,8 @@ int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline)
 			}
 			for (i = 0; i < 8; i++) {	//查看打开的文件列表
 				if (task->fhandle[i].buf != 0) {
+					sprintf(text_buff,"app file page free: %d\n",(task->fhandle[i].size+0xfff)>>12);
+					cons_putstr0(cons,text_buff);
 					for(i=0;i<(task->fhandle[i].size+0xfff)>>12;i++){
 						void* po=pageman_unlink_page_32(pageman,(int)(task->fhandle[i].buf)+0x1000*i,1);
 						//memman_free_page_32(pageman,po);
@@ -456,7 +668,7 @@ int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline)
 			}
 			timer_cancelall(&task->fifo);
 			for(i=0;i<(segsiz+0xfff)>>12;i++){
-				void* po=pageman_unlink_page_32(task_now()->memman,(int)q+0x1000*i,1);
+				void* po=pageman_unlink_page_32(pageman,(int)q+0x1000*i,1);
 				//memman_free_page_32(pageman,po);
 			}
 			memman_free_4k(memman, (int) q, segsiz);
@@ -494,7 +706,7 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 	struct FILEHANDLE *fh;
 	struct MEMMAN *memman = task_now()->memman;
 	struct MEMMAN *memman_os=(struct MEMMAN *) MEMMAN_ADDR;
-
+	cons_putstr0(cons,"sys api call \n");
 	if (edx == 1) {//命令行输出字符
 		cons_putchar(cons, eax & 0xff, 1);
 	} else if (edx == 2) {//命令行输出字符串0结尾
@@ -544,12 +756,16 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 		memman_init((struct MEMMAN *) (ebx + ds_base));
 		ecx &= 0xfffffff0;	/* 16バイト単位に */
 		memman_free((struct MEMMAN *) (ebx + ds_base), eax, ecx);
+		cons_putstr0(cons,"memman init\n");
+		
 	} else if (edx == 9) {//应用程序用malloc
 		ecx = (ecx + 0x0f) & 0xfffffff0; /* 16バイト単位に切り上げ */
 		reg[7] = memman_alloc((struct MEMMAN *) (ebx + ds_base), ecx);
+		cons_putstr0(cons,"memman malloc\n");
 	} else if (edx == 10) {//应用程序用free
 		ecx = (ecx + 0x0f) & 0xfffffff0; /* 16バイト単位に切り上げ */
 		memman_free((struct MEMMAN *) (ebx + ds_base), eax, ecx);
+		cons_putstr0(cons,"memman free\n");
 	} else if (edx == 11) {//在指定图层画一个像素
 		sht = (struct SHEET *) (ebx & 0xfffffffe);
 		sht->buf32[sht->bxsize * edi + esi] = eax;
@@ -652,14 +868,21 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 		reg[7] = 0;
 		if (i < 8) {
 			finfo = file_search((char *) ebx + ds_base,
-					(struct FILEINFO *) (ADR_DISKIMG + 0x002600), 224);
+					task_now()->root_dir_addr, 224);
 			if (finfo != 0) {
 				//reg[7] = (int) fh;
-				reg[7] = (int) i+1;
+				reg[7] = (int) i+1;//返回代号
 				fh->size = finfo->size;
 				fh->pos = 0;
 				fh->buf = file_loadfile2(finfo->clustno, &fh->size, task->fat);
+				cons_putstr0(cons,"fopen ok\n");
 			}
+			else{
+				cons_putstr0(cons,"fopen err\n");
+			}
+		}
+		else{
+			cons_putstr0(cons,"fopen full\n");
 		}
 	} else if (edx == 22) {//关闭文件fclose
 		fh = &task->fhandle[eax-1];
@@ -706,6 +929,9 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 		}
 		reg[7] = i;
 	} else if (edx == 26) {//获取命令行
+		cons_putstr0(cons,"api get command:");
+		cons_putstr0(cons,task->cmdline);
+		cons_putstr0(cons,"\n");
 		i = 0;
 		for (;;) {
 			*((char *) ebx + ds_base + i) =  task->cmdline[i];
@@ -746,6 +972,14 @@ int *inthandler0d(int *esp)
 	sprintf(s, "EIP = %08X\n", esp[11]);
 	cons_putstr0(cons, s);
 	sprintf(s,"ERROR CODE =%08X\n",esp[10]);
+	cons_putstr0(cons, s);
+	sprintf(s,"APP CS =%08X\n",esp[12]);
+	cons_putstr0(cons, s);
+	sprintf(s,"APP ESP =%08X\n",esp[14]);
+	cons_putstr0(cons, s);
+	sprintf(s,"APP SS =%08X\n",esp[15]);
+	cons_putstr0(cons, s);
+	sprintf(s,"APP DS =%08X\n",esp[8]);
 	cons_putstr0(cons, s);
 	return &(task->tss.esp0);	/* 異常終了させる */
 }

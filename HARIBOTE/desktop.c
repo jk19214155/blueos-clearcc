@@ -13,7 +13,7 @@ struct TASK *desktop_start()
 	task->cons_stack = memman_alloc_4k(memman, 64 * 1024);//内存分配!!!
 	pageman_link_page_32_m(pageman,task->cons_stack,7,0x10,0);//
 	task->tss.esp = task->cons_stack + 64 * 1024 - 12;
-	task->tss.eip = (int) &desktop_task;
+	task->tss.eip = ((int) &desktop_task)+((int)get_this());
 	task->tss.es = 1 * 8;
 	task->tss.cs = 2 * 8;
 	task->tss.ss = 1 * 8;
@@ -64,33 +64,7 @@ struct SHEET* desktop_task(struct SHEET* sheet){
 	sheet_base->col_inv=-1;
 	char* buff=memman_alloc_4k(memman,(sheet_base->bxsize)*(sheet_base->bysize));//新图层申请buff
 	pageman_link_page_32_m(pageman,buff,7,((sheet_base->bxsize)*(sheet_base->bysize)+0xfff)>>12,0);
-	sheet_base->buf=buff;//将原图层的buff复制到新图层
-	boxfill8(buff, sheet_base->bxsize, 15, 0,0,sheet_base->bxsize-1,sheet_base->bysize-1);//灰色底色
-	//boxfill8(sheet->buf, sheet->bxsize, 2, 0,0,sheet->bxsize-1,sheet->bysize-1);
-	icon_buff=memman_alloc_4k(memman,32*32*10);//为图标申请空间
-	pageman_link_page_32_m(pageman,icon_buff,7,(32*32*10+0xfff)>>12,0);
-	/*申请10个图标图层*/
-	sheet_slide(sheet_base,0,0);
-	sheet_updown(sheet_base,0);//放在低端
-	sheet_refreshsub(shtctl, 0, 0, shtctl->xsize, shtctl->ysize, 0, shtctl->top);//刷新整个页面
-	sheet_refreshsub(shtctl->vram4sht->ctl, 0, 0, shtctl->vram4sht->ctl->xsize, shtctl->vram4sht->ctl->ysize, 0, shtctl->vram4sht->ctl->top);//刷新整个页面
-	for(i=0;i<0;i++){
-		icon_sheet[i]=sheet_alloc(shtctl);//申请图层
-		sheet_setbuf(icon_sheet[i], icon_buff+i, 32, 32, -1);//设置属性
-		boxfill8(icon_buff+i, 32, 8, 0,0,31,31);
-		sheet_slide(icon_sheet[i],500,500);//排布图层
-		sheet_updown(icon_sheet[i],shtctl->top+1);//显示图层
-	}
-	sheet_setbuf(&text0, icon_buff, 32, 32, -1);//设置属性
-	boxfill8(icon_buff, 32, 8, 0,0,31,31);
-	sheet_slide(&text0,500,500);//排布图层
-	text0.text=s;
-	((struct SHEET*)text0_p)->ctl=shtctl;
-	((struct SHEET*)text0_p)->height=-1;
-	((struct View*)text0_p)->background_color=2;
-	text0_p->color=3;
-	textview_flush(&text0);//刷新控件
-	sheet_updown(&text0,shtctl->top+1);//显示图层
+	
 	sheet_refreshsub(shtctl->vram4sht->ctl, 0, 0, shtctl->vram4sht->ctl->xsize, shtctl->vram4sht->ctl->ysize, 0, shtctl->vram4sht->ctl->top);//刷新整个页面
 	task_sleep(task_now());
 	return sheet_base;

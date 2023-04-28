@@ -27,6 +27,8 @@
 		EXTERN	_inthandler2c, _inthandler0d
 		EXTERN	_inthandler0c, _inthandler0e
 		EXTERN	_hrb_api
+		tpm_command equ 0xfed40000      ;TPM命令寄存器地址
+		tpm_status equ 0xfed40014       ;TPM状态寄存器地址
 
 [SECTION .text]
 
@@ -471,3 +473,21 @@ _rdrand: ;int rdrand()
 	db 0x0f,0xc7,0xf0 ;rnrand eax
 	ret
 _invlpg:
+	ret
+_tpm_init:
+	;初始化TPM
+	push eax
+    mov eax, 0x6f000
+    mov dword [tpm_command], eax
+    call _tpm_wait_for_status
+	pop eax
+	ret
+_tpm_get_a_key:
+	
+_tpm_wait_for_status:
+        ;等待TPM状态就绪
+        mov eax, dword [tpm_status]
+        and eax, 0x01800000
+        cmp eax, 0x00800000
+        jne _tpm_wait_for_status
+		ret

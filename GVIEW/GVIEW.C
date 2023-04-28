@@ -19,21 +19,26 @@ int decode0_JPEG(struct DLL_STRPICENV *env, int size, char *fp, int b_type, char
 unsigned char rgb2pal(int r, int g, int b, int x, int y);
 void error(char *s);
 
+
 void HariMain(void)
 {
 	struct DLL_STRPICENV env;
-	char filebuf[512 * 1024], winbuf[1040 * 805];
-	char s[32], *p;
+	int winbuf[1024 * 768 *4];
+	char filebuf[512 * 1024 *4];
+	char s[32];
+	char* pp;
+	int* p;
 	int win, i, j, fsize, xsize, info[8];
-	struct RGB picbuf[1024 * 768], *q;
+	struct RGB picbuf[1024 * 768 *4], *q;
 
 	/* コマンドライン解析 */
 	api_cmdline(s, 30);
-	for (p = s; *p > ' '; p++) { }	/* スペースが来るまで読み飛ばす */
-	for (; *p == ' '; p++) { }	/* スペースを読み飛ばす */
+	for (pp = s; *pp > ' '; pp++) { }	/* スペースが来るまで読み飛ばす */
+	for (; *pp == ' '; pp++) { }	/* スペースを読み飛ばす */
 
 	/* ファイル読み込み */
-	i = api_fopen(p); if (i == 0) { error("file not found.\n"); }
+	api_putstr0(pp);
+	i = api_fopen(pp); if (i == 0) { error("file not found.\n"); }
 	fsize = api_fsize(i, 0);
 	if (fsize > 512 * 1024) {
 		error("file too large.\n");
@@ -81,10 +86,11 @@ void HariMain(void)
 
 	/* 表示 */
 	for (i = 0; i < info[3]; i++) {
-		p = winbuf + (i + 29) * xsize + (xsize - info[2]) / 2;
+		p = winbuf + (i + 29) * xsize  + (xsize - info[2]) / 2;
 		q = picbuf + i * info[2];
 		for (j = 0; j < info[2]; j++) {
-			p[j] = rgb2pal(q[j].r, q[j].g, q[j].b, j, i);
+			//p[j] = rgb2pal(q[j].r, q[j].g, q[j].b, j, i);
+			p[j]=*(int*)(&q[j]);
 		}
 	}
 	api_refreshwin(win, (xsize - info[2]) / 2, 29, (xsize - info[2]) / 2 + info[2], 29 + info[3]);

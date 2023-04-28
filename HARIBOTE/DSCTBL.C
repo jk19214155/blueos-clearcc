@@ -2,18 +2,21 @@
 
 #include "bootpack.h"
 
-void init_gdtidt(void)
+void init_gdtidt(UINTN main_this)
 {
 	struct SEGMENT_DESCRIPTOR *gdt = (struct SEGMENT_DESCRIPTOR *) ADR_GDT;
 	struct GATE_DESCRIPTOR    *idt = (struct GATE_DESCRIPTOR    *) ADR_IDT;
 	int i;
-
+	void* base;
+	EFI_SYSTEM_TABLE* Systemtable=get_sys_table_addr();//Œn?•\’nš¬
+	EFI_GUID* GUID=get_var_guid();
+	//Systemtable->RuntimeServices->GetVariable("xsize",GUID,);
 	/* GDT‚Ì‰Šú‰» */
 	for (i = 0; i <= LIMIT_GDT / 8; i++) {
 		set_segmdesc(gdt + i, 0, 0, 0);
 	}
 	set_segmdesc(gdt + 1, 0xffffffff,   0x00000000, AR_DATA32_RW);
-	set_segmdesc(gdt + 2, LIMIT_BOTPAK, ADR_BOTPAK, AR_CODE32_ER);
+	set_segmdesc(gdt + 2, 0xffffffff, 0x00000000, AR_CODE32_ER);
 	load_gdtr(LIMIT_GDT, ADR_GDT);
 
 	/* IDT‚Ì‰Šú‰» */
@@ -24,12 +27,12 @@ void init_gdtidt(void)
 
 	/* IDT‚Ìİ’è */
 	//set_gatedesc(idt + 0x0e, (int) asm_inthandler0e, 2 * 8, AR_INTGATE32);
-	set_gatedesc(idt + 0x0c, (int) asm_inthandler0c, 2 * 8, AR_INTGATE32);
-	set_gatedesc(idt + 0x0d, (int) asm_inthandler0d, 2 * 8, AR_INTGATE32);
-	set_gatedesc(idt + 0x20, (int) asm_inthandler20, 2 * 8, AR_INTGATE32);
-	set_gatedesc(idt + 0x21, (int) asm_inthandler21, 2 * 8, AR_INTGATE32);
-	set_gatedesc(idt + 0x2c, (int) asm_inthandler2c, 2 * 8, AR_INTGATE32);
-	set_gatedesc(idt + 0x40, (int) asm_hrb_api,      2 * 8, AR_INTGATE32 + 0x60);
+	set_gatedesc(idt + 0x0c, (int) asm_inthandler0c+main_this, 2 * 8, AR_INTGATE32);
+	set_gatedesc(idt + 0x0d, (int) asm_inthandler0d+main_this, 2 * 8, AR_INTGATE32);
+	set_gatedesc(idt + 0x20, (int) asm_inthandler20+main_this, 2 * 8, AR_INTGATE32);
+	set_gatedesc(idt + 0x21, (int) asm_inthandler21+main_this, 2 * 8, AR_INTGATE32);
+	set_gatedesc(idt + 0x2c, (int) asm_inthandler2c+main_this, 2 * 8, AR_INTGATE32);
+	set_gatedesc(idt + 0x40, (int) asm_hrb_api+main_this,      2 * 8, AR_INTGATE32 + 0x60);
 	
 	return;
 }

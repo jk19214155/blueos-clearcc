@@ -1,19 +1,47 @@
 	.file	"mtask.c"
+.globl _taskctl
+	.data
+	.balign 4
+_taskctl:
+	.long	0
+.globl _zero_task_lock
+	.balign 4
+_zero_task_lock:
+	.long	0
+.globl _task_ready
+	.balign 4
+_task_ready:
+	.long	0
 	.text
+	.balign 2
+.globl _task_ctl_now
+	.def	_task_ctl_now;	.scl	2;	.type	32;	.endef
+_task_ctl_now:
+	pushl	%ebp
+	movl	_taskctl, %eax
+	movl	%esp, %ebp
+	popl	%ebp
+	ret
 	.balign 2
 .globl _task_now
 	.def	_task_now;	.scl	2;	.type	32;	.endef
 _task_now:
-	movl	_taskctl, %eax
 	pushl	%ebp
 	movl	%esp, %ebp
-	popl	%ebp
+	cmpl	$0, _task_ready
+	je	L3
+	movl	_taskctl, %eax
 	movl	(%eax), %edx
 	imull	$408, %edx, %edx
-	leal	16(%edx,%eax), %eax
+	leal	13(%edx,%eax), %eax
 	movl	4(%eax), %edx
 	movl	8(%eax,%edx,4), %eax
+L2:
+	popl	%ebp
 	ret
+L3:
+	xorl	%eax, %eax
+	jmp	L2
 	.balign 2
 .globl _add_child_task
 	.def	_add_child_task;	.scl	2;	.type	32;	.endef
@@ -23,29 +51,28 @@ _add_child_task:
 	pushl	%ebx
 	movl	8(%ebp), %ebx
 	movl	12(%ebp), %ecx
-	movl	248(%ebx), %eax
+	movl	266(%ebx), %eax
 	testl	%eax, %eax
-	jne	L3
-	movl	%ecx, 248(%ebx)
-	movl	%ecx, 244(%ecx)
-L12:
-	movl	%ebx, 252(%ecx)
+	jne	L6
+	movl	%ecx, 266(%ebx)
+L15:
+	movl	%ebx, 270(%ecx)
 	popl	%ebx
 	popl	%ebp
 	ret
-L3:
+L6:
 	movl	%eax, %edx
-	cmpl	%eax, 244(%eax)
-	je	L11
-L9:
-	movl	244(%edx), %edx
-	cmpl	%eax, 244(%edx)
-	jne	L9
-L11:
-	movl	244(%edx), %eax
-	movl	%eax, 244(%ecx)
-	movl	%ecx, 244(%edx)
-	jmp	L12
+	cmpl	%eax, 262(%eax)
+	je	L14
+L12:
+	movl	262(%edx), %edx
+	cmpl	%eax, 262(%edx)
+	jne	L12
+L14:
+	movl	262(%edx), %eax
+	movl	%eax, 262(%ecx)
+	movl	%ecx, 262(%edx)
+	jmp	L15
 	.balign 2
 .globl _find_child_task
 	.def	_find_child_task;	.scl	2;	.type	32;	.endef
@@ -55,22 +82,22 @@ _find_child_task:
 	pushl	%ebx
 	xorl	%ebx, %ebx
 	movl	8(%ebp), %eax
-	movl	248(%eax), %eax
+	movl	266(%eax), %eax
 	testl	%eax, %eax
-	je	L13
-L23:
+	je	L16
+L26:
 	movl	%eax, %edx
 	movl	%eax, %ecx
-L16:
-	movl	248(%edx), %eax
+L19:
+	movl	266(%edx), %eax
 	testl	%eax, %eax
-	jne	L23
-	movl	244(%edx), %eax
+	jne	L26
+	movl	262(%edx), %eax
 	movl	%edx, %ebx
 	cmpl	%ecx, %eax
 	movl	%eax, %edx
-	jne	L16
-L13:
+	jne	L19
+L16:
 	movl	%ebx, %eax
 	popl	%ebx
 	popl	%ebp
@@ -82,29 +109,29 @@ _unlink_task:
 	pushl	%ebp
 	movl	%esp, %ebp
 	movl	8(%ebp), %eax
-	cmpl	$0, 248(%eax)
-	jne	L24
+	cmpl	$0, 266(%eax)
+	jne	L27
 	movl	%eax, %edx
-	cmpl	%eax, 244(%eax)
-	je	L35
-L31:
-	movl	244(%edx), %edx
-	cmpl	%eax, 244(%edx)
-	jne	L31
-L35:
+	cmpl	%eax, 262(%eax)
+	je	L38
+L34:
+	movl	262(%edx), %edx
+	cmpl	%eax, 262(%edx)
+	jne	L34
+L38:
 	cmpl	%eax, %edx
-	je	L37
-	movl	244(%eax), %eax
-	movl	%eax, 244(%edx)
-L36:
+	je	L40
+	movl	262(%eax), %eax
+	movl	%eax, 262(%edx)
+L39:
 	xorl	%eax, %eax
-L24:
+L27:
 	popl	%ebp
 	ret
-L37:
-	movl	252(%edx), %edx
-	movl	$0, 248(%edx)
-	jmp	L36
+L40:
+	movl	270(%edx), %edx
+	movl	$0, 266(%edx)
+	jmp	L39
 	.balign 2
 .globl _task_add
 	.def	_task_add;	.scl	2;	.type	32;	.endef
@@ -115,10 +142,10 @@ _task_add:
 	movl	8(%ecx), %edx
 	imull	$408, %edx, %edx
 	addl	_taskctl, %edx
-	movl	16(%edx), %eax
-	movl	%ecx, 24(%edx,%eax,4)
+	movl	13(%edx), %eax
+	movl	%ecx, 21(%edx,%eax,4)
 	incl	%eax
-	movl	%eax, 16(%edx)
+	movl	%eax, 13(%edx)
 	movl	$2, 4(%ecx)
 	popl	%ebp
 	ret
@@ -126,70 +153,52 @@ _task_add:
 .globl _task_remove
 	.def	_task_remove;	.scl	2;	.type	32;	.endef
 _task_remove:
+L48:
+L43:
 	pushl	%ebp
 	movl	%esp, %ebp
-	pushl	%edi
-	pushl	%esi
-	movl	8(%ebp), %edi
 	pushl	%ebx
-	movl	8(%edi), %eax
+	movl	8(%ebp), %ebx
+	movl	8(%ebx), %eax
 	imull	$408, %eax, %eax
 	addl	_taskctl, %eax
-	leal	16(%eax), %esi
-L40:
-	pushl	%edi
-	call	_find_child_task
-	popl	%ecx
-	movl	%eax, %ebx
-	testl	%eax, %eax
-	je	L46
-	pushl	%eax
-	call	_task_remove
-	pushl	%ebx
-	call	_unlink_task
-	popl	%eax
-	popl	%edx
-	jmp	L40
-L46:
-	xorl	%edx, %edx
-	movl	(%esi), %eax
-	cmpl	%eax, %edx
-	jge	L48
-L52:
-	cmpl	%edi, 8(%esi,%edx,4)
-	je	L48
-	incl	%edx
-	cmpl	%eax, %edx
-	jl	L52
-L48:
+	leal	13(%eax), %edx
+	xorl	%ecx, %ecx
+	movl	13(%eax), %eax
+	cmpl	%eax, %ecx
+	jge	L51
+L55:
+	cmpl	%ebx, 8(%edx,%ecx,4)
+	je	L51
+	incl	%ecx
+	cmpl	%eax, %ecx
+	jl	L55
+L51:
 	decl	%eax
-	movl	%eax, (%esi)
-	movl	4(%esi), %eax
-	cmpl	%eax, %edx
-	jge	L53
+	movl	%eax, (%edx)
+	movl	4(%edx), %eax
+	cmpl	%eax, %ecx
+	jge	L56
 	decl	%eax
-	movl	%eax, 4(%esi)
-L53:
-	movl	(%esi), %eax
-	cmpl	%eax, 4(%esi)
-	jl	L54
-	movl	$0, 4(%esi)
-L54:
-	movl	$1, 4(%edi)
-	movl	(%esi), %ecx
-	cmpl	%ecx, %edx
-	jge	L62
-L59:
-	movl	12(%esi,%edx,4), %eax
-	movl	%eax, 8(%esi,%edx,4)
-	incl	%edx
-	cmpl	%ecx, %edx
-	jl	L59
+	movl	%eax, 4(%edx)
+L56:
+	movl	(%edx), %eax
+	cmpl	%eax, 4(%edx)
+	jl	L57
+	movl	$0, 4(%edx)
+L57:
+	movl	$1, 4(%ebx)
+	movl	(%edx), %ebx
+	cmpl	%ebx, %ecx
+	jge	L65
 L62:
-	leal	-12(%ebp), %esp
+	movl	12(%edx,%ecx,4), %eax
+	movl	%eax, 8(%edx,%ecx,4)
+	incl	%ecx
+	cmpl	%ebx, %ecx
+	jl	L62
+L65:
 	popl	%ebx
-	popl	%esi
-	popl	%edi
 	popl	%ebp
 	ret
 	.balign 2
@@ -201,14 +210,14 @@ _task_switchsub:
 	movl	%esp, %ebp
 	movl	_taskctl, %eax
 	xorl	%edx, %edx
-L69:
-	cmpl	$0, 16(%eax,%edx)
-	jg	L65
+L72:
+	cmpl	$0, 13(%eax,%edx)
+	jg	L68
 	incl	%ecx
 	addl	$408, %edx
 	cmpl	$9, %ecx
-	jle	L69
-L65:
+	jle	L72
+L68:
 	movl	%ecx, (%eax)
 	movb	$0, 4(%eax)
 	popl	%ebp
@@ -219,9 +228,17 @@ L65:
 _task_idle:
 	pushl	%ebp
 	movl	%esp, %ebp
-L72:
+L75:
 	call	_io_hlt
-	jmp	L72
+	jmp	L75
+	.data
+LC0:
+	.ascii "NONAME\0"
+LC1:
+	.ascii "mainloop\0"
+LC2:
+	.ascii "idle\0"
+	.text
 	.balign 2
 .globl _task_init
 	.def	_task_init;	.scl	2;	.type	32;	.endef
@@ -233,33 +250,34 @@ _task_init:
 	xorl	%edi, %edi
 	pushl	%ebx
 	xorl	%esi, %esi
-	pushl	%ebx
+	pushl	%eax
 	movl	$999, %ebx
 	movl	2551808, %eax
-	pushl	$288096
+	pushl	$318093
 	pushl	8(%ebp)
 	movl	%eax, -16(%ebp)
 	call	_memman_alloc_4k
 	pushl	$0
 	movl	%eax, _taskctl
-	pushl	$71
+	pushl	$78
 	pushl	$7
 	pushl	%eax
 	pushl	$2523136
 	pushl	-16(%ebp)
 	call	_memmam_link_page_32_m
 	addl	$32, %esp
-L80:
+L83:
 	movl	%edi, %edx
 	leal	24(%esi), %eax
 	addl	_taskctl, %edx
-	movl	%eax, 4096(%edx)
+	leal	4080(%edx), %ecx
+	movl	%eax, 13(%ecx)
 	leal	8024(%esi), %eax
-	movl	%eax, 4236(%edx)
+	movl	%eax, 4253(%edx)
 	leal	2555928(%esi), %eax
-	movl	$0, 4100(%edx)
+	movl	$0, 17(%ecx)
+	addl	$4157, %edx
 	pushl	$137
-	addl	$4140, %edx
 	pushl	%edx
 	pushl	$103
 	pushl	%eax
@@ -267,8 +285,7 @@ L80:
 	movl	_taskctl, %eax
 	addl	%edi, %eax
 	pushl	$130
-	addl	$4244, %eax
-	addl	$284, %edi
+	addl	$4261, %eax
 	pushl	%eax
 	leal	2563928(%esi), %eax
 	pushl	$31
@@ -276,29 +293,31 @@ L80:
 	pushl	%eax
 	call	_set_segmdesc
 	addl	$32, %esp
+	movl	_taskctl, %eax
+	movl	$LC0, 4403(%eax,%edi)
+	addl	$314, %edi
 	decl	%ebx
-	jns	L80
-	movl	_taskctl, %edx
-	xorl	%ecx, %ecx
+	jns	L83
+	xorl	%edx, %edx
 	movl	$9, %ebx
-L85:
-	leal	(%edx,%ecx), %eax
-	addl	$408, %ecx
+L88:
+	movl	$0, 13(%eax,%edx)
+	movl	$0, 17(%eax,%edx)
+	addl	$408, %edx
 	decl	%ebx
-	movl	$0, 16(%eax)
-	movl	$0, 20(%eax)
-	jns	L85
-	movl	$0, 8(%edx)
-	movl	$0, 12(%edx)
+	jns	L88
+	movl	$0, 5(%eax)
+	movl	$0, 9(%eax)
 	movl	$0, _zero_task_lock
 	call	_task_alloc
 	movl	%eax, %esi
-	movl	$2523136, 72(%eax)
+	movl	$2523136, 92(%eax)
 	movl	8(%ebp), %eax
-	movl	%eax, 260(%esi)
+	movl	%eax, 278(%esi)
 	movl	$2, 4(%esi)
 	movl	$2, 12(%esi)
 	movl	$0, 8(%esi)
+	movl	$LC1, 310(%esi)
 	pushl	%esi
 	call	_task_add
 	call	_task_switchsub
@@ -315,32 +334,39 @@ L85:
 	movl	%eax, %ebx
 	call	_memman_alloc_4k
 	addl	$65536, %eax
-	movl	%eax, 100(%ebx)
+	movl	%eax, 120(%ebx)
 	pushl	$0
 	pushl	$16
 	pushl	$7
-	movl	100(%ebx), %eax
+	movl	120(%ebx), %eax
 	subl	$65536, %eax
 	pushl	%eax
 	pushl	$2523136
 	pushl	-16(%ebp)
 	call	_memmam_link_page_32_m
 	addl	$48, %esp
-	movl	$_task_idle, 76(%ebx)
-	movl	$8, 116(%ebx)
-	movl	$16, 120(%ebx)
-	movl	$8, 124(%ebx)
-	movl	$8, 128(%ebx)
-	movl	$8, 132(%ebx)
+	call	_get_this
+	movl	%ebx, 262(%ebx)
+	addl	$_task_idle, %eax
+	movl	%eax, 96(%ebx)
 	movl	$8, 136(%ebx)
-	movl	$2523136, 72(%ebx)
-	movl	$0, 252(%ebx)
-	movl	$0, 248(%ebx)
-	movl	%ebx, 244(%ebx)
+	movl	$16, 140(%ebx)
+	movl	$8, 144(%ebx)
+	movl	$8, 148(%ebx)
+	movl	$8, 152(%ebx)
+	movl	$8, 156(%ebx)
+	movl	$2523136, 92(%ebx)
+	movl	$0, 270(%ebx)
+	movl	$0, 266(%ebx)
+	movl	$LC2, 310(%ebx)
 	pushl	$1
 	pushl	$9
 	pushl	%ebx
 	call	_task_run
+	pushl	%ebx
+	pushl	%esi
+	movl	$1, _task_ready
+	call	_add_child_task
 	leal	-12(%ebp), %esp
 	popl	%ebx
 	movl	%esi, %eax
@@ -357,52 +383,56 @@ _task_alloc:
 	movl	%esp, %ebp
 	pushl	%ebx
 	xorl	%ebx, %ebx
-L96:
+L99:
 	movl	_taskctl, %ecx
 	leal	(%ecx,%edx), %eax
-	cmpl	$0, 4100(%eax)
-	je	L99
+	cmpl	$0, 4097(%eax)
+	je	L102
 	incl	%ebx
-	addl	$284, %edx
+	addl	$314, %edx
 	cmpl	$999, %ebx
-	jle	L96
+	jle	L99
 	xorl	%eax, %eax
-L90:
+L93:
 	popl	%ebx
 	popl	%ebp
 	ret
-L99:
-	addl	$4096, %eax
+L102:
+	addl	$4093, %eax
 	movl	$1, 4(%eax)
-	movl	$514, 80(%eax)
-	movl	$0, 84(%eax)
-	movl	$0, 88(%eax)
-	movl	$0, 92(%eax)
-	movl	$0, 96(%eax)
+	movl	$514, 100(%eax)
 	movl	$0, 104(%eax)
 	movl	$0, 108(%eax)
 	movl	$0, 112(%eax)
 	movl	$0, 116(%eax)
+	movl	$0, 124(%eax)
 	movl	$0, 128(%eax)
 	movl	$0, 132(%eax)
 	movl	$0, 136(%eax)
-	movl	$1073741824, 144(%eax)
-	movl	$0, 52(%eax)
+	movl	$0, 148(%eax)
+	movl	$0, 152(%eax)
+	movl	$0, 156(%eax)
+	movl	$1073741824, 164(%eax)
 	movl	$0, 72(%eax)
-	movl	$0, 256(%eax)
-	movl	8(%ecx), %edx
-	movl	%eax, 244(%eax)
-	movl	%edx, 276(%eax)
-	movl	12(%ecx), %edx
-	incl	8(%ecx)
-	movl	%edx, 280(%eax)
-	incl	12(%ecx)
-	movl	$0, 252(%eax)
-	movl	$0, 248(%eax)
-	movl	$0, 264(%eax)
-	movl	$0, 268(%eax)
-	movl	$0, 272(%eax)
-	jmp	L90
+	movl	$0, 92(%eax)
+	movl	$0, 274(%eax)
+	movl	5(%ecx), %edx
+	movl	%eax, 262(%eax)
+	movl	%edx, 294(%eax)
+	movl	9(%ecx), %edx
+	incl	5(%ecx)
+	movl	%edx, 298(%eax)
+	incl	9(%ecx)
+	movl	$0, 270(%eax)
+	movl	$0, 266(%eax)
+	movl	$0, 282(%eax)
+	movl	$0, 286(%eax)
+	movl	$0, 290(%eax)
+	movl	$0, 56(%eax)
+	movl	$0, 52(%eax)
+	movl	$0, 302(%eax)
+	movl	$0, 306(%eax)
+	jmp	L93
 	.balign 2
 .globl _task_run
 	.def	_task_run;	.scl	2;	.type	32;	.endef
@@ -411,15 +441,9 @@ _task_run:
 	movl	%esp, %ebp
 	pushl	%esi
 	pushl	%ebx
-	movl	8(%ebp), %ebx
 	movl	12(%ebp), %esi
 	movl	16(%ebp), %eax
-	cmpl	$0, 276(%ebx)
-	jne	L101
-	cmpl	$0, 280(%ebx)
-	jne	L101
-	movl	$0, _zero_task_lock
-L101:
+	movl	8(%ebp), %ebx
 	testl	%esi, %esi
 	js	L108
 L104:
@@ -435,7 +459,7 @@ L106:
 	movl	%esi, 8(%ebx)
 	pushl	%ebx
 	call	_task_add
-	popl	%esi
+	popl	%edx
 L107:
 	movl	_taskctl, %eax
 	movb	$1, 4(%eax)
@@ -449,7 +473,7 @@ L109:
 	je	L106
 	pushl	%ebx
 	call	_task_remove
-	popl	%eax
+	popl	%ecx
 	jmp	L106
 L108:
 	movl	8(%ebx), %esi
@@ -476,7 +500,7 @@ L113:
 	pushl	%esi
 	movl	%eax, %ebx
 	call	_task_remove
-	popl	%ecx
+	popl	%eax
 	cmpl	%ebx, %esi
 	jne	L110
 	call	_task_switchsub
@@ -484,8 +508,8 @@ L113:
 	pushl	(%eax)
 	pushl	$0
 	call	_farjmp
-	popl	%eax
-	popl	%edx
+	popl	%ebx
+	popl	%esi
 	jmp	L110
 	.balign 2
 .globl _task_switch
@@ -499,12 +523,12 @@ _task_switch:
 	movl	(%ebx), %edx
 	imull	$408, %edx, %edx
 	leal	(%edx,%ebx), %edx
-	leal	16(%edx), %ecx
+	leal	13(%edx), %ecx
 	movl	4(%ecx), %eax
 	movl	8(%ecx,%eax,4), %esi
 	incl	%eax
 	movl	%eax, 4(%ecx)
-	cmpl	16(%edx), %eax
+	cmpl	13(%edx), %eax
 	je	L118
 L115:
 	cmpb	$0, 4(%ebx)
@@ -516,14 +540,14 @@ L116:
 	pushl	_task_timer
 	call	_timer_settime
 	cmpl	%esi, %ebx
+	popl	%ecx
 	popl	%eax
-	popl	%edx
 	je	L114
 	pushl	(%ebx)
 	pushl	$0
 	call	_farjmp
-	popl	%ebx
-	popl	%esi
+	popl	%eax
+	popl	%edx
 L114:
 	leal	-8(%ebp), %esp
 	popl	%ebx
@@ -535,7 +559,7 @@ L119:
 	movl	_taskctl, %edx
 	movl	(%edx), %eax
 	imull	$408, %eax, %eax
-	leal	16(%eax,%edx), %ecx
+	leal	13(%eax,%edx), %ecx
 	jmp	L116
 L118:
 	movl	$0, 4(%ecx)
@@ -556,23 +580,77 @@ _task_get_index:
 	movl	%esp, %ebp
 	popl	%ebp
 	ret
-.globl _taskctl
-	.data
-	.balign 4
-_taskctl:
-	.space 4
+	.balign 2
+.globl _task_get_msg
+	.def	_task_get_msg;	.scl	2;	.type	32;	.endef
+_task_get_msg:
+	pushl	%ebp
+	orl	$-1, %eax
+	movl	%esp, %ebp
+	movl	8(%ebp), %ecx
+	movl	52(%ecx), %edx
+	testl	%edx, %edx
+	je	L122
+	movl	28(%edx), %eax
+	decl	48(%ecx)
+	movl	%eax, 52(%ecx)
+	movl	%edx, %eax
+L122:
+	popl	%ebp
+	ret
+	.balign 2
+.globl _task_send_msg
+	.def	_task_send_msg;	.scl	2;	.type	32;	.endef
+_task_send_msg:
+	pushl	%ebp
+	movl	%esp, %ebp
+	movl	12(%ebp), %edx
+	movl	16(%ebp), %ecx
+	testb	$1, 56(%edx)
+	jne	L128
+	orl	$-1, %eax
+L125:
+	leave
+	ret
+L128:
+	movl	8(%ebp), %eax
+	movl	298(%eax), %eax
+	movl	%eax, 20(%ecx)
+	movl	298(%edx), %eax
+	movl	%eax, 20(%ecx)
+	movl	52(%edx), %eax
+	movl	%eax, 28(%ecx)
+	leal	16(%edx), %eax
+	movl	%ecx, 52(%edx)
+	pushl	44(%edx)
+	pushl	%eax
+	call	_fifo32_put
+	xorl	%eax, %eax
+	jmp	L125
+	.balign 2
+.globl _task_msg_init
+	.def	_task_msg_init;	.scl	2;	.type	32;	.endef
+_task_msg_init:
+	pushl	%ebp
+	movl	%esp, %ebp
+	movl	8(%ebp), %eax
+	movl	12(%ebp), %edx
+	movl	%edx, 44(%eax)
+	movl	$0, 48(%eax)
+	movl	$1, 56(%eax)
+	movl	$0, 60(%eax)
+	movl	$0, 52(%eax)
+	popl	%ebp
+	ret
 .globl _task_timer
 	.data
 	.balign 4
 _task_timer:
 	.space 4
-.globl _zero_task_lock
-	.data
-	.balign 4
-_zero_task_lock:
-	.space 4
+	.def	_fifo32_put;	.scl	2;	.type	32;	.endef
 	.def	_farjmp;	.scl	2;	.type	32;	.endef
 	.def	_task_run;	.scl	2;	.type	32;	.endef
+	.def	_get_this;	.scl	2;	.type	32;	.endef
 	.def	_timer_settime;	.scl	2;	.type	32;	.endef
 	.def	_timer_alloc;	.scl	2;	.type	32;	.endef
 	.def	_load_tr;	.scl	2;	.type	32;	.endef

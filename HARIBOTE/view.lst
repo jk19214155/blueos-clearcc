@@ -13,7 +13,7 @@
     13 00000000 55                              	PUSH	EBP
     14 00000001 89 E5                           	MOV	EBP,ESP
     15 00000003 8B 45 08                        	MOV	EAX,DWORD [8+EBP]
-    16 00000006 C7 40 34 00000000               	MOV	DWORD [52+EAX],0
+    16 00000006 C7 40 40 00000000               	MOV	DWORD [64+EAX],0
     17 0000000D 5D                              	POP	EBP
     18 0000000E C3                              	RET
     19 0000000F                                 	GLOBAL	_view_setfunc
@@ -22,7 +22,7 @@
     22 00000010 89 E5                           	MOV	EBP,ESP
     23 00000012 8B 45 08                        	MOV	EAX,DWORD [8+EBP]
     24 00000015 8B 55 0C                        	MOV	EDX,DWORD [12+EBP]
-    25 00000018 89 50 34                        	MOV	DWORD [52+EAX],EDX
+    25 00000018 89 50 40                        	MOV	DWORD [64+EAX],EDX
     26 0000001B 5D                              	POP	EBP
     27 0000001C C3                              	RET
     28 0000001D                                 	GLOBAL	_textview_init
@@ -33,7 +33,7 @@
     33 00000021 8B 5D 08                        	MOV	EBX,DWORD [8+EBP]
     34 00000024 53                              	PUSH	EBX
     35 00000025 E8 FFFFFFD6                     	CALL	_view_init
-    36 0000002A C7 43 48 00000000               	MOV	DWORD [72+EBX],0
+    36 0000002A C7 43 54 00000000               	MOV	DWORD [84+EBX],0
     37 00000031 8B 5D FC                        	MOV	EBX,DWORD [-4+EBP]
     38 00000034 C9                              	LEAVE
     39 00000035 C3                              	RET
@@ -43,7 +43,7 @@
     43 00000037 89 E5                           	MOV	EBP,ESP
     44 00000039 8B 45 08                        	MOV	EAX,DWORD [8+EBP]
     45 0000003C 8B 55 0C                        	MOV	EDX,DWORD [12+EBP]
-    46 0000003F 89 50 48                        	MOV	DWORD [72+EAX],EDX
+    46 0000003F 89 50 54                        	MOV	DWORD [84+EAX],EDX
     47 00000042 5D                              	POP	EBP
     48 00000043 C3                              	RET
     49 00000044                                 	GLOBAL	_textview_flush
@@ -55,7 +55,7 @@
     55 00000049 53                              	PUSH	EBX
     56 0000004A 50                              	PUSH	EAX
     57 0000004B 8B 5D 08                        	MOV	EBX,DWORD [8+EBP]
-    58 0000004E 8B 43 4C                        	MOV	EAX,DWORD [76+EBX]
+    58 0000004E 8B 43 58                        	MOV	EAX,DWORD [88+EBX]
     59 00000051 8B 73 08                        	MOV	ESI,DWORD [8+EBX]
     60 00000054 89 45 F0                        	MOV	DWORD [-16+EBP],EAX
     61 00000057 8B 43 0C                        	MOV	EAX,DWORD [12+EBX]
@@ -66,12 +66,12 @@
     66 00000061 50                              	PUSH	EAX
     67 00000062 6A 00                           	PUSH	0
     68 00000064 6A 00                           	PUSH	0
-    69 00000066 0F B6 43 44                     	MOVZX	EAX,BYTE [68+EBX]
+    69 00000066 0F B6 43 50                     	MOVZX	EAX,BYTE [80+EBX]
     70 0000006A 50                              	PUSH	EAX
     71 0000006B 56                              	PUSH	ESI
     72 0000006C 57                              	PUSH	EDI
     73 0000006D E8 [00000000]                   	CALL	_boxfill8
-    74 00000072 FF 73 48                        	PUSH	DWORD [72+EBX]
+    74 00000072 FF 73 54                        	PUSH	DWORD [84+EBX]
     75 00000075 0F BE 45 F0                     	MOVSX	EAX,BYTE [-16+EBP]
     76 00000079 50                              	PUSH	EAX
     77 0000007A 6A 01                           	PUSH	1

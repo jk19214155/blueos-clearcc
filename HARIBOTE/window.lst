@@ -397,7 +397,7 @@
    369 000002EC 80 7D 14 00                     	CMP	BYTE [20+EBP],0
    370 000002F0 0F 84 00000099                  	JE	L30
    371 000002F6 BB 00FFFFFF                     	MOV	EBX,16777215
-   372 000002FB BA 80000084                     	MOV	EDX,-2147483516
+   372 000002FB BA C0000084                     	MOV	EDX,-1073741692
    373 00000300                                 L31:
    374 00000300 6A 14                           	PUSH	20
    375 00000302 8D 47 FC                        	LEA	EAX,DWORD [-4+EDI]
@@ -461,7 +461,7 @@
    433 0000038D EB CD                           	JMP	L41
    434 0000038F                                 L30:
    435 0000038F BB 00C6C6C6                     	MOV	EBX,13027014
-   436 00000394 BA A0848484                     	MOV	EDX,-1601928060
+   436 00000394 BA C0848484                     	MOV	EDX,-1065057148
    437 00000399 E9 FFFFFF62                     	JMP	L31
    438 0000039E                                 	GLOBAL	_window_init
    439 0000039E                                 _window_init:
@@ -508,9 +508,9 @@
    480 000003F4 E8 [00000000]                   	CALL	_boxfill8
    481 000003F9 8B 4D E0                        	MOV	ECX,DWORD [-32+EBP]
    482 000003FC 83 C4 1C                        	ADD	ESP,28
-   483 000003FF 80 B9 000000CC 00               	CMP	BYTE [204+ECX],0
+   483 000003FF 80 B9 000000E0 00               	CMP	BYTE [224+ECX],0
    484 00000406 74 09                           	JE	L57
-   485 00000408 80 B9 000000CD 00               	CMP	BYTE [205+ECX],0
+   485 00000408 80 B9 000000E1 00               	CMP	BYTE [225+ECX],0
    486 0000040F 75 52                           	JNE	L62
    487 00000411                                 L57:
    488 00000411 FF 75 E8                        	PUSH	DWORD [-24+EBP]
@@ -609,9 +609,9 @@
    581 000004F2 FF 36                           	PUSH	DWORD [ESI]
    582 000004F4 E8 [00000000]                   	CALL	_boxfill32
    583 000004F9 83 C4 1C                        	ADD	ESP,28
-   584 000004FC 80 BB 000000CC 00               	CMP	BYTE [204+EBX],0
+   584 000004FC 80 BB 000000E0 00               	CMP	BYTE [224+EBX],0
    585 00000503 74 09                           	JE	L65
-   586 00000505 80 BB 000000CD 00               	CMP	BYTE [205+EBX],0
+   586 00000505 80 BB 000000E1 00               	CMP	BYTE [225+EBX],0
    587 0000050C 75 50                           	JNE	L70
    588 0000050E                                 L65:
    589 0000050E FF 75 E4                        	PUSH	DWORD [-28+EBP]
@@ -1018,9 +1018,9 @@
    990 000008ED 89 55 D8                        	MOV	DWORD [-40+EBP],EDX
    991 000008F0 0F 84 000000A8                  	JE	L98
    992 000008F6 C7 45 E8 00FFFFFF               	MOV	DWORD [-24+EBP],16777215
-   993 000008FD C7 45 E4 80000084               	MOV	DWORD [-28+EBP],-2147483516
+   993 000008FD C7 45 E4 C0000084               	MOV	DWORD [-28+EBP],-1073741692
    994 00000904 C7 45 E0 00C6C6C6               	MOV	DWORD [-32+EBP],13027014
-   995 0000090B C7 45 DC A0848484               	MOV	DWORD [-36+EBP],-1601928060
+   995 0000090B C7 45 DC C0848484               	MOV	DWORD [-36+EBP],-1065057148
    996 00000912                                 L99:
    997 00000912 6B F9 03                        	IMUL	EDI,ECX,3
    998 00000915 C7 45 EC 00000011               	MOV	DWORD [-20+EBP],17
@@ -1085,7 +1085,7 @@
   1057 0000099C EB AA                           	JMP	L109
   1058 0000099E                                 L98:
   1059 0000099E C7 45 E8 00C6C6C6               	MOV	DWORD [-24+EBP],13027014
-  1060 000009A5 C7 45 E4 A0848484               	MOV	DWORD [-28+EBP],-1601928060
+  1060 000009A5 C7 45 E4 C0848484               	MOV	DWORD [-28+EBP],-1065057148
   1061 000009AC C7 45 E0 00FFFFFF               	MOV	DWORD [-32+EBP],16777215
-  1062 000009B3 C7 45 DC 80000084               	MOV	DWORD [-36+EBP],-2147483516
+  1062 000009B3 C7 45 DC C0000084               	MOV	DWORD [-36+EBP],-1073741692
   1063 000009BA E9 FFFFFF53                     	JMP	L99

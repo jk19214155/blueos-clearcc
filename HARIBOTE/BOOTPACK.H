@@ -1,12 +1,170 @@
+typedef unsigned int UINTN;
+typedef UINTN EFI_HANDLE;
+typedef UINTN EFI_STATUS;
+
+typedef struct {
+  unsigned int  Signature_low;
+  unsigned int  Signature_high;
+  unsigned int  Revision;
+  unsigned int  HeaderSize;
+  unsigned int  CRC32;
+  unsigned int  Reserved;
+} EFI_TABLE_HEADER;
+
+typedef struct {
+	unsigned int g1;
+	unsigned short g2;
+	unsigned short g3;
+	unsigned char g4[8];
+}EFI_GUID;
+
+typedef struct {
+  EFI_TABLE_HEADER                Hdr;
+  //
+  // Time Services
+  //
+  UINTN                    (*GetTime)(void* Time,void* Capabilities);
+  UINTN                    (*SetTime)(void* Time);
+  UINTN             (*GetWakeupTime)(void* Enabled,void* Pending,void* Time);
+  UINTN             (*SetWakeupTime)(void* Enabled,void* Time);
+  //
+  // Virtual Memory Services
+  //
+  UINTN     (*SetVirtualAddressMap)(UINTN MemoryMapSize,UINTN DescriptorSize,unsigned int DescriptorVersion,void* VirtualMap);
+  UINTN             (*ConvertPointer)(UINTN DebugDisposition,void** address);
+  //
+  // Variable Services
+  //
+  EFI_STATUS                (*GetVariable)(short* VariableName,EFI_GUID* VendorGuid,unsigned int* Attributes,UINTN* DataSize,void* Data);
+  EFI_STATUS      (*GetNextVariableName)(UINTN* VariableNameSize,short* VariableName,EFI_GUID VendorGuid);
+  EFI_STATUS                (*SetVariable)(short* VariableName,EFI_GUID* VendorGuid,unsigned int Attributes,UINTN DataSize,void* Data);
+  //
+  // Miscellaneous Services
+  //
+  EFI_STATUS    (*GetNextHighMonotonicCount)();
+  EFI_STATUS                (*ResetSystem)();
+  //
+  // UEFI 2.0 Capsule Services
+  //
+  EFI_STATUS              (*UpdateCapsule)();
+  EFI_STATUS  (*QueryCapsuleCapabilities)();
+  //
+  // Miscellaneous UEFI 2.0 Service
+  //
+  EFI_STATUS         (*QueryVariableInfo)();
+} EFI_RUNTIME_SERVICES;
+
+typedef struct {
+  EFI_TABLE_HEADER                    	Hdr;
+  short                              	*FirmwareVendor;
+  unsigned int                      	FirmwareRevision;
+  EFI_HANDLE                          	ConsoleInHandle;
+  void      							*ConIn;
+  EFI_HANDLE                          	ConsoleOutHandle;
+  void     								*ConOut;
+  EFI_HANDLE                          	StandardErrorHandle;
+  void     								*StdErr;
+  EFI_RUNTIME_SERVICES                	*RuntimeServices;
+  void                   				*BootServices;
+  UINTN                               	NumberOfTableEntries;
+  void             						*ConfigurationTable;
+} EFI_SYSTEM_TABLE;
+int dmg_write(void* buff,int lba28,int block_number,int divice);
+EFI_SYSTEM_TABLE* get_sys_table_addr();
+EFI_GUID* get_var_guid();
 void test3();
+//EFI分区的代码
+#define gUidPartTypeEFI {0xC12A7328,0xF81F,0x11D2,{0xBA, 0x4B, 0x00, 0xA0, 0xC9, 0x3E, 0xC9, 0x3B}
+//数据分区的代码
+#define gUidPartTypeBaseData {0xEBD0A0A2,0xB9E5,0x4433,{0x87, 0xC0, 0x68, 0xB6, 0xB7, 0x26, 0x99, 0xC7}}
+//EFI分区表的表项
+typedef struct{
+	EFI_GUID type;//分区的类型id
+	EFI_GUID guid;//分区自身的唯一id
+	unsigned int start_lba_low;//分区开始的lba号码
+	unsigned int start_lba_high;
+	unsigned int end_lba_low;//分区结束（包含）的lba号码
+	unsigned int end_lba_high;
+	unsigned int status_low;//分区状态
+	unsigned int status_high;//分区状态
+	short name[36];//人类可读的UTF-16编码格式
+}GPT_ITEM;
+//阻止结构体内部对齐
+#pragma pack(1)
+typedef struct{
+	unsigned char BS_jmpBOOT[3];
+	unsigned char BS_OEMName[8];
+	unsigned short BPB_BytesPerSec; //每扇区字节数（Bytes/Sector）
+	unsigned char BPB_SecPerClus; //每簇扇区数（Sector/Cluster）
+	unsigned short BPB_ResvdSecCnt; //Boot记录占用多少扇区,也就是FAT之前有多少扇区
+	unsigned char BPB_NumFATs; //共有多少FAT表
+	unsigned short BPB_RootEntCnt; //根目录区文件最大数
+	unsigned short BPB_TotSec16; //	扇区总数
+	unsigned char BPB_Media; //介质描述符
+	unsigned short BPB_FATSz16;//每个FAT表所占扇区数
+	unsigned short BPB_SecPerTrk;//每磁道扇区数（Sector/track）
+	unsigned short BPB_NumHeads;//磁头数（面数）
+	unsigned int BPB_HiddSec;//隐藏扇区数
+	unsigned int BPB_TotSec32;//如果BPB_TotSec16=0,则由这里给出扇区数
+	unsigned int BPB_FATSz32;//每个FAT表所占扇区数
+	unsigned short BS_BootSig;
+	unsigned short Var;
+	unsigned int BPB_Root;//文件根目录的起始簇号
+	//剩下的部分不使用，因此不解析
+}FAT32_HEADER;
+//FAT32_FILE_INFO是32字节结构
+#pragma pack(1)
+typedef struct {
+	unsigned char name[8];
+	unsigned char ext[3];
+	unsigned char type; //1:只读 2：隐藏 4：系统 8：卷标 0x10：子目录 0x20：归档
+	unsigned char res1;
+	unsigned char creat_time[10];
+	unsigned short create_time;
+	unsigned short create_data;
+	unsigned short last_found;
+	unsigned short start_high;
+	unsigned short change_time;
+	unsigned short change_data;
+	unsigned short start_low;
+	unsigned int file_size;
+}FAT32_FILE_INFO;
+typedef struct{//设备信息
+	unsigned int divice_index;//设备编号
+}BLUEOS_STORAGE_INFO;
+typedef struct{
+	unsigned short name[64];//文件名
+	unsigned int device;//所属设备
+	unsigned int size_low;
+	unsigned int size_high;
+}BLUEOS_FILE_INFO;
+//FAT32_LONG_NAME是32字节结构
+#pragma pack(1)
+typedef struct {
+	char type;
+	unsigned short name1[5];
+	unsigned char type2;//0x0f
+	unsigned char res1;//保留
+	unsigned char chk;//校验码
+	unsigned short name2[6];
+	unsigned char mode;
+	unsigned short start;//通常是0
+	unsigned short name3[2];
+}FAT32_LONG_NAME;
 /* asmhead.nas */
 struct BOOTINFO { /* 0x0ff0-0x0fff */
-	char cyls; /* ブートセクタはどこまでディスクを読んだのか */
+	char cyls; /* 引导扇区读取了磁盘的哪一部分 */
 	char leds; /* ブート時のキーボードのLEDの状態 */
-	char vmode; /* ビデオモード  何ビットカラーか */
+	char vmode; /* 视频模式下使用了多少位色彩深度 */
 	char reserve;
 	short scrnx, scrny; /* 画面解像度 */
 	void *vram;
+	int mode;//显示模式
+	/*
+	*1. 调色板
+	*2. 24色全彩色
+	*3. 32色全彩色
+	*/
 };
 #define ADR_BOOTINFO	0x00000ff0
 #define ADR_DISKIMG		0x00100000
@@ -125,7 +283,7 @@ struct GATE_DESCRIPTOR {
 	char dw_count, access_right;
 	short offset_high;
 };
-void init_gdtidt(void);
+void init_gdtidt(UINTN main_this);
 void set_segmdesc(struct SEGMENT_DESCRIPTOR *sd, unsigned int limit, int base, int ar);
 void set_gatedesc(struct GATE_DESCRIPTOR *gd, int offset, int selector, int ar);
 #define ADR_IDT			0x0026f800
@@ -224,11 +382,14 @@ struct SHEET {
 	*/
 	struct SHTCTL *ctl;//属于哪一个图层管理器
 	struct SHTCTL *ctl_from;//本图层是否由另一个图层控制器生成?
-	struct TASK *task;
+	struct TASK *task;//属于哪一个任务
+	int red_size;//图层红色部分大小bit
+	int grenn_size;//
+	int yellow_size;//
 	struct VIEW_FUNC* func;
 };
 struct DISPLAY{
-	void (*sheet_refreshsub)(struct SHTCTL* ctl, int vx0, int vy0, int vx1, int vy1, int h0, int h1);
+	void (*sheet_refreshsub)(struct SHTCTL* ctl, int vx0, int vy0, int vx1, int vy1, int h0, int h1);//局部刷新函数
 };
 struct SHTCTL {
 	void *vram;//图层管理器输出buff
@@ -275,6 +436,8 @@ struct TextView{
 	struct View view;
 	char* text;//文本内容
 	int color;
+	int point;//要显示的位置
+	int ix,iy;//文本框输入焦点位置
 };
 void textview_init(struct TextView* self,char* text);
 void textview_settext(struct TextView* self,char* text);
@@ -340,6 +503,29 @@ void inthandler20(int *esp);
 int timer_cancel(struct TIMER *timer);
 void timer_cancelall(struct FIFO32 *fifo);
 
+/*taskmsg.c*/
+typedef struct _TASK_MSG{
+	unsigned int type;//消息类型
+	void* name;//消息名称
+	unsigned int name_len;//名称长度
+	void* body;//消息正文
+	unsigned int body_len;//正文长度
+	unsigned int sender_pid;//发送者进程id
+	unsigned int c;//接收者进程id
+	struct _TASK_MSG* next;//下一个消息
+}TASK_MSG;
+typedef struct _TASK_MSG_MUSK{//消息来源
+	unsigned int pid;
+	struct _TASK_MSG_MUSK* next;
+}TASK_MSG_MUSK;
+typedef struct _TASK_MSG_BOX{
+	unsigned int fifo_sel;//当有消息时向fifo发送哪个编号
+	unsigned int num;//消息数量
+	struct _TASK_MSG* msg;
+	unsigned int flag;//0：使能消息进入 1：musk列表类型（0：阻止列表 1：允许列表）
+	struct _TASK_MSG_MUSK* musk;
+}TASK_MSG_BOX;
+
 /* mtask.c */
 #define MAX_TASKS		1000	/* 最大タスク数 */
 #define TASK_GDT0		3		/* TSSをGDTの何番から割り当てるのか */
@@ -355,11 +541,12 @@ struct TASK {
 	int sel, flags; /* selはGDTの番号のこと */
 	int level, priority;
 	struct FIFO32 fifo;
+	struct _TASK_MSG_BOX msg_box;
 	struct TSS32 tss;
 	struct SEGMENT_DESCRIPTOR ldt[4];
 	struct CONSOLE *cons;
 	int ds_base, cons_stack;
-	struct FILEHANDLE *fhandle;
+	struct FILEHANDLE *fhandle;//打开的文件列表
 	int *fat;
 	char *cmdline;
 	unsigned char langmode, langbyte1;
@@ -375,23 +562,27 @@ struct TASK {
 	struct SHTCTL* shtctl;//应用程序图层管理器
 	int id_high;//任务唯一id值高位
 	int id_low;//任务唯一id值低位
+	unsigned int mem_use;//内存使用量
+	unsigned int root_dir_addr;//文件根目录
+	char *name;//进程名称
 };
 struct TASKLEVEL {
-	int running; /* 動作しているタスクの数 */
-	int now; /* 現在動作しているタスクがどれだか分かるようにするための変数 */
-	struct TASK *tasks[MAX_TASKS_LV];
+	int running; /* 当前级别运行的任务数量 */
+	int now; /* 现在正在运行的任务编号 */
+	struct TASK *tasks[MAX_TASKS_LV];//当前级别任务数组
 };
 struct TASKCTL {
-	int now_lv; /* 現在動作中のレベル */
-	char lv_change; /* 次回タスクスイッチのときに、レベルも変えたほうがいいかどうか */
+	int now_lv; /* 现在运行中的任务级别 */
+	char lv_change; /* 下一次要切换到的任务级别 */
 	int id_high;//下一个任务id高位
 	int id_low;//下一个任务id低位
-	struct TASKLEVEL level[MAX_TASKLEVELS];
-	struct TASK tasks0[MAX_TASKS];
+	struct TASKLEVEL level[MAX_TASKLEVELS];//任务级别数组
+	struct TASK tasks0[MAX_TASKS];//所有任务池
 	
 };
 extern struct TASKCTL *taskctl;
 extern struct TIMER *task_timer;
+struct TASKCTL *task_ctl_now(void);
 struct TASK *task_now(void);
 struct TASK *task_init(struct MEMMAN *memman);
 struct TASK *task_alloc(void);
@@ -413,7 +604,9 @@ void change_wtitle32(struct SHEET *sht, char act);
 /* console.c */
 struct CONSOLE {
 	struct SHEET *sht;
-	int cur_x, cur_y, cur_c;
+	int cur_x, cur_y, cur_c;//命令行输出坐标和光标颜色
+	int font_x,font_y;//命令行输出行数和字数
+	int font_x_max,font_y_max;//命令行的总x和总y
 	struct TIMER *timer;
 	int mode;/*命令行模式 0：普通文本模式*/
 	char* message;/*message为cmd中的内容，根据mode进行相应解析*/
@@ -468,6 +661,7 @@ struct vfs_FILEINFO{
 void file_readfat(int *fat, unsigned char *img);
 void file_loadfile(int clustno, int size, char *buf, int *fat, char *img);
 struct FILEINFO *file_search(char *name, struct FILEINFO *finfo, int max);
+struct FILEINFO *file_full_search(char *name, struct FILEINFO *finfo, unsigned char type_have ,unsigned char type_havnt ,int max);
 char *file_loadfile2(int clustno, int *psize, int *fat);
 
 /* tek.c */
@@ -609,3 +803,77 @@ struct ACPI_FADT//FADT表的格式
 
 void init_acpi(void);
 int acpi_shutdown(void);
+struct pci_device{//设备信息编号
+	int bus;
+	int device;
+	int function;
+	int vendor_id;
+	int device_id;
+	int class_code;
+	int subclass_code;
+};
+unsigned int read_pci_config8(unsigned char bus, unsigned char dev, unsigned char func, unsigned char reg_offset);
+unsigned int read_pci_config32(unsigned char bus, unsigned char dev, unsigned char func, unsigned char reg_offset);
+/*bmp.c*/
+void write_bmp(int* buff, int xsize, int ysize, char* buff2);
+/*bmp2.obj*/
+int info_BMP(struct DLL_STRPICENV *env, int *info, int size, char *fp);//env:图像数据保存与工作空间;info:8字节探测结果;size:文件大小;fp:文件内容指针
+int decode0_BMP(struct DLL_STRPICENV *env, int size, char *fp, int b_type, char *buf, int skip);
+/*dmg.obj*/
+void dmg_init();
+int dmg_read(char* buff,int lba28,int block_number,int divice);
+
+
+void* get_this();
+/*drvier.c*/
+// 设备操作函数
+typedef struct {
+	unsigned int index;//偏移量
+	int (*read)(char* buff,unsigned int lba28,unsigned int block_number,int divice);
+	int (*write)(void* buff,unsigned int lba28,unsigned int block_number,int divice);
+}vdisk;
+
+
+// 存储设备抽象结构体
+struct _StorageDeviceOperations;
+typedef struct _StorageDevice{
+    char* name; // 设备名称
+    unsigned int size; // 设备大小
+    unsigned free;//设备空闲空间
+	int status;//设备状态
+	int rand;//校验值，当设备被挂载时会填写
+    struct _StorageDeviceOperations* driver; // 设备驱动程序
+	
+} StorageDevice;
+
+typedef struct _StorageDeviceOperations{
+    // 打开设备，返回0表示成功，返回-1表示失败
+    int (*open)(StorageDevice* dev,int* user_index,char* name,int mode);//返回int user_index
+
+    // 从设备中读取数据，返回实际读取的字节数，返回-1表示失败
+    int (*read)(StorageDevice* dev,int user_index, void* buf, unsigned int* count);
+
+    // 将数据写入设备，返回实际写入的字节数，返回-1表示失败
+    int (*write)(StorageDevice* dev,int user_index, void* buf, unsigned int* count);
+
+    // 关闭设备，返回0表示成功，返回-1表示失败
+    int (*close)(StorageDevice* dev);
+
+    // 定位设备的读写指针，返回指针位置，返回-1表示失败
+    unsigned int (*seek)(StorageDevice* dev, int user_index,unsigned int* offset);
+} StorageDeviceOperations;
+void device_init();
+unsigned int device_add(char* name,unsigned int size,unsigned int free,StorageDeviceOperations* driver);
+unsigned int device_remove(unsigned int index);
+unsigned int device_open(unsigned int device_index,int* rand,int* user_index,char* name,int mode);
+unsigned int device_read(unsigned int device_index,int rand,int user_index,char* buff,unsigned int* count);
+unsigned int device_write(unsigned int device_index,int rand,int user_index,char* buff,unsigned int* count);
+unsigned int device_seek(unsigned int device_index,int rand,int user_index,int* count);
+/*dmg.c*/
+void task_disk();
+struct TASK* start_task_disk();
+unsigned int _dmg_open(StorageDevice* dev,int* user_index,char* name,int mode);
+unsigned int _dmg_read(StorageDevice* dev,int user_index, void* buf, unsigned int* count);
+unsigned int _dmg_write(StorageDevice* dev,int user_index, void* buf, unsigned int* count);
+unsigned int _dmg_seek(StorageDevice* dev, int user_index,unsigned int* offset);
+unsigned int _dmg_close(StorageDevice* dev);

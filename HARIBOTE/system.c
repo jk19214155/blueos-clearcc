@@ -5,6 +5,7 @@ int system_running=0;//系统运行标志
 struct  task_abort *system_task_abort_list;//task回收队列
 struct TASK *system_task;
 void system_mainloop();
+void* sheet_ctls[10];//10个桌面控制器
 struct TASK* system_start(){
 	if(system_running!=0){
 		return system_task;
@@ -19,7 +20,7 @@ struct TASK* system_start(){
 	task->cons_stack = memman_alloc_4k(memman, 64 * 1024);//内存分配!!!
 	pageman_link_page_32_m(pageman,task->cons_stack,7,0x10,0);//
 	task->tss.esp = task->cons_stack + 64 * 1024 - 12;
-	task->tss.eip = (int) &system_mainloop;
+	task->tss.eip = ((int) &system_mainloop)+((int)get_this());
 	task->tss.es = 1 * 8;
 	task->tss.cs = 2 * 8;
 	task->tss.ss = 1 * 8;
@@ -85,6 +86,9 @@ void system_mainloop(){
 					}
 				}
 				system_task_abort_list=0;
+			}
+			if(i==6){
+				
 			}
 		}
 	}

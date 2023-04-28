@@ -29,7 +29,15 @@
 0x0026f014(int) memman_core
 0x0026f018(int) shtctl[10]
 0x0026f01c(int) shtctl_num
-
+0x0026f020(int) file_list_base
+0x0026f020(int) file_num
+0x0026f024(int) 启动分区的mbr
+0x0026f028(int) FAT保存位置
+0x0026f02c(char) 硬盘状态指示器
+0x0026f030 part_base_lba
+0x0026f034 part_endl_lba
+0x0026f038 root_dir_addr
+0x0026f03c &sht_back[10]
 
 00:00:10.565085 0000000000000000-000000000009ffff 0000000000000000 Conventional RAM
 00:00:10.565088 00000000000a0000-00000000000bffff 0000000000000000 VGA - VGA Video Buffer
@@ -68,3 +76,19 @@
 00:00:11.787974 00000000fee00000-00000000fee00fff 0000000000000000 APIC
 00:00:11.787977 00000000ffff0000-00000000ffffffff 0000000000000000 PC BIOS - 0xffffffff
 00:00:11.787979 0000000100000000-00000001587fffff 0000000000000000 Above 4GB Base RAM
+//打开TPM
+section .data
+tpm_base equ 0xfed40000  ; TPM base address
+tpm_access equ tpm_base + 0x0
+
+section .text
+global _start
+_start:
+mov eax, tpm_access
+mov byte [eax], 0x20 ; request TPM access
+
+; TPM communication code here
+
+mov eax, 1 ; exit system call
+xor ebx, ebx
+int 0x80

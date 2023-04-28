@@ -32,7 +32,7 @@ void init_apic(void* apic_base)
 	io_out8(PIC0_IMR, 0xff);
 	//Enabling xAPIC(IA32_APIC_BASE[10]) and 2xAPIC(IA32_APIC_BASE[11])
     io_rdmsr(&tmp_high,&tmp_low,0x1b);
-    tmp_low |= (1 << 11);
+    tmp_low = ((int)apic_base)|(1 << 11);
     io_wrmsr(tmp_high,tmp_low,0x1b);
     //Enabling LAPIC(SVR[8])
     *(int*)(apic_base+0xf0)|=(1<<8);
@@ -53,15 +53,11 @@ void init_apic(void* apic_base)
 	//初始化多处理器环境
 	store_gdt((void*)0xc202);
 	store_idt((void*)0xc20a);
-	memcpy((void*)0x8000,(void*)0xc200,512);
+	//memcpy((void*)0x8000,(void*)0xc200,512);
 	for(i=1;i<16;i++){
 		//io_ipi_message(apic_base,((char)i)<<24,0x05<<8);//广播init
 		//io_ipi_message(apic_base,((char)i)<<24,(0x06<<8)+8);//广播sipi
 		//io_ipi_message(apic_base,((char)i)<<24,(0x06<<8)+8);//广播sipi
-	}
-	for(;;){
-		if((*(int*)(0x8016))==(*(int*)(0x8012)))
-			break;
 	}
 	return;
 }

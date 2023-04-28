@@ -12,7 +12,7 @@ static int tek_decode2(int siz, UCHAR *p, UCHAR *q);
 static int tek_decode5(int siz, UCHAR *p, UCHAR *q);
 
 static unsigned int tek_getnum_s7s(UCHAR **pp)
-/* ‚±‚ê‚Í•K‚¸big-endian */
+/* ?ˆê’è¥big-endianB */
 /* ‰º‘Ê‚ª‚È‚¢‚Ì‚Å’†g‚ğ‚¢‚¶‚è‚â‚·‚¢ */
 {
 	unsigned int s = 0;

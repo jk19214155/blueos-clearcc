@@ -63,8 +63,8 @@ haribote.img : haribote/ipl09.bin haribote/haribote.sys Makefile \
 		copy from:mmldata/daigo.mml to:@: \
 		copy from:mmldata/daiku.mml to:@: \
 		copy from:gview/gview.hrb to:@: \
-		copy from:pictdata/fujisan.jpg to:@: \
-		copy from:pictdata/night.bmp to:@: \
+		copy from:pictdata/fujisan2.jpg to:@: \
+		copy from:pictdata/night2.bmp to:@: \
 		copy from:nihongo/nihongo.fnt to:@: \
 		imgout:haribote.img
 

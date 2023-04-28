@@ -188,12 +188,19 @@ void init_page(struct PAGEMAN32 *man){
 	}
 	man->mem_map_base=(char*)0x00800000;
 	//memset(man->mem_map_base,0xff,0x00100000);//所有内存不可用
-	for(i=0;i<0x00100000;i++){
-		*(((char*)man->mem_map_base)+i)=0xff;
-	}
-	
+	//for(i=0;i<0x00100000;i++){
+	//	*(((char*)man->mem_map_base)+i)=0xff;
+	//}
 	man->total_page_num=0;
 	man->free_page_num=0;
+	for(i=0x800000;i<0x900000;i++){
+		if((*(unsigned char*)i)==0){
+			man->total_page_num++;
+			man->free_page_num++;
+		}
+	}
+	*(unsigned int*)0x0026f004=man->total_page_num;
+	return;
 	for(i=0;i<128;i++){
 		if(meminfo[i].index==i){//区?信息完整
 			if(meminfo[i].base_addr_high!=0 || meminfo[i].length_high!=0){//属于高4G内存
@@ -316,6 +323,7 @@ unsigned int memman_unlink_page_32(struct PAGEMAN32 *man,unsigned int cr3_addres
 }
 
 unsigned int pageman_link_page_32_m(struct PAGEMAN32 *man,unsigned int linear_address,unsigned int physical_address,int page_num,int mode){
+	io_cli();
 	int i;
 	if(mode==0){//没有要链接的页面
 		for(i=0;i<page_num;i++){
@@ -328,7 +336,9 @@ unsigned int pageman_link_page_32_m(struct PAGEMAN32 *man,unsigned int linear_ad
 		}
 	}
 	*(int*)0x0026f00c=man->free_page_num;
-	
+	i=load_cr3();
+	store_cr3(i);
+	io_sti();
 	return physical_address;
 }
 
@@ -338,8 +348,15 @@ unsigned pageman_link_page_32(struct PAGEMAN32 *man,unsigned int linear_address,
 	addr=0xfffff000|((linear_address>>20)&0xfffffffc);
 	if(((*(int*)addr)&1)==0){//要链接的目标页面不存在
 		*(int*)addr=memman_alloc_page_32(man)|7;
+		addr=(0xffc00000|((linear_address>>10)&0xfffffffc))&0xfffff000;
+		for(i=0;i<4096;i++){
+			*(char*)addr=0;
+		}
+		addr=0xffc00000|((linear_address>>10)&0xfffffffc);
 	}
-	addr=0xffc00000|((linear_address>>10)&0xfffffffc);
+	else{
+		addr=0xffc00000|((linear_address>>10)&0xfffffffc);
+	}
 	if(mode==0){//没有想要链接的地址
 		physical_address=(physical_address&0xfff)|(memman_alloc_page_32(man));
 		*(int*)addr=physical_address;
@@ -412,6 +429,9 @@ unsigned int memman_alloc_page_32(struct PAGEMAN32 *man){
 		if(man->mem_map_base[i]==0){
 			man->mem_map_base[i]=1;//已使用
 			man->free_page_num--;
+			if(task_now()!=0){//记录内存使用情况
+				task_now()->mem_use++;
+			}
 			return i*4096;//返回物理地址
 		}
 	}
@@ -429,6 +449,9 @@ unsigned int memman_free_page_32_m(struct PAGEMAN32 *man,unsigned physical_addre
 	for(i=0;i<page_num;i++){
 		if(man->mem_map_base[index+i]==1){//正在使用
 			man->free_page_num++;
+			if(task_now()!=0){//记录内存使用情况
+				task_now()->mem_use--;
+			}
 		}
 		man->mem_map_base[index+i]=0;//未使用;
 	}
@@ -438,6 +461,9 @@ unsigned int memman_free_page_32(struct PAGEMAN32 *man,unsigned physical_address
 	int index=physical_address>>12;//得到?的索引
 	if(man->mem_map_base[index]==1){//正在使用
 		man->free_page_num++;
+		if(task_now()!=0){//记录内存使用情况
+			task_now()->mem_use--;
+		}
 	}
 	man->mem_map_base[index]=0;//未使用;
 	*(int*)0x0026f00c=man->free_page_num;
