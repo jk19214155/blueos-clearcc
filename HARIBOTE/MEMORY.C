@@ -5,7 +5,7 @@
 
 #define EFLAGS_AC_BIT		0x00040000
 #define CR0_CACHE_DISABLE	0x60000000
-
+char buff[128];
 unsigned int memtest(unsigned int start, unsigned int end)
 {
 	char flg486 = 0;
@@ -267,6 +267,8 @@ void init_page(struct PAGEMAN32 *man){
 }*/
 unsigned int memmam_link_page_32_m(struct PAGEMAN32 *man,unsigned int cr3_address,unsigned int linear_address,unsigned int physical_address,int page_num,int mode){
 	int i;
+	sprintf(buff,"memman_alloc: alloc page num %d linear_address: %x physical_address: %x\n",page_num,linear_address,physical_address);
+	com_out_string(0x3f8,buff);
 	if(mode==0){//没有要链接的页面
 		for(i=0;i<page_num;i++){
 			memman_link_page_32(man,cr3_address,linear_address+i*0x1000,physical_address,mode);
@@ -342,8 +344,42 @@ unsigned int pageman_link_page_32_m(struct PAGEMAN32 *man,unsigned int linear_ad
 	return physical_address;
 }
 
+/*经过此函数连接的内存，保证其物理内存连续性*/
+unsigned int pageman_link_page_32_mf(struct PAGEMAN32* man, unsigned int linear_address,unsigned int physical_address,int page_num){
+	int num=0;
+	int start=0;
+	for(int i=0;i<0x100000;i++){
+		if(man->mem_map_base[i]==0){
+			if(num==0){//开始
+				start=i;
+			}
+			num++;
+			if(num==page_num){//连续页数量符合要求
+				/*进行连接*/
+				break;
+			}
+			else{
+				
+			}
+		}
+		else{
+			num=0;
+			continue;
+		}
+	}
+	if(num==page_num){
+		for(int i=0;i<page_num;i++){
+			pageman_link_page_32(man,linear_address+0x1000*i,(start+i)*0x1000,9999);
+			man->mem_map_base[i]=1;
+		}
+		return 0;
+	}
+	else{//连接失败
+		return -1;
+	}
+}
 
-unsigned pageman_link_page_32(struct PAGEMAN32 *man,unsigned int linear_address,unsigned int physical_address,int mode){
+unsigned int pageman_link_page_32(struct PAGEMAN32 *man,unsigned int linear_address,unsigned int physical_address,int mode){
 	int addr,i;
 	addr=0xfffff000|((linear_address>>20)&0xfffffffc);
 	if(((*(int*)addr)&1)==0){//要链接的目标页面不存在
@@ -364,6 +400,11 @@ unsigned pageman_link_page_32(struct PAGEMAN32 *man,unsigned int linear_address,
 	}
 	*(int*)addr=physical_address;
 	return *(int*)addr;
+}
+
+unsigned int get_physical_by_linear_32(unsigned int linear_address){
+	unsigned int addr=0xffc00000|((linear_address>>10)&0xfffffffc);
+	return *(unsigned int*)addr;
 }
 
 unsigned int pageman_unlink_page_32_m(struct PAGEMAN32 *man,unsigned int linear_address,int page_num,int mode){
@@ -403,7 +444,7 @@ unsigned int pageman_unlink_page_32_m(struct PAGEMAN32 *man,unsigned int linear_
 }
 
 
-unsigned pageman_unlink_page_32(struct PAGEMAN32 *man,unsigned int linear_address,int mode){
+unsigned int pageman_unlink_page_32(struct PAGEMAN32 *man,unsigned int linear_address,int mode){
 	if(linear_address>=0xfffff000){
 		io_cli();
 		for(;;);
@@ -443,7 +484,7 @@ unsigned int memman_alloc_page_32(struct PAGEMAN32 *man){
 	return -1;//没有找到可用的物理内存
 }
 
-unsigned int memman_free_page_32_m(struct PAGEMAN32 *man,unsigned physical_address,int page_num){
+unsigned int memman_free_page_32_m(struct PAGEMAN32 *man,unsigned int physical_address,int page_num){
 	int index=physical_address>>12;//得到?的索引
 	int i;
 	for(i=0;i<page_num;i++){
@@ -457,7 +498,7 @@ unsigned int memman_free_page_32_m(struct PAGEMAN32 *man,unsigned physical_addre
 	}
 	return 0;
 }
-unsigned int memman_free_page_32(struct PAGEMAN32 *man,unsigned physical_address){
+unsigned int memman_free_page_32(struct PAGEMAN32 *man,unsigned int physical_address){
 	int index=physical_address>>12;//得到?的索引
 	if(man->mem_map_base[index]==1){//正在使用
 		man->free_page_num++;

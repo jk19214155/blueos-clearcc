@@ -51,27 +51,27 @@ _add_child_task:
 	pushl	%ebx
 	movl	8(%ebp), %ebx
 	movl	12(%ebp), %ecx
-	movl	266(%ebx), %eax
+	movl	326(%ebx), %eax
 	testl	%eax, %eax
 	jne	L6
-	movl	%ecx, 266(%ebx)
+	movl	%ecx, 326(%ebx)
 L15:
-	movl	%ebx, 270(%ecx)
+	movl	%ebx, 330(%ecx)
 	popl	%ebx
 	popl	%ebp
 	ret
 L6:
 	movl	%eax, %edx
-	cmpl	%eax, 262(%eax)
+	cmpl	%eax, 322(%eax)
 	je	L14
 L12:
-	movl	262(%edx), %edx
-	cmpl	%eax, 262(%edx)
+	movl	322(%edx), %edx
+	cmpl	%eax, 322(%edx)
 	jne	L12
 L14:
-	movl	262(%edx), %eax
-	movl	%eax, 262(%ecx)
-	movl	%ecx, 262(%edx)
+	movl	322(%edx), %eax
+	movl	%eax, 322(%ecx)
+	movl	%ecx, 322(%edx)
 	jmp	L15
 	.balign 2
 .globl _find_child_task
@@ -82,17 +82,17 @@ _find_child_task:
 	pushl	%ebx
 	xorl	%ebx, %ebx
 	movl	8(%ebp), %eax
-	movl	266(%eax), %eax
+	movl	326(%eax), %eax
 	testl	%eax, %eax
 	je	L16
 L26:
 	movl	%eax, %edx
 	movl	%eax, %ecx
 L19:
-	movl	266(%edx), %eax
+	movl	326(%edx), %eax
 	testl	%eax, %eax
 	jne	L26
-	movl	262(%edx), %eax
+	movl	322(%edx), %eax
 	movl	%edx, %ebx
 	cmpl	%ecx, %eax
 	movl	%eax, %edx
@@ -109,28 +109,28 @@ _unlink_task:
 	pushl	%ebp
 	movl	%esp, %ebp
 	movl	8(%ebp), %eax
-	cmpl	$0, 266(%eax)
+	cmpl	$0, 326(%eax)
 	jne	L27
 	movl	%eax, %edx
-	cmpl	%eax, 262(%eax)
+	cmpl	%eax, 322(%eax)
 	je	L38
 L34:
-	movl	262(%edx), %edx
-	cmpl	%eax, 262(%edx)
+	movl	322(%edx), %edx
+	cmpl	%eax, 322(%edx)
 	jne	L34
 L38:
 	cmpl	%eax, %edx
 	je	L40
-	movl	262(%eax), %eax
-	movl	%eax, 262(%edx)
+	movl	322(%eax), %eax
+	movl	%eax, 322(%edx)
 L39:
 	xorl	%eax, %eax
 L27:
 	popl	%ebp
 	ret
 L40:
-	movl	270(%edx), %edx
-	movl	$0, 266(%edx)
+	movl	330(%edx), %edx
+	movl	$0, 326(%edx)
 	jmp	L39
 	.balign 2
 .globl _task_add
@@ -253,13 +253,13 @@ _task_init:
 	pushl	%eax
 	movl	$999, %ebx
 	movl	2551808, %eax
-	pushl	$318093
+	pushl	$398093
 	pushl	8(%ebp)
 	movl	%eax, -16(%ebp)
 	call	_memman_alloc_4k
 	pushl	$0
 	movl	%eax, _taskctl
-	pushl	$78
+	pushl	$98
 	pushl	$7
 	pushl	%eax
 	pushl	$2523136
@@ -273,10 +273,10 @@ L83:
 	leal	4080(%edx), %ecx
 	movl	%eax, 13(%ecx)
 	leal	8024(%esi), %eax
-	movl	%eax, 4253(%edx)
+	movl	%eax, 4281(%edx)
 	leal	2555928(%esi), %eax
 	movl	$0, 17(%ecx)
-	addl	$4157, %edx
+	addl	$4185, %edx
 	pushl	$137
 	pushl	%edx
 	pushl	$103
@@ -285,7 +285,7 @@ L83:
 	movl	_taskctl, %eax
 	addl	%edi, %eax
 	pushl	$130
-	addl	$4261, %eax
+	addl	$4289, %eax
 	pushl	%eax
 	leal	2563928(%esi), %eax
 	pushl	$31
@@ -294,8 +294,8 @@ L83:
 	call	_set_segmdesc
 	addl	$32, %esp
 	movl	_taskctl, %eax
-	movl	$LC0, 4403(%eax,%edi)
-	addl	$314, %edi
+	movl	$LC0, 4463(%eax,%edi)
+	addl	$394, %edi
 	decl	%ebx
 	jns	L83
 	xorl	%edx, %edx
@@ -311,13 +311,13 @@ L88:
 	movl	$0, _zero_task_lock
 	call	_task_alloc
 	movl	%eax, %esi
-	movl	$2523136, 92(%eax)
+	movl	$2523136, 120(%eax)
 	movl	8(%ebp), %eax
-	movl	%eax, 278(%esi)
+	movl	%eax, 338(%esi)
 	movl	$2, 4(%esi)
 	movl	$2, 12(%esi)
 	movl	$0, 8(%esi)
-	movl	$LC1, 310(%esi)
+	movl	$LC1, 370(%esi)
 	pushl	%esi
 	call	_task_add
 	call	_task_switchsub
@@ -334,11 +334,11 @@ L88:
 	movl	%eax, %ebx
 	call	_memman_alloc_4k
 	addl	$65536, %eax
-	movl	%eax, 120(%ebx)
+	movl	%eax, 148(%ebx)
 	pushl	$0
 	pushl	$16
 	pushl	$7
-	movl	120(%ebx), %eax
+	movl	148(%ebx), %eax
 	subl	$65536, %eax
 	pushl	%eax
 	pushl	$2523136
@@ -346,19 +346,19 @@ L88:
 	call	_memmam_link_page_32_m
 	addl	$48, %esp
 	call	_get_this
-	movl	%ebx, 262(%ebx)
+	movl	%ebx, 322(%ebx)
 	addl	$_task_idle, %eax
-	movl	%eax, 96(%ebx)
-	movl	$8, 136(%ebx)
-	movl	$16, 140(%ebx)
-	movl	$8, 144(%ebx)
-	movl	$8, 148(%ebx)
-	movl	$8, 152(%ebx)
-	movl	$8, 156(%ebx)
-	movl	$2523136, 92(%ebx)
-	movl	$0, 270(%ebx)
-	movl	$0, 266(%ebx)
-	movl	$LC2, 310(%ebx)
+	movl	%eax, 124(%ebx)
+	movl	$8, 164(%ebx)
+	movl	$16, 168(%ebx)
+	movl	$8, 172(%ebx)
+	movl	$8, 176(%ebx)
+	movl	$8, 180(%ebx)
+	movl	$8, 184(%ebx)
+	movl	$2523136, 120(%ebx)
+	movl	$0, 330(%ebx)
+	movl	$0, 326(%ebx)
+	movl	$LC2, 370(%ebx)
 	pushl	$1
 	pushl	$9
 	pushl	%ebx
@@ -389,7 +389,7 @@ L99:
 	cmpl	$0, 4097(%eax)
 	je	L102
 	incl	%ebx
-	addl	$314, %edx
+	addl	$394, %edx
 	cmpl	$999, %ebx
 	jle	L99
 	xorl	%eax, %eax
@@ -400,38 +400,39 @@ L93:
 L102:
 	addl	$4093, %eax
 	movl	$1, 4(%eax)
-	movl	$514, 100(%eax)
-	movl	$0, 104(%eax)
-	movl	$0, 108(%eax)
-	movl	$0, 112(%eax)
-	movl	$0, 116(%eax)
-	movl	$0, 124(%eax)
-	movl	$0, 128(%eax)
+	movl	$514, 128(%eax)
 	movl	$0, 132(%eax)
 	movl	$0, 136(%eax)
-	movl	$0, 148(%eax)
+	movl	$0, 140(%eax)
+	movl	$0, 144(%eax)
 	movl	$0, 152(%eax)
 	movl	$0, 156(%eax)
-	movl	$1073741824, 164(%eax)
-	movl	$0, 72(%eax)
-	movl	$0, 92(%eax)
-	movl	$0, 274(%eax)
+	movl	$0, 160(%eax)
+	movl	$0, 164(%eax)
+	movl	$0, 176(%eax)
+	movl	$0, 180(%eax)
+	movl	$0, 184(%eax)
+	movl	$1073741824, 192(%eax)
+	movl	$0, 100(%eax)
+	movl	$0, 120(%eax)
+	movl	$0, 334(%eax)
 	movl	5(%ecx), %edx
-	movl	%eax, 262(%eax)
-	movl	%edx, 294(%eax)
+	movl	%eax, 322(%eax)
+	movl	%edx, 354(%eax)
 	movl	9(%ecx), %edx
 	incl	5(%ecx)
-	movl	%edx, 298(%eax)
+	movl	%edx, 358(%eax)
 	incl	9(%ecx)
-	movl	$0, 270(%eax)
-	movl	$0, 266(%eax)
-	movl	$0, 282(%eax)
-	movl	$0, 286(%eax)
-	movl	$0, 290(%eax)
-	movl	$0, 56(%eax)
-	movl	$0, 52(%eax)
-	movl	$0, 302(%eax)
-	movl	$0, 306(%eax)
+	movl	$0, 330(%eax)
+	movl	$0, 326(%eax)
+	movl	$0, 342(%eax)
+	movl	$0, 346(%eax)
+	movl	$0, 350(%eax)
+	movl	$0, 84(%eax)
+	movl	$0, 80(%eax)
+	movl	$0, 362(%eax)
+	movl	$0, 366(%eax)
+	movl	$0, 374(%eax)
 	jmp	L93
 	.balign 2
 .globl _task_run
@@ -588,12 +589,12 @@ _task_get_msg:
 	orl	$-1, %eax
 	movl	%esp, %ebp
 	movl	8(%ebp), %ecx
-	movl	52(%ecx), %edx
+	movl	80(%ecx), %edx
 	testl	%edx, %edx
 	je	L122
 	movl	28(%edx), %eax
-	decl	48(%ecx)
-	movl	%eax, 52(%ecx)
+	decl	76(%ecx)
+	movl	%eax, 80(%ecx)
 	movl	%edx, %eax
 L122:
 	popl	%ebp
@@ -606,7 +607,7 @@ _task_send_msg:
 	movl	%esp, %ebp
 	movl	12(%ebp), %edx
 	movl	16(%ebp), %ecx
-	testb	$1, 56(%edx)
+	testb	$1, 84(%edx)
 	jne	L128
 	orl	$-1, %eax
 L125:
@@ -614,15 +615,15 @@ L125:
 	ret
 L128:
 	movl	8(%ebp), %eax
-	movl	298(%eax), %eax
+	movl	358(%eax), %eax
 	movl	%eax, 20(%ecx)
-	movl	298(%edx), %eax
+	movl	358(%edx), %eax
 	movl	%eax, 20(%ecx)
-	movl	52(%edx), %eax
+	movl	80(%edx), %eax
 	movl	%eax, 28(%ecx)
 	leal	16(%edx), %eax
-	movl	%ecx, 52(%edx)
-	pushl	44(%edx)
+	movl	%ecx, 80(%edx)
+	pushl	72(%edx)
 	pushl	%eax
 	call	_fifo32_put
 	xorl	%eax, %eax
@@ -635,11 +636,11 @@ _task_msg_init:
 	movl	%esp, %ebp
 	movl	8(%ebp), %eax
 	movl	12(%ebp), %edx
-	movl	%edx, 44(%eax)
-	movl	$0, 48(%eax)
-	movl	$1, 56(%eax)
-	movl	$0, 60(%eax)
-	movl	$0, 52(%eax)
+	movl	%edx, 72(%eax)
+	movl	$0, 76(%eax)
+	movl	$1, 84(%eax)
+	movl	$0, 88(%eax)
+	movl	$0, 80(%eax)
 	popl	%ebp
 	ret
 .globl _task_timer

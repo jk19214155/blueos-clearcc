@@ -42,9 +42,9 @@ void console_task(struct SHEET *sheet, int memtotal)
 	task->cons = &cons;
 	task->cmdline = cmdline;
 	if (cons.sht != 0) {
-		cons.timer = timer_alloc();
+		cons.timer = timer_alloc(0);
 		timer_init(cons.timer, &task->fifo, 1);
-		timer_settime(cons.timer, 50);
+		timer_settime(0,cons.timer, timer_get_fps(0)/2 ,0);
 	}
 	//file_readfat(fat, (unsigned char *) (ADR_DISKIMG + 0x000200));
 	for (i = 0; i < 8; i++) {
@@ -79,6 +79,11 @@ void console_task(struct SHEET *sheet, int memtotal)
 	//(int*)(0x0026f038)=num;
 	/* プロンプト表示 */
 	cons_putchar(&cons, '>', 1);
+	/*启用鼠标点击事件*/
+	task->fifo32_mouse_event=0x20000000;
+	task->mouse_x=0;
+	task->mouse_y=0;
+	task->mouse_btn=0;
 	for (;;) {
 		io_cli();
 		if (fifo32_status(&task->fifo) == 0) {
@@ -99,32 +104,30 @@ void console_task(struct SHEET *sheet, int memtotal)
 						cons.cur_c = COL8_000000;
 					}
 				}
-				timer_settime(cons.timer, 50);
+				timer_settime(0,cons.timer, timer_get_fps(0)/2 ,0);
 			}
-			if (i == 2) {	/* カーソルON */
+			if (i == 2) {	//光标关闭
 				cons.cur_c = COL8_FFFFFF;
 			}
-			if (i == 3) {	/* カーソルOFF */
+			if (i == 3) {	//光标开启
 				if (cons.sht != 0) {
 					boxfill32(cons.sht->buf, cons.sht->bxsize, COL8_000000,
 						cons.cur_x, cons.cur_y, cons.cur_x + 7, cons.cur_y + 15);
 				}
 				cons.cur_c = -1;
 			}
-			if (i == 4) {	/* コンソールの「×」ボタンクリック */
+			if (i == 4) {	//退出信号
 				cmd_exit(&cons, fat);
 			}
-			if (256 <= i && i <= 511) { /* キーボードデータ（タスクA経由） */
+			if (256 <= i && i <= 511) {//键盘事件
 				if (i == 8 + 256) {
 					/* バックスペース */
 					if (cons.cur_x > 16) {
-						/* カーソルをスペースで消してから、カーソルを1つ戻す */
 						cons_putchar(&cons, ' ', 0);
 						cons.cur_x -= 8;
 					}
 				} else if (i == 10 + 256) {
 					/* Enter */
-					/* カーソルをスペースで消してから改行する */
 					cons_putchar(&cons, ' ', 0);
 					cmdline[cons.cur_x / 8 - 2] = 0;
 					cons_newline(&cons);
@@ -132,18 +135,24 @@ void console_task(struct SHEET *sheet, int memtotal)
 					if (cons.sht == 0) {
 						cmd_exit(&cons, fat);
 					}
-					/* プロンプト表示 */
+					//显示提示符
 					cons_putchar(&cons, '>', 1);
 				} else {
 					/* 一般文字 */
 					if (cons.cur_x < 240) {
-						/* 一文字表示してから、カーソルを1つ進める */
 						cmdline[cons.cur_x / 8 - 2] = i - 256;
 						cons_putchar(&cons, i - 256, 1);
 					}
 				}
 			}
-			/* カーソル再表示 */
+			if(i==task->fifo32_mouse_event){//获得了鼠标事件
+				MOUSESTATUS* mouse_status=fifo_mouse_get(&(task->fifom));
+				task->mouse_x=mouse_status->x;
+				task->mouse_y=mouse_status->y;
+				task->mouse_btn=mouse_status->btn;
+				task->sheet_mouse_on=mouse_status->sht;
+			}
+			//光标的重新显示
 			if (cons.sht != 0) {
 				if (cons.cur_c >= 0) {
 					boxfill32(cons.sht->buf, cons.sht->bxsize, cons.cur_c, 
@@ -183,7 +192,7 @@ void cons_putchar(struct CONSOLE *cons, int chr, char move)
 			putfonts8_asc_sht32(cons->sht, cons->cur_x, cons->cur_y, COL8_FFFFFF, COL8_000000, s, 1);
 		}
 		if (move != 0) {
-			/* moveが0のときはカーソルを進めない */
+			/* 当移动量为0时,不移动光标 */
 			cons->cur_x += 8;
 			if (cons->cur_x >= 8 + 1024) {//输出超界
 				cons_newline(cons);//换行
@@ -198,18 +207,18 @@ void cons_newline(struct CONSOLE *cons)
 	int x, y;
 	struct SHEET *sheet = cons->sht;
 	struct TASK *task = task_now();
-	if (cons->cur_y < 28 + 700) {//如果在界限内则直接换行
+	if (cons->cur_y < 28 + 600) {//如果在界限内则直接换行
 		cons->cur_y += 16;
 	} else {
 		//滚动屏幕
 		if (sheet != 0) {
-			for (y = 28; y < 28 + 112; y++) {
-				for (x = 8; x < 8 + 240; x++) {
+			for (y = 28; y < 28 + (768-2*28) - 16; y++) {
+				for (x = 8; x < 8 + 1024; x++) {
 					sheet->buf32[x + y * sheet->bxsize] = sheet->buf32[x + (y + 16) * sheet->bxsize];
 				}
 			}
-			for (y = 28 + 112; y < 28 + 128; y++) {
-				for (x = 8; x < 8 + 240; x++) {
+			for (y = 28 + (768-2*28)-16; y < 28 + (768-2*28); y++) {
+				for (x = 8; x < 8 + 1024; x++) {
 					sheet->buf32[x + y * sheet->bxsize] = COL8_000000;
 				}
 			}
@@ -246,11 +255,11 @@ void cons_runcmd(char *cmdline, struct CONSOLE *cons, int *fat, int memtotal)
 {
 	if (strcmp(cmdline, "mem") == 0 && cons->sht != 0) {
 		cmd_mem(cons, memtotal);
-	} else if (strcmp(cmdline, "cls") == 0 && cons->sht != 0) {
+	} else if (asm_sse_strcmp(cmdline, "cls",3) == 16 && cons->sht != 0) {
 		cmd_cls(cons);
-	} else if (strcmp(cmdline, "dir") == 0 && cons->sht != 0) {
+	} else if (asm_sse_strcmp(cmdline, "dir",3) == 16 && cons->sht != 0) {
 		cmd_dir(cons);
-	} else if (strcmp(cmdline, "exit") == 0) {
+	} else if (asm_sse_strcmp(cmdline, "exit",4) == 16) {
 		cmd_exit(cons, fat);
 	} else if (strncmp(cmdline, "start ", 6) == 0) {
 		cmd_start(cons, cmdline, memtotal);
@@ -258,18 +267,18 @@ void cons_runcmd(char *cmdline, struct CONSOLE *cons, int *fat, int memtotal)
 		cmd_ncst(cons, cmdline, memtotal);
 	} else if (strncmp(cmdline, "langmode ", 9) == 0) {
 		cmd_langmode(cons, cmdline);
-	} else if (strcmp(cmdline, "reload") == 0) {
+	} else if (asm_sse_strcmp(cmdline, "reload",6) == 16) {
 		sys_reboot();
-	} else if (strcmp(cmdline, "shutdown") == 0) {
+	} else if (asm_sse_strcmp(cmdline, "shutdown",8) == 16) {
 		struct FIFO32 *fifo = &system_task->fifo;//intel南桥的关机方法
 		fifo32_put(fifo,8);
-	} else if (strcmp(cmdline, "rdrand") ==0){
+	} else if (asm_sse_strcmp(cmdline, "rdrand",6) ==16){
 		cmd_rdrand(cons, cmdline);
 	}
-	else if (strcmp(cmdline,"desktop") ==0){//开启桌面
+	else if (asm_sse_strcmp(cmdline,"desktop",7) ==16){//开启桌面
 		desktop_start();
 	}
-	else if (strcmp(cmdline,"fdir") ==0){//显示所有文件
+	else if (asm_sse_strcmp(cmdline,"fdir",4) ==16){//显示所有文件
 		cmd_fdir(cons);
 	}
 	else if (strncmp(cmdline,"cd ",3) ==0){//切换目录
@@ -277,6 +286,9 @@ void cons_runcmd(char *cmdline, struct CONSOLE *cons, int *fat, int memtotal)
 	}
 	else if (strncmp(cmdline,"task ",4) ==0){//切换目录
 		cmd_task(cons,cmdline);
+	}
+	else if (asm_sse_strcmp(cmdline,"12341234",4) == 16){
+		cons_putstr0(cons, "sse OK.\n\n");
 	}
 	else if (cmdline[0] != 0) {
 		if (cmd_app(cons, fat, cmdline) == 0) {
@@ -354,21 +366,45 @@ void find_intel_gpu(struct CONSOLE *cons){
 				// 选择要访问的总线和设备
 				unsigned int id = (bus<<16) | (dev<<11) | (1<<31) | (func<<8);
 				io_out32(pci_config_space,id); 
-				
-				// 读取PCI类代码,判断是否是显卡
 				unsigned int u = io_in32(pci_config_space+4);
 				unsigned short vendor_id =u&0xffff;
 				if(vendor_id==0xffff){//设备不存在
 					continue;
 				}
-				sprintf(text_buff,"Found DEVICE %d-%d-%d: %x\n", bus,dev,func, u);
+				sprintf(text_buff,"Found DEVICE %d-%d-%d: %x ", bus,dev,func, u);
 				cons_putstr0(cons,text_buff);
-				//判断是不是显卡
+
 				io_out32(pci_config_space,id|0x08);
 				u = io_in32(pci_config_space+4);
-				sprintf(text_buff,"Found DEVICE class %x\n", u);
+				sprintf(text_buff,"class %x ", u);
 				cons_putstr0(cons,text_buff);
-				
+				if(1){
+					io_out32(pci_config_space,id|0x10);
+					u = io_in32(pci_config_space+4);
+					sprintf(text_buff,"BAR0 %x ", u);
+					cons_putstr0(cons,text_buff);
+					
+					io_out32(pci_config_space,id|0x14);
+					u = io_in32(pci_config_space+4);
+					sprintf(text_buff,"BAR1 %x \n", u);
+					cons_putstr0(cons,text_buff);
+					
+					io_out32(pci_config_space, id|0x18); 
+					u = io_in32(pci_config_space+4);
+					sprintf(text_buff,"BAR2 %x ", u);
+					cons_putstr0(cons,text_buff); 
+					
+					io_out32(pci_config_space, id|0x1c); 
+					u = io_in32(pci_config_space+4);
+					sprintf(text_buff,"BAR3 %x ", u);
+					cons_putstr0(cons,text_buff); 
+
+					io_out32(pci_config_space, id|0x20); 
+					u = io_in32(pci_config_space+4);
+					sprintf(text_buff,"BAR4 %x ", u);
+					cons_putstr0(cons,text_buff); 
+				}
+				cons_putstr0(cons,"\n");
 			}
         }
     }
@@ -412,7 +448,7 @@ void cmd_dir(struct CONSOLE *cons)
 	//struct FILEINFO *finfo = (struct FILEINFO *) (ADR_DISKIMG + 0x002600);
 	struct FILEINFO *finfo=task_now()->root_dir_addr;
 	int i, j;
-	char s[30];
+	char s[60];
 	if(task_now()->root_dir_addr==0){//文件系统没有准备好
 		cons_putstr0(cons, "file system not ready\n");
 		return;
@@ -423,7 +459,14 @@ void cmd_dir(struct CONSOLE *cons)
 		}
 		if (finfo[i].name[0] != 0xe5) {
 			if ((finfo[i].type & 0x18) == 0) {
-				sprintf(s, "filename.ext   %7d\n", finfo[i].size);
+				int year,month,date;
+				year= (finfo[i].date)>>9;
+				month= ((finfo[i].date)>>5)&0x0f;
+				date=(finfo[i].date)&0x1f;
+				int hour=(finfo[i].time)>>11;
+				int min=((finfo[i].time)>>5)&0x3f;
+				int second=(finfo[i].time)&0x1f;
+				sprintf(s, "filename.ext   %7d %5dY%2dM%2dD %2d:%2d:%2d\n", finfo[i].size,year,month,date,hour,min,second);
 				for (j = 0; j < 8; j++) {
 					s[j] = finfo[i].name[j];
 				}
@@ -454,13 +497,52 @@ void cmd_fdir(struct CONSOLE *cons)
 		}
 		if (finfo[i].name[0] != 0xe5) {
 			if (finfo[i].type  != 0x0f) {
-				sprintf(s, "filename.ext   %7d:%5d:%5x\n", finfo[i].size,finfo[i].clustno,finfo[i].type);
+				sprintf(s, "filename.ext   %7d:%5d:%5x ", finfo[i].size,finfo[i].clustno,finfo[i].type);
 				for (j = 0; j < 8; j++) {
 					s[j] = finfo[i].name[j];
 				}
 				s[ 9] = finfo[i].ext[0];
 				s[10] = finfo[i].ext[1];
 				s[11] = finfo[i].ext[2];
+				cons_putstr0(cons, s);
+				if((finfo[i].type&0x01)!=0){
+					s[0]='R';
+				}
+				else{
+					s[0]='-';
+				}
+				if((finfo[i].type&0x02)!=0){
+					s[1]='H';
+				}
+				else{
+					s[1]='-';
+				}
+				if((finfo[i].type&0x04)!=0){
+					s[2]='S';
+				}
+				else{
+					s[2]='-';
+				}
+				if((finfo[i].type&0x08)!=0){
+					s[3]='V';
+				}
+				else{
+					s[3]='-';
+				}
+				if((finfo[i].type&0x10)!=0){
+					s[4]='D';
+				}
+				else{
+					s[4]='-';
+				}
+				if((finfo[i].type&0x20)!=0){
+					s[5]='A';
+				}
+				else{
+					s[5]='-';
+				}
+				s[6]='\n';
+				s[7]=0;
 				cons_putstr0(cons, s);
 			}
 		}
@@ -515,7 +597,7 @@ void cmd_exit(struct CONSOLE *cons, int *fat)
 	struct task_abort struct_task_abort;
 	int i;
 	if (cons->sht != 0) {
-		timer_cancel(cons->timer);
+		timer_cancel(0,cons->timer);
 	}
 	//释放fat
 	//for(i=0;i<3;i++){
@@ -666,7 +748,7 @@ int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline)
 					task->fhandle[i].buf = 0;
 				}
 			}
-			timer_cancelall(&task->fifo);
+			timer_cancelall(0,&task->fifo);
 			for(i=0;i<(segsiz+0xfff)>>12;i++){
 				void* po=pageman_unlink_page_32(pageman,(int)q+0x1000*i,1);
 				//memman_free_page_32(pageman,po);
@@ -706,7 +788,7 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 	struct FILEHANDLE *fh;
 	struct MEMMAN *memman = task_now()->memman;
 	struct MEMMAN *memman_os=(struct MEMMAN *) MEMMAN_ADDR;
-	cons_putstr0(cons,"sys api call \n");
+	//cons_putstr0(cons,"sys api call \n");
 	if (edx == 1) {//命令行输出字符
 		cons_putchar(cons, eax & 0xff, 1);
 	} else if (edx == 2) {//命令行输出字符串0结尾
@@ -801,36 +883,42 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 			io_cli();
 			if (fifo32_status(&task->fifo) == 0) {
 				if (eax != 0) {
-					task_sleep(task);	/* FIFOが空なので寝て待つ */
+					task_sleep(task);	/* FIFO为空则等待 */
 				} else {
 					io_sti();
-					reg[7] = -1;
+					reg[7] = -1;//没有数据
 					return 0;
 				}
 			}
 			i = fifo32_get(&task->fifo);
 			io_sti();
-			if (i <= 1 && cons->sht != 0) { /* カーソル用タイマ */
-				/* アプリ実行中はカーソルが出ないので、いつも次は表示用の1を注文しておく */
-				timer_init(cons->timer, &task->fifo, 1); /* 次は1を */
-				timer_settime(cons->timer, 50);
+			if (i <= 1 && cons->sht != 0) { /* 光标用定时器*/
+				timer_init(cons->timer, &task->fifo, 1);
+				timer_settime(0,cons->timer, timer_get_fps(0)/2,0);
 			}
-			if (i == 2) {	/* カーソルON */
+			if (i == 2) {	/* 光标开启 */
 				cons->cur_c = COL8_FFFFFF;
 			}
-			if (i == 3) {	/* カーソルOFF */
+			if (i == 3) {	/* 光标关闭*/
 				cons->cur_c = -1;
 			}
-			if (i == 4) {	/* コンソールだけを閉じる */
-				timer_cancel(cons->timer);
+			if (i == 4) {	
+				timer_cancel(0,cons->timer);
 				io_cli();
 				fifo32_put(sys_fifo, cons->sht->sid + 2024);	/* 2024～2279 */
 				cons->sht = 0;
 				io_sti();
 			}
-			if (i >= 256) { /* キーボードデータ（タスクA経由）など */
+			if (i >= 256 && i<=511) { /* キーボードデータ（タスクA経由）など */
 				reg[7] = i - 256;
 				return 0;
+			}
+			if(i==task->fifo32_mouse_event){//获得了鼠标事件
+				MOUSESTATUS* mouse_status=fifo_mouse_get(&(task->fifom));
+				task->mouse_x=mouse_status->x;
+				task->mouse_y=mouse_status->y;
+				task->mouse_btn=mouse_status->btn;
+				task->sheet_mouse_on=mouse_status->sht;
 			}
 		}
 	} else if (edx == 16) {//获取计时器
@@ -838,12 +926,12 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 		/*if(task->timerctl==0){
 			task->timerctl=0;
 		}*/
-		reg[7] = (int) timer_alloc();
+		reg[7] = (int) timer_alloc(0);
 		((struct TIMER *) reg[7])->flags2 = 1;	/* 自動キャンセル有効 */
 	} else if (edx == 17) {//初始化计时器
 		timer_init((struct TIMER *) ebx, &task->fifo, eax + 256);
 	} else if (edx == 18) {//计时器定时
-		timer_settime((struct TIMER *) ebx, eax);
+		timer_settime(0,(struct TIMER *) ebx, (timer_get_fps(0)*eax)/100,0);
 	} else if (edx == 19) {//计时器释放
 		timer_free((struct TIMER *) ebx);
 	} else if (edx == 20) {//播放声音(蜂鸣器发声)
@@ -946,8 +1034,61 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 		reg[7] = i;
 	} else if (edx == 27) {//设置语言
 		reg[7] = task->langmode;
-	} else if (edx == 28) {//获取鼠标
-		
+	} else if (edx == 28) {//获取按键加强版
+		//返回值：eax ==-1 无数据
+		//eax == 0 键盘数据 数据在 edx
+		//eax ==1 鼠标数据 x坐标在esi y坐标在edi 按键状态在 edx 命中的图层
+		for (;;) {
+			io_cli();
+			if (fifo32_status(&task->fifo) == 0) {
+				if (eax != 0) {
+					task_sleep(task);	/* FIFOが空なので寝て待つ */
+				} else {
+					io_sti();
+					reg[7] = -1;
+					return 0;
+				}
+			}
+			i = fifo32_get(&task->fifo);
+			io_sti();
+			if (i <= 1 && cons->sht != 0) { 
+				timer_init(cons->timer, &task->fifo, 1); 
+				timer_settime(0,cons->timer, timer_get_fps(0)/2,0);
+			}
+			if (i == 2) {	//光标开启
+				cons->cur_c = COL8_FFFFFF;
+			}
+			if (i == 3) {	//光标关闭
+				cons->cur_c = -1;
+			}
+			if (i == 4) {	//关闭信号
+				timer_cancel(0,cons->timer);
+				io_cli();
+				fifo32_put(sys_fifo, cons->sht->sid + 2024);	/* 2024～2279 */
+				cons->sht = 0;
+				io_sti();
+			}
+			if (i >= 256 && i<=511) { /* キーボードデータ（タスクA経由）など */
+				reg[7] = 0;//eax=0 键盘事件
+				reg[5] = i-256;//edx=字符编码
+				return 0;//返回键盘事件
+			}
+			if(i==task->fifo32_mouse_event){//获得了鼠标事件
+				MOUSESTATUS* mouse_status=fifo_mouse_get(&(task->fifom));
+				task->mouse_x=mouse_status->x;
+				task->mouse_y=mouse_status->y;
+				task->mouse_btn=mouse_status->btn;
+				task->sheet_mouse_on=mouse_status->sht;
+				reg[7]=1;//eax=1 鼠标事件
+				reg[5]=mouse_status->btn;//edx=mouse->btn
+				reg[1]=mouse_status->x;//esi=mouse->x
+				reg[0]=mouse_status->y;//edi=mouse->y
+				//reg[1]==mouse_status->x;//esi=mouse->x
+				//reg[0]==1314520;//edi=mouse->y
+				reg[4]=mouse_status->sht;//ebx==mouse->sht
+				return 0;//0返回鼠标事件
+			}
+		}
 	}
 	return 0;
 }
@@ -983,6 +1124,7 @@ int *inthandler0d(int *esp)
 	cons_putstr0(cons, s);
 	return &(task->tss.esp0);	/* 異常終了させる */
 }
+
 
 void hrb_api_linewin(struct SHEET *sht, int x0, int y0, int x1, int y1, int col)
 {

@@ -3,10 +3,29 @@
      3 00000000                                 [BITS 32]
      4 00000000                                 [FILE "api028.nas"]
      5 00000000                                 
-     6 00000000                                 		GLOBAL	_api_getlang
+     6 00000000                                 		GLOBAL	_api_getevent
      7 00000000                                 
      8                                          [SECTION .text]
      9 00000000                                 
-    10 00000000                                 _api_sysenter:		; int api_getlang(void);
-    11 00000000 0F 34                           		db 0x0f,0x34 ;sysenter
-    12 00000002 C3                              		RET
+    10 00000000                                 _api_getevent:		; //_api_getevent(int* regs);
+    11 00000000 50                              		push eax
+    12 00000001 8B 44 24 08                     		mov eax,[esp+8];获取regs
+    13 00000005 60                              		pushad ;eax最先入栈
+    14 00000006 50                              		push eax
+    15 00000007 BA 0000001C                     		mov edx,28
+    16 0000000C CD 40                           		int 0x40
+    17 0000000E                                 		;交换eax的值
+    18 0000000E 33 04 24                        		xor eax,[esp]
+    19 00000011 31 04 24                        		xor [esp],eax
+    20 00000014 33 04 24                        		xor eax,[esp]
+    21 00000017 89 48 04                        		mov [eax+4],ecx
+    22 0000001A 89 50 08                        		mov [eax+8],edx
+    23 0000001D 89 58 0C                        		mov [eax+12],ebx
+    24 00000020 89 70 10                        		mov [eax+16],esi
+    25 00000023 89 78 14                        		mov [eax+20],edi
+    26 00000026 89 68 18                        		mov [eax+24],ebp
+    27 00000029 5B                              		pop ebx
+    28 0000002A 89 18                           		mov [eax],ebx
+    29 0000002C 61                              		popad
+    30 0000002D 58                              		pop eax
+    31 0000002E C3                              		RET

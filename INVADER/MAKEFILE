@@ -1,5 +1,5 @@
 APP      = invader
-STACK    = 90k
+STACK    = 512k
 MALLOC   = 0k
 
 include ../app_make.txt

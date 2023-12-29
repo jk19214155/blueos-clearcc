@@ -1,15 +1,17 @@
 OBJS_BOOTPACK = bootpack.obj naskfunc.obj hankaku.obj graphic.obj dsctbl.obj \
 		int.obj fifo.obj keyboard.obj mouse.obj memory.obj sheet.obj timer.obj \
-		mtask.obj window.obj console.obj file.obj tek.obj dav.obj desktop.obj view.obj system.obj acpi.obj bmp.obj bmp2.obj dmg.obj drvier.obj
+		mtask.obj window.obj console.obj file.obj tek.obj dav.obj desktop.obj view.obj system.obj acpi.obj bmp.obj bmp2.obj dmg.obj drvier.obj \
+		fifo_mouse.obj com.obj vmx.obj ahci.obj pcie.obj sse.obj
 
 TOOLPATH = ../../z_tools/
 INCPATH  = ../../z_tools/haribote/
 
 MAKE     = $(TOOLPATH)make.exe -r
 NASK     = $(TOOLPATH)nask.exe
+NASM     = $(TOOLPATH)nasm.exe
 GCC      = $(TOOLPATH)MinGW/bin/gcc.exe -I$(INCPATH) -m32  -nostdlib -fno-builtin -ffreestanding \
 			-fno-stack-protector -Os -fno-pic -fno-pie -fno-asynchronous-unwind-tables  \
-			-fomit-frame-pointer -O0 -finput-charset=UTF-8 -w -c 
+			-fomit-frame-pointer -O0 -finput-charset=UTF-8 -w -c
 CC1      = $(TOOLPATH)cc1.exe -I$(INCPATH) -Os -Wall -quiet
 GAS2NASK = $(TOOLPATH)gas2nask.exe -a
 OBJ2BIM  = $(TOOLPATH)obj2bim.exe
@@ -35,7 +37,8 @@ ipl09.bin : ipl09.nas makefile
 	$(NASK) ipl09.nas ipl09.bin ipl09.lst
 
 asmhead.bin : asmhead.nas makefile
-	$(NASK) asmhead.nas asmhead.bin asmhead.lst
+#	$(NASK) asmhead.nas asmhead.bin asmhead.lst
+	$(NASM) asmhead.nas -f bin -o asmhead.bin -l asmhead.lst
 
 hankaku.bin : hankaku.txt makefile
 	$(MAKEFONT) hankaku.txt hankaku.bin
@@ -54,6 +57,9 @@ bootpack.hrb : bootpack.bim makefile
 haribote.sys : asmhead.bin bootpack.hrb makefile
 	copy /B asmhead.bin+bootpack.hrb haribote.sys
 
+naskfunc.obj : naskfunc.nas makefile
+	$(NASM) naskfunc.nas -f coff -o naskfunc.obj -l naskfunc.lst
+
 # ˆê”Ê‹K‘¥
 
 %.gas : %.c bootpack.h makefile
@@ -62,9 +68,11 @@ haribote.sys : asmhead.bin bootpack.hrb makefile
 %.nas : %.gas makefile
 	$(GAS2NASK) $*.gas $*.nas
 
-%.obj : %.nas makefile bootpack.h
-	$(NASK) $*.nas $*.obj $*.lst
-#	$(GCC) $*.c -o $*.obj
+#%.obj : %.nas makefile bootpack.h
+%.obj : %.c makefile bootpack.h
+#	$(NASK) $*.nas $*.obj $*.lst
+#	$(NASM) -f elf32 $*.nas -o $*.obj  -l $*.lst
+	$(GCC) $*.c -o $*.obj -l $*.lst
 
 # ƒRƒ}ƒ“ƒh
 

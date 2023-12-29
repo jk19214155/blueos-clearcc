@@ -1,67 +1,82 @@
-/* ƒ}ƒEƒXŠÖŒW */
+/* ãƒã‚¦ã‚¹é–¢ä¿‚ */
 
 #include "bootpack.h"
 
-struct FIFO32 *mousefifo;
-int mousedata0;
-
+static struct FIFO32 *mousefifo;
+static int mousedata0;
+static char buff[256];
 void inthandler2c(int *esp)
-/* PS/2ƒ}ƒEƒX‚©‚ç‚ÌŠ„‚è‚İ */
+/* PS/2ãƒã‚¦ã‚¹ã‹ã‚‰ã®å‰²ã‚Šè¾¼ã¿ */
 {
 	int data;
-	//io_out8(PIC1_OCW2, 0x64);	/* IRQ-12ó•tŠ®—¹‚ğPIC1‚É’Ê’m */
-	//io_out8(PIC0_OCW2, 0x62);	/* IRQ-02ó•tŠ®—¹‚ğPIC0‚É’Ê’m */
+	//io_out8(PIC1_OCW2, 0x64);	/* IRQ-12å—ä»˜å®Œäº†ã‚’PIC1ã«é€šçŸ¥ */
+	//io_out8(PIC0_OCW2, 0x62);	/* IRQ-02å—ä»˜å®Œäº†ã‚’PIC0ã«é€šçŸ¥ */
 	*(int*)(0xfec00040)=0;
 	*(int*)(0xfee000b0)=0;
 	data = io_in8(PORT_KEYDAT);
 	fifo32_put(mousefifo, data + mousedata0);
+	sprintf(buff,"inthandler2c data: %d\n",data);
+	com_out_string(0x3f8,buff);
+	sprintf(buff,"fifo_sattus: this:%x p:%d q:%d size:%d free:%d task:%x\n",mousefifo,mousefifo->p,mousefifo->q,mousefifo->size,mousefifo->free,mousefifo->task);
+	com_out_string(0x3f8,buff);
 	return;
 }
 
 #define KEYCMD_SENDTO_MOUSE		0xd4
 #define MOUSECMD_ENABLE			0xf4
-
+#define MOUSECMD_ENABLE_WHEEL	0xe8 
 void enable_mouse(struct FIFO32 *fifo, int data0, struct MOUSE_DEC *mdec)
 {
-	/* ‘‚«‚İæ‚ÌFIFOƒoƒbƒtƒ@‚ğ‹L‰¯ */
+	/* æ›¸ãè¾¼ã¿å…ˆã®FIFOãƒãƒƒãƒ•ã‚¡ã‚’è¨˜æ†¶ */
+	sprintf(buff,"enable_mouse fifo: %x\n",fifo);
+	com_out_string(0x3f8,buff);
 	mousefifo = fifo;
 	mousedata0 = data0;
-	/* ƒ}ƒEƒX—LŒø */
+	/* ?ç”¨é¼ ??? */
+	wait_KBC_sendready();
+	io_out8(PORT_KEYCMD, KEYCMD_SENDTO_MOUSE);
+	wait_KBC_sendready();
+	io_out8(PORT_KEYDAT, MOUSECMD_ENABLE_WHEEL); 
+	/* ?ç”¨é¼ ?ç§»? */
 	wait_KBC_sendready();
 	io_out8(PORT_KEYCMD, KEYCMD_SENDTO_MOUSE);
 	wait_KBC_sendready();
 	io_out8(PORT_KEYDAT, MOUSECMD_ENABLE);
-	/* ‚¤‚Ü‚­‚¢‚­‚ÆACK(0xfa)‚ª‘—M‚³‚ê‚Ä‚­‚é */
-	mdec->phase = 0; /* ƒ}ƒEƒX‚Ì0xfa‚ğ‘Ò‚Á‚Ä‚¢‚é’iŠK */
+	/* ã†ã¾ãã„ãã¨ACK(0xfa)ãŒé€ä¿¡ã•ã‚Œã¦ãã‚‹ */
+	mdec->phase = 0; /* ãƒã‚¦ã‚¹ã®0xfaã‚’å¾…ã£ã¦ã„ã‚‹æ®µéš */
 	return;
 }
 
 int mouse_decode(struct MOUSE_DEC *mdec, unsigned char dat)
 {
 	if (mdec->phase == 0) {
-		/* ƒ}ƒEƒX‚Ì0xfa‚ğ‘Ò‚Á‚Ä‚¢‚é’iŠK */
+		/* ãƒã‚¦ã‚¹ã®0xfaã‚’å¾…ã£ã¦ã„ã‚‹æ®µéš */
+		com_out_string(0x3f8,"mouse_decode 0\n");
 		if (dat == 0xfa) {
 			mdec->phase = 1;
 		}
 		return 0;
 	}
 	if (mdec->phase == 1) {
-		/* ƒ}ƒEƒX‚Ì1ƒoƒCƒg–Ú‚ğ‘Ò‚Á‚Ä‚¢‚é’iŠK */
+		/* ãƒã‚¦ã‚¹ã®1ãƒã‚¤ãƒˆç›®ã‚’å¾…ã£ã¦ã„ã‚‹æ®µéš */
+		com_out_string(0x3f8,"mouse_decode 1\n");
 		if ((dat & 0xc8) == 0x08) {
-			/* ³‚µ‚¢1ƒoƒCƒg–Ú‚¾‚Á‚½ */
+			/* æ­£ã—ã„1ãƒã‚¤ãƒˆç›®ã ã£ãŸ */
 			mdec->buf[0] = dat;
 			mdec->phase = 2;
 		}
 		return 0;
 	}
 	if (mdec->phase == 2) {
-		/* ƒ}ƒEƒX‚Ì2ƒoƒCƒg–Ú‚ğ‘Ò‚Á‚Ä‚¢‚é’iŠK */
+		/* ãƒã‚¦ã‚¹ã®2ãƒã‚¤ãƒˆç›®ã‚’å¾…ã£ã¦ã„ã‚‹æ®µéš */
+		com_out_string(0x3f8,"mouse_decode 2\n");
 		mdec->buf[1] = dat;
 		mdec->phase = 3;
 		return 0;
 	}
 	if (mdec->phase == 3) {
-		/* ƒ}ƒEƒX‚Ì3ƒoƒCƒg–Ú‚ğ‘Ò‚Á‚Ä‚¢‚é’iŠK */
+		/* ãƒã‚¦ã‚¹ã®3ãƒã‚¤ãƒˆç›®ã‚’å¾…ã£ã¦ã„ã‚‹æ®µéš */
+		com_out_string(0x3f8,"mouse_decode 3\n");
 		mdec->buf[2] = dat;
 		mdec->phase = 1;
 		mdec->btn = mdec->buf[0] & 0x07;
@@ -73,8 +88,70 @@ int mouse_decode(struct MOUSE_DEC *mdec, unsigned char dat)
 		if ((mdec->buf[0] & 0x20) != 0) {
 			mdec->y |= 0xffffff00;
 		}
-		mdec->y = - mdec->y; /* ƒ}ƒEƒX‚Å‚Íy•ûŒü‚Ì•„†‚ª‰æ–Ê‚Æ”½‘Î */
+		mdec->y = - mdec->y; /* ãƒã‚¦ã‚¹ã§ã¯yæ–¹å‘ã®ç¬¦å·ãŒç”»é¢ã¨åå¯¾ */
 		return 1;
 	}
-	return -1; /* ‚±‚±‚É—ˆ‚é‚±‚Æ‚Í‚È‚¢‚Í‚¸ */
+	return -1; /* ã“ã“ã«æ¥ã‚‹ã“ã¨ã¯ãªã„ã¯ãš */
+}
+
+int mouse_decode_wheel(struct MOUSE_DEC *mdec, unsigned char dat)
+{
+	if (mdec->phase == 0) {
+		/* ãƒã‚¦ã‚¹ã®0xfaã‚’å¾…ã£ã¦ã„ã‚‹æ®µéš */
+		if (dat == 0xfa) {
+			mdec->phase = 1;
+		}
+		return 0;
+	}
+	if (mdec->phase == 1) {
+		/* ãƒã‚¦ã‚¹ã®1ãƒã‚¤ãƒˆç›®ã‚’å¾…ã£ã¦ã„ã‚‹æ®µéš */
+		if ((dat & 0xc8) == 0x08) {
+			/* æ­£ã—ã„1ãƒã‚¤ãƒˆç›®ã ã£ãŸ */
+			mdec->buf[0] = dat;
+			mdec->phase = 2;
+		}
+		return 0;
+	}
+	if (mdec->phase == 2) {
+		/* ãƒã‚¦ã‚¹ã®2ãƒã‚¤ãƒˆç›®ã‚’å¾…ã£ã¦ã„ã‚‹æ®µéš */
+		mdec->buf[1] = dat;
+		mdec->phase = 3;
+		return 0;
+	}
+	//åŸåˆæ‹¦æˆª
+	if (mdec->phase == 3) {
+		/* ãƒã‚¦ã‚¹ã®2ãƒã‚¤ãƒˆç›®ã‚’å¾…ã£ã¦ã„ã‚‹æ®µéš */
+		mdec->buf[2] = dat;
+		mdec->phase = 1;
+		mdec->btn = mdec->buf[0] & 0x07;
+		mdec->x = mdec->buf[1];
+		mdec->y = mdec->buf[2];
+		if ((mdec->buf[0] & 0x10) != 0) {
+			mdec->x |= 0xffffff00;
+		}
+		if ((mdec->buf[0] & 0x20) != 0) {
+			mdec->y |= 0xffffff00;
+		}
+		mdec->y = - mdec->y; /* ãƒã‚¦ã‚¹ã§ã¯yæ–¹å‘ã®ç¬¦å·ãŒç”»é¢ã¨åå¯¾ */
+		mdec->wheel=0;
+		return 0;
+	}
+	if (mdec->phase == 4) {
+		/* ãƒã‚¦ã‚¹ã®3ãƒã‚¤ãƒˆç›®ã‚’å¾…ã£ã¦ã„ã‚‹æ®µéš */
+		mdec->buf[3] = dat;
+		mdec->phase = 1;
+		mdec->btn = mdec->buf[0] & 0x07;
+		mdec->x = mdec->buf[1];
+		mdec->y = mdec->buf[2];
+		if ((mdec->buf[0] & 0x10) != 0) {
+			mdec->x |= 0xffffff00;
+		}
+		if ((mdec->buf[0] & 0x20) != 0) {
+			mdec->y |= 0xffffff00;
+		}
+		mdec->y = - mdec->y; /* ãƒã‚¦ã‚¹ã§ã¯yæ–¹å‘ã®ç¬¦å·ãŒç”»é¢ã¨åå¯¾ */
+		mdec->wheel=mdec->buf[3];
+		return 1;
+	}
+	return -1; /* ã“ã“ã«æ¥ã‚‹ã“ã¨ã¯ãªã„ã¯ãš */
 }

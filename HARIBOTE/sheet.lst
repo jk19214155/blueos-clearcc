@@ -97,7 +97,7 @@
     97 000000EE 83 78 20 00                     	CMP	DWORD [32+EAX],0
     98 000000F2 74 0E                           	JE	L22
     99 000000F4 41                              	INC	ECX
-   100 000000F5 83 C2 54                        	ADD	EDX,84
+   100 000000F5 83 C2 68                        	ADD	EDX,104
    101 000000F8 39 D9                           	CMP	ECX,EBX
    102 000000FA 7C EA                           	JL	L19
    103 000000FC                                 L21:

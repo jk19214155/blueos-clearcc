@@ -508,9 +508,9 @@
    480 000003F4 E8 [00000000]                   	CALL	_boxfill8
    481 000003F9 8B 4D E0                        	MOV	ECX,DWORD [-32+EBP]
    482 000003FC 83 C4 1C                        	ADD	ESP,28
-   483 000003FF 80 B9 000000E0 00               	CMP	BYTE [224+ECX],0
+   483 000003FF 80 B9 000000FC 00               	CMP	BYTE [252+ECX],0
    484 00000406 74 09                           	JE	L57
-   485 00000408 80 B9 000000E1 00               	CMP	BYTE [225+ECX],0
+   485 00000408 80 B9 000000FD 00               	CMP	BYTE [253+ECX],0
    486 0000040F 75 52                           	JNE	L62
    487 00000411                                 L57:
    488 00000411 FF 75 E8                        	PUSH	DWORD [-24+EBP]
@@ -609,9 +609,9 @@
    581 000004F2 FF 36                           	PUSH	DWORD [ESI]
    582 000004F4 E8 [00000000]                   	CALL	_boxfill32
    583 000004F9 83 C4 1C                        	ADD	ESP,28
-   584 000004FC 80 BB 000000E0 00               	CMP	BYTE [224+EBX],0
+   584 000004FC 80 BB 000000FC 00               	CMP	BYTE [252+EBX],0
    585 00000503 74 09                           	JE	L65
-   586 00000505 80 BB 000000E1 00               	CMP	BYTE [225+EBX],0
+   586 00000505 80 BB 000000FD 00               	CMP	BYTE [253+EBX],0
    587 0000050C 75 50                           	JNE	L70
    588 0000050E                                 L65:
    589 0000050E FF 75 E4                        	PUSH	DWORD [-28+EBP]

@@ -184,14 +184,14 @@ struct TASK *task_init(struct MEMMAN *memman)
 	task->tss.cr3= 0x00268000;
 	task->memman=memman;
 	task->flags = 2;	/* 動作中マーク */
-	task->priority = 2; /* 0.02秒 */
+	task->priority = (timer_get_fps(1)/50)>=1?(timer_get_fps(1)/50):1; /* 0.02秒 */
 	task->level = 0;	/* 最高レベル */
 	task->name="mainloop";
 	task_add(task);
 	task_switchsub();	/* レベル設定 */
 	load_tr(task->sel);
-	task_timer = timer_alloc();
-	timer_settime(task_timer, task->priority);
+	task_timer = timer_alloc(1);
+	timer_settime(1,task_timer, task->priority,0);
 	idle = task_alloc();
 	idle->tss.esp = memman_alloc_4k(memman, 64 * 1024) + 64 * 1024;
 	memmam_link_page_32_m(pageman,0x268000,idle->tss.esp- 64 * 1024,7,(64*1024+0xfff)>>12,0);//
@@ -252,6 +252,7 @@ struct TASK *task_alloc(void)
 			task->msg_box.msg=0;
 			task->mem_use=0;//内存占用计数器
 			task->root_dir_addr=0;
+			task->fifo32_mouse_event=0;//不监听鼠标
 			//task->fifo_mouse_updown_listen_num=0;//不监听鼠标事件
 			return task;
 		}
@@ -313,7 +314,7 @@ void task_switch(void)
 		tl = &taskctl->level[taskctl->now_lv];
 	}
 	new_task = tl->tasks[tl->now];
-	timer_settime(task_timer, new_task->priority);
+	timer_settime(1,task_timer, new_task->priority,0);
 	if (new_task != now_task) {
 		farjmp(0, new_task->sel);
 		//task_switch32(old_tss32,&(new_task->tss));

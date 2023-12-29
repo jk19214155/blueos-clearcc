@@ -1,47 +1,56 @@
-     1 00000000                                 ; haribote-os boot asm
-     2 00000000                                 ; TAB=4
-     3 00000000                                 
-     4 00000000                                 [INSTRSET "i486p"]
-     5 00000000                                 
-     6 00000000                                 ; bootpack的启动
-     7 00000000                                 		[bits 32]
-     8 00000000 89 E5                           		mov 	EBP,ESP
-     9 00000002 BB 00280070                     		MOV		EBX,bootpack+0x280000
-    10 00000007 8B 4B 10                        		MOV		ECX,[EBX+16];数据段大小
-    11 0000000A 83 C1 03                        		ADD		ECX,3			; ECX += 3;
-    12 0000000D C1 E9 02                        		SHR		ECX,2			; ECX /= 4;
-    13 00000010 74 0D                           		JZ		skip			; 没有要传送的数据
-    14 00000012 8B 73 14                        		MOV		ESI,[EBX+20]	; 数据开始部分
-    15 00000015 01 DE                           		ADD		ESI,EBX
-    16 00000017 8B 7B 0C                        		MOV		EDI,[EBX+12]	; esp初始值
-    17 0000001A E8 00000013                     		CALL	memcpy
-    18 0000001F                                 		
-    19 0000001F                                 skip:
-    20 0000001F 8B 63 0C                        		MOV		ESP,[EBX+12]	; esp初期値
-    21 00000022 FF 75 04                        		push  	dword[ebp+4]		;传入参数
-    22 00000025 68 00280070                     		push 	dword bootpack+0x280000
-    23 0000002A B8 0028008B                     		mov eax,0x28001b+bootpack;
-    24 0000002F FF D0                           		call	eax
-    25 00000031                                 		;LGDT [GDTR0]
-    26 00000031                                 		;jmp far 0x10:0x1b
-    27 00000031 C3                              		ret
-    28 00000032                                 memcpy:
-    29 00000032 8B 06                           		MOV		EAX,[ESI]
-    30 00000034 83 C6 04                        		ADD		ESI,4
-    31 00000037 89 07                           		MOV		[EDI],EAX
-    32 00000039 83 C7 04                        		ADD		EDI,4
-    33 0000003C 83 E9 01                        		SUB		ECX,1
-    34 0000003F 75 F1                           		JNZ		memcpy			; 引き算した結果が0でなければmemcpyへ
-    35 00000041 C3                              		RET
-    36 00000042 00 00 00 00 00 00 00 00 00 00   		ALIGNB	16
-       0000004C 00 00 00 00 
-    37 00000050                                 GDT0:
-    38 00000050 00 00 00 00 00 00 00 00         		RESB	8				; ヌルセレクタ
-    39 00000058 FFFF 0000 9200 00CF             		DW		0xffff,0x0000,0x9200,0x00cf	; 読み書き可能セグメント32bit
-    40 00000060 FFFF 0000 9A28 0047             		DW		0xffff,0x0000,0x9a28,0x0047	; 実行可能セグメント32bit（bootpack用）
-    41 00000068 0000                            		DW		0
-    42 0000006A                                 GDTR0:
-    43 0000006A 0017                            		DW		8*3-1
-    44 0000006C 00000050                        		DD		GDT0
-    45 00000070                                 		ALIGNB	16
-    46 00000070                                 bootpack:
+     1                                  ; haribote-os boot asm
+     2                                  ; TAB=4
+     3                                  
+     4                                  ;[INSTRSET "i486p"]
+     5                                  
+     6                                  ; bootpack的启动
+     7                                  		bits 32
+     8                                  start:
+     9 00000000 FA                      		cli
+    10 00000001 BB00002800              		mov ebx,0x280000
+    11 00000006 0F0193[7A000000]        		LGDT [GDTR0+ebx]
+    12 0000000D EB00                    		jmp .next
+    13                                  .next:
+    14 0000000F 89E5                    		mov 	EBP,ESP
+    15 00000011 BB[80002800]            		MOV		EBX,bootpack+0x280000
+    16 00000016 8B4B10                  		MOV		ECX,[EBX+16];数据段大小
+    17 00000019 83C103                  		ADD		ECX,3			; ECX += 3;
+    18 0000001C C1E902                  		SHR		ECX,2			; ECX /= 4;
+    19 0000001F 7412                    		JZ		skip			; 没有要传送的数据
+    20 00000021 8B7314                  		MOV		ESI,[EBX+20]	; 数据开始部分
+    21 00000024 01DE                    		ADD		ESI,EBX
+    22 00000026 8B7B0C                  		MOV		EDI,[EBX+12]	; esp初始值
+    23 00000029 E818000000              		CALL	memcpy
+    24                                  		
+    25 0000002E 31C0                    		xor eax,eax
+    26 00000030 0F22E0                  		mov cr4,eax
+    27                                  		
+    28                                  skip:
+    29 00000033 8B630C                  		MOV		ESP,[EBX+12]	; esp初期値
+    30 00000036 FF7504                  		push  	dword[ebp+4]		;传入参数
+    31 00000039 68[80002800]            		push 	dword bootpack+0x280000
+    32 0000003E B8[9B002800]            		mov eax,0x28001b+bootpack
+    33 00000043 FFD0                    		call	eax
+    34                                  		;jmp far 0x10:0x1b
+    35 00000045 C3                      		ret
+    36                                  memcpy:
+    37 00000046 8B06                    		MOV		EAX,[ESI]
+    38 00000048 83C604                  		ADD		ESI,4
+    39 0000004B 8907                    		MOV		[EDI],EAX
+    40 0000004D 83C704                  		ADD		EDI,4
+    41 00000050 83E901                  		SUB		ECX,1
+    42 00000053 75F1                    		JNZ		memcpy			; 引き算した結果が0でなければmemcpyへ
+    43 00000055 C3                      		RET
+    44 00000056 <res 0000000A>          		ALIGNB	16
+    45          ******************       warning: uninitialized space declared in .text section: zeroing
+    46                                  GDT0:
+    47 00000060 <res 00000008>          		RESB	8				; ヌルセレクタ
+    48          ******************       warning: uninitialized space declared in .text section: zeroing
+    49 00000068 FFFF00000092CF00        		DW		0xffff,0x0000,0x9200,0x00cf	; 読み書き可能セグメント32bit
+    50 00000070 FFFF0000289A4700        		DW		0xffff,0x0000,0x9a28,0x0047	; 実行可能セグメント32bit（bootpack用）
+    51 00000078 0000                    		DW		0
+    52                                  GDTR0:
+    53 0000007A 1700                    		DW		8*3-1
+    54 0000007C [60002800]              		DD		GDT0+0x280000
+    55                                  		ALIGNB	16
+    56                                  bootpack:

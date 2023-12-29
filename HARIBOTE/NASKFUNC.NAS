@@ -1,10 +1,10 @@
 ; naskfunc
 ; TAB=4
 
-[FORMAT "WCOFF"]				; オブジェクトファイルを作るモーチE
-[INSTRSET "i486p"]				; 486の命令まで使ぁE��ぁE��ぁE��記述
-[BITS 32]						; 32ビットモード用の機械語を作らせる
-[FILE "naskfunc.nas"]			; ソースファイル名情報
+;FORMAT "WCOFF"				; オブジェクトファイルを作るモーチE
+;INSTRSET "i486p"				; 486の命令まで使ぁE��ぁE��ぁE��記述
+BITS 32						; 32ビットモード用の機械語を作らせる
+;FILE "naskfunc.nas"			; ソースファイル名情報
 
 		GLOBAL	_io_hlt, _io_cli, _io_sti, _io_stihlt
 		GLOBAL	_io_in8,  _io_in16,  _io_in32
@@ -13,24 +13,27 @@
 		GLOBAL	_load_gdtr, _load_idtr
 		GLOBAL	_load_cr0, _store_cr0
 		GLOBAL	_load_cr3, _store_cr3
+		GLOBAL _load_cr4, _store_cr4
 		GLOBAL	_load_tr
 		GLOBAL	_asm_inthandler20, _asm_inthandler21
-		GLOBAL	_asm_inthandler2c, _asm_inthandler0c, _asm_inthandler0e
+		GLOBAL	_asm_inthandler2c, _asm_inthandler0c , _asm_inthandler34, _asm_inthandler0e
 		GLOBAL	_asm_inthandler0d, _asm_end_app
 		GLOBAL	_memtest_sub
 		GLOBAL	_farjmp, _farcall
 		GLOBAL	_asm_hrb_api, _start_app
+		GLOBAL _sys_nop , _asm_sse_strcmp
 		;GLOBAL	_memset,_strcpy,_strcmp
 		global	_support_apic, _io_wrmsr, _io_rdmsr, _test2, _get_lock, _rdrand
 		global	_store_gdt, _store_idt,_sys_reboot,_sys_call,_test3
 		EXTERN	_inthandler20, _inthandler21
 		EXTERN	_inthandler2c, _inthandler0d
-		EXTERN	_inthandler0c, _inthandler0e
+		EXTERN	_inthandler0c, _inthandler0e , _inthandler34
 		EXTERN	_hrb_api
 		tpm_command equ 0xfed40000      ;TPM命令寄存器地址
 		tpm_status equ 0xfed40014       ;TPM状态寄存器地址
+; 一个接收指针参数的 VMXON 指令宏定义
 
-[SECTION .text]
+SECTION .text
 
 _io_hlt:	; void io_hlt(void);
 		HLT
@@ -90,21 +93,27 @@ _io_load_eflags:	; int io_load_eflags(void);
 		RET
 
 _io_store_eflags:	; void io_store_eflags(int eflags);
+		;push eax
 		MOV		EAX,[ESP+4]
 		PUSH	EAX
 		POPFD		; POP EFLAGS とぁE��意味
+		;pop eax
 		RET
 
 _load_gdtr:		; void load_gdtr(int limit, int addr);
+		;push eax
 		MOV		AX,[ESP+4]		; limit
 		MOV		[ESP+6],AX
 		LGDT	[ESP+6]
+		;pop eax
 		RET
 
 _load_idtr:		; void load_idtr(int limit, int addr);
+		;push eax
 		MOV		AX,[ESP+4]		; limit
 		MOV		[ESP+6],AX
 		LIDT	[ESP+6]
+		;pop eax
 		RET
 
 _load_cr0:		; int load_cr0(void);
@@ -112,8 +121,10 @@ _load_cr0:		; int load_cr0(void);
 		RET
 
 _store_cr0:		; void store_cr0(int cr0);
+		;push eax
 		MOV		EAX,[ESP+4]
 		MOV		CR0,EAX
+		;pop eax
 		nop
 		nop
 		RET
@@ -123,14 +134,23 @@ _load_cr3:		; int load_cr3(void);
 		RET
 
 _store_cr3:		; void store_cr3(int cr0);
+		;push eax 
 		MOV		EAX,[ESP+4]
 		MOV		CR3,EAX
+		;pop eax
 		RET
 
 _load_tr:		; void load_tr(int tr);
 		LTR		[ESP+4]			; tr
 		RET
-
+_load_cr4:
+		mov eax,[esp+4]
+		mov cr4,eax
+		ret
+_store_cr4:
+		mov eax,cr4
+		ret
+		
 _asm_inthandler20:
 		PUSH	ES
 		PUSH	DS
@@ -173,6 +193,22 @@ _asm_inthandler2c:
 		MOV		DS,AX
 		MOV		ES,AX
 		CALL	_inthandler2c
+		POP		EAX
+		POPAD
+		POP		DS
+		POP		ES
+		IRETD
+
+_asm_inthandler34:
+		PUSH	ES
+		PUSH	DS
+		PUSHAD
+		MOV		EAX,ESP
+		PUSH	EAX
+		MOV		AX,SS
+		MOV		DS,AX
+		MOV		ES,AX
+		CALL	_inthandler34
 		POP		EAX
 		POPAD
 		POP		DS
@@ -349,7 +385,8 @@ _strcpy:	;void strcpy(char* s,char* t,int longer);
 	mov esi,[esp+4]
 	mov edi,[esp+8]
 	mov ecx,[esp+12]
-	db 0xf3,0xa5;rep movsb
+	;db 0xf3,0xa5;rep movsb
+	rep movsb
 	pop ecx
 	pop edi
 	pop esi
@@ -369,7 +406,8 @@ _memset:	;void memset(char* s,int num,int longer)
 _support_apic: ;int support_apic(void):
 	push edx
 	mov eax,1
-	db 0x0f,0xa2 ;cpuid 
+	;db 0x0f,0xa2 ;cpuid 
+	cpuid
 	bt edx,9
 	setc al
 	movzx eax,al
@@ -380,7 +418,8 @@ _io_rdmsr: ;void io_rdmsr(int* edx,int* eax,int ecx)
 	push ecx
 	push eax
 	mov ecx,[esp+24]
-	db 0x0f,0x32 ;rdmsr
+	;db 0x0f,0x32 ;rdmsr
+	rdmsr
 	mov ecx,[esp+16]
 	mov [ecx],edx
 	mov ecx,[esp+20]
@@ -396,7 +435,8 @@ _io_wrmsr: ;void io_wrmsr(int edx,int eax,int ecx)
 	mov edx,[esp+16]
 	mov eax,[esp+20]
 	mov ecx,[esp+24]
-	db 0x0f,0x30 ;wrmsr
+	;db 0x0f,0x30 ;wrmsr
+	wrmsr
 	pop eax
 	pop ecx
 	pop edx
@@ -471,6 +511,7 @@ _support_rand: ;int support_rand()
 	ret
 _rdrand: ;int rdrand()
 	db 0x0f,0xc7,0xf0 ;rnrand eax
+	;rdrand
 	ret
 _invlpg:
 	ret
@@ -491,3 +532,56 @@ _tpm_wait_for_status:
         cmp eax, 0x00800000
         jne _tpm_wait_for_status
 		ret
+_sys_nop:
+	nop
+	ret
+;unsigned int asm_sse_strcmp(char* str,char* str,unsigned,int longer)
+_asm_sse_strcmp:
+	push ebp
+	mov ebp,esp
+	
+	mov eax,[ebp+8]
+	mov edx,[ebp+12]
+	mov ecx,[ebp+16]
+	push ebx
+	push esi
+	push edi
+	mov esi,eax
+	mov edi,edx
+	mov edx,ecx
+	;清零计数器
+	xor eax,eax 
+	clts
+	pxor xmm2,xmm2
+.lp:
+	clts
+	movdqu xmm0, [esi+eax]
+	movdqu xmm1, [edi+eax]
+	pcmpistri xmm0,xmm1,0x18
+	
+	cmp ecx,16
+	jne .fin
+	
+	;检查两个字符串中是否有0 如果有 证明其中一个字符串已经结束
+	mov ebx,ecx
+	pcmpistri xmm0,xmm2,0x04
+	;如果是16 证明没有任何一个字符是空字符 字符串没有结束
+	cmp ecx,16
+	jne .fin2
+	
+	pcmpistri xmm0,xmm2,0x04
+	;如果是16 证明没有任何一个字符是空字符 字符串没有结束
+	cmp ecx,16
+	jne .fin2
+	
+	add eax,16
+	jmp .lp
+.fin2:
+	mov ecx,ebx
+.fin:
+	add eax,ecx
+	pop edi
+	pop esi
+	pop ebx
+	pop ebp
+	ret

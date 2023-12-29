@@ -1,0 +1,12 @@
+vendorid	drviceid	dscription								vendor
+80ee		beef		VirtualBox Graphics Adapter
+1022		10142000	NetFinity 10/100 Fast Ethernet
+1022		10222000	PCnet - Fast 79C971
+1022		2000		79c970 [PCnet32 LANCE]					Advanced Micro Devices, Inc. [AMD]
+80ee		cafe		VirtualBox Guest Service				InnoTek Systemberatung GmbH
+8086		2415		82801AA AC'97 Audio Controller			Intel Corporation
+8086		7113		82371AB/EB/MB PIIX4 ACPI				Intel Corporation
+8086		27b9		82801GBM (ICH7-M) LPC Interface Bridge	Intel Corporation
+8086		7111		82371AB/EB/MB PIIX4 IDE					Intel Corporation
+106b		003f		KeyLargo/Intrepid USB					Apple Inc.
+8086		2829		82801HM/HEM (ICH8M/ICH8M-E) SATA Controller [AHCI mode]	Intel Corporation

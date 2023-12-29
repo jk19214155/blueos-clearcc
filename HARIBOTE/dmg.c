@@ -1,4 +1,8 @@
 #include "bootpack.h"
+
+
+
+unsigned int _read_file(char* buff,unsigned int* size,unsigned int fat32_addr,unsigned part_base_lba,FAT32_HEADER* mbr,unsigned int start_lba_low,unsigned int start_lba_high);
 typedef struct{
 	int lba;//当前访问的lba信息
 	int status;
@@ -115,7 +119,8 @@ void task_disk(){
 	/*for(i=0;i<dmg_info_num;i++){
 		info[i].status=0;
 	}*/
-	/**/
+	/*运行AHCI初始化函数*/
+	ahci_init();
 	for(;;){
 		io_cli();
 		if (fifo32_status(&task->fifo) == 0) {

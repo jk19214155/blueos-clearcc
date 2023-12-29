@@ -1,7 +1,7 @@
 #include <string.h>		/* strlen */
 #include "apilib.h"
 
-void putstr(int win, char *winbuf, int x, int y, int col, unsigned char *s);
+void putstr(int win, int *winbuf, int x, int y, int col, unsigned char *s);
 void wait(int i, int timer, char *keyflag);
 void setdec8(char *s, int i);
 
@@ -46,7 +46,8 @@ void HariMain(void)
 	int win, timer, i, j, fx, laserwait, lx = 0, ly;
 	int ix, iy, movewait0, movewait, idir;
 	int invline, score, high, point;
-	char winbuf[336 * 261], invstr[32 * 6], s[12], keyflag[4], *p;
+	int winbuf[336 * 261];
+	char*  s[12], keyflag[4],invstr[32 * 6], *p;
 	static char invstr0[32] = " abcd abcd abcd abcd abcd ";
 
 	win = api_openwin(winbuf, 336, 261, -1, "invader");
@@ -55,15 +56,15 @@ void HariMain(void)
 	api_inittimer(timer, 128);
 
 	high = 0;
-	putstr(win, winbuf, 22, 0, 7, "HIGH:00000000");
+	putstr(win, winbuf, 22, 0, 0x00ff, "HIGH:00000000");
 
 restart:
 	score = 0;
 	point = 1;
-	putstr(win, winbuf,  4, 0, 7, "SCORE:00000000");
+	putstr(win, winbuf,  4, 0, 0x00ff, "SCORE:00000000");
 	movewait0 = 20;
 	fx = 18;
-	putstr(win, winbuf, fx, 13, 6, "efg");
+	putstr(win, winbuf, fx, 13, 0x00ff, "efg");
 	wait(100, timer, keyflag);
 
 next_group:
@@ -75,7 +76,7 @@ next_group:
 		for (j = 0; j < 27; j++) {
 			invstr[i * 32 + j] = invstr0[j];
 		}
-		putstr(win, winbuf, ix, iy + i, 2, invstr + i * 32);
+		putstr(win, winbuf, ix, iy + i, 0x00ff, invstr + i * 32);
 	}
 	keyflag[0] = 0;
 	keyflag[1] = 0;
@@ -98,11 +99,11 @@ next_group:
 		/* 自機の処理 */
 		if (keyflag[0 /* left */]  != 0 && fx > 0) {
 			fx--;
-			putstr(win, winbuf, fx, 13, 6, "efg ");
+			putstr(win, winbuf, fx, 13, 0x00ff, "efg ");
 			keyflag[0 /* left */]  = 0;
 		}
 		if (keyflag[1 /* right */] != 0 && fx < 37) {
-			putstr(win, winbuf, fx, 13, 6, " efg");
+			putstr(win, winbuf, fx, 13, 0x00ff, " efg");
 			fx++;
 			keyflag[1 /* right */] = 0;
 		}
@@ -112,7 +113,7 @@ next_group:
 			ly = 13;
 		}
 
-		/* インベーダ移動 */
+		//外星人的移?
 		if (movewait != 0) {
 			movewait--;
 		} else {
@@ -122,28 +123,28 @@ next_group:
 					break; /* GAME OVER */
 				}
 				idir = - idir;
-				putstr(win, winbuf, ix + 1, iy, 0, "                         ");
+				putstr(win, winbuf, ix + 1, iy, 0xff00, "                         ");
 				iy++;
 			} else {
 				ix += idir;
 			}
 			for (i = 0; i < invline; i++) {
-				putstr(win, winbuf, ix, iy + i, 2, invstr + i * 32);
+				putstr(win, winbuf, ix, iy + i, 0x00ff, invstr + i * 32);
 			}
 		}
 
-		/* レーザー処理 */
+		//自己的?理
 		if (ly > 0) {
 			if (ly < 13) {
 				if (ix < lx && lx < ix + 25 && iy <= ly && ly < iy + invline) {
-					putstr(win, winbuf, ix, ly, 2, invstr + (ly - iy) * 32);
+					putstr(win, winbuf, ix, ly, 0x00ff, invstr + (ly - iy) * 32);
 				} else {
-					putstr(win, winbuf, lx, ly, 0, " ");
+					putstr(win, winbuf, lx, ly, 0xff00, " ");
 				}
 			}
 			ly--;
 			if (ly > 0) {
-				putstr(win, winbuf, lx, ly, 3, "h");
+				putstr(win, winbuf, lx, ly, 0x00ff, "h");
 			} else {
 				point -= 10;
 				if (point <= 0) {
@@ -157,16 +158,16 @@ next_group:
 					score += point;
 					point++;
 					setdec8(s, score);
-					putstr(win, winbuf, 10, 0, 7, s);
+					putstr(win, winbuf, 10, 0, 0x00ff, s);
 					if (high < score) {
 						high = score;
-						putstr(win, winbuf, 27, 0, 7, s);
+						putstr(win, winbuf, 27, 0, 0x00ff, s);
 					}
 					for (p--; *p != ' '; p--) { }
 					for (i = 1; i < 5; i++) {
 						p[i] = ' ';
 					}
-					putstr(win, winbuf, ix, ly, 2, invstr + (ly - iy) * 32);
+					putstr(win, winbuf, ix, ly, 0x00ff, invstr + (ly - iy) * 32);
 					for (; invline > 0; invline--) {
 						for (p = invstr + (invline - 1) * 32; *p != 0; p++) {
 							if (*p != ' ') {
@@ -185,18 +186,19 @@ next_group:
 	}
 
 	/* GAME OVER */
-	putstr(win, winbuf, 15, 6, 1, "GAME OVER");
+	putstr(win, winbuf, 15, 6, 0x00ff, "GAME OVER");
 	wait(0, timer, keyflag);
 	for (i = 1; i < 14; i++) {
-		putstr(win, winbuf, 0, i, 0, "                                        ");
+		putstr(win, winbuf, 0, i, 0xff00, "                                        ");
 	}
 	goto restart;
 }
 
-void putstr(int win, char *winbuf, int x, int y, int col, unsigned char *s)
+void putstr(int win, int *winbuf, int x, int y, int col, unsigned char *s)
 {
 	int c, x0, i;
-	char *p, *q, t[2];
+	char *p, t[2];
+	int* q;
 	x = x * 8 + 8;
 	y = y * 16 + 29;
 	x0 = x;
@@ -240,8 +242,8 @@ void putstr(int win, char *winbuf, int x, int y, int col, unsigned char *s)
 void wait(int i, int timer, char *keyflag)
 {
 	int j;
+	regs[10];
 	if (i > 0) {
-		/* 一定時間待つ */
 		api_settimer(timer, i);
 		i = 128;
 	} else {
@@ -249,6 +251,7 @@ void wait(int i, int timer, char *keyflag)
 	}
 	for (;;) {
 		j = api_getkey(1);
+		api_getevent(regs);
 		if (i == j) {
 			break;
 		}

@@ -2,9 +2,9 @@
 #include <stdio.h>
 #include <string.h>
 
-struct ACPI_RSDP *RSDP;
-struct ACPI_RSDT *RSDT;
-struct ACPI_FADT *FADT;
+static struct ACPI_RSDP *RSDP;
+static struct ACPI_RSDT *RSDT;
+static struct ACPI_FADT *FADT;
 
 char checksum(unsigned char *addr, unsigned int length)
 {

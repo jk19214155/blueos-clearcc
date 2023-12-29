@@ -441,7 +441,7 @@
    441 000003FE 8B 02                           	MOV	EAX,DWORD [EDX]
    442 00000400 89 45 F0                        	MOV	DWORD [-16+EBP],EAX
    443 00000403 E8 [00000000]                   	CALL	_task_now
-   444 00000408 8B 80 00000116                  	MOV	EAX,DWORD [278+EAX]
+   444 00000408 8B 80 00000152                  	MOV	EAX,DWORD [338+EAX]
    445 0000040E 89 45 EC                        	MOV	DWORD [-20+EBP],EAX
    446 00000411 A1 0026F000                     	MOV	EAX,DWORD [2551808]
    447 00000416 FF 75 F0                        	PUSH	DWORD [-16+EBP]

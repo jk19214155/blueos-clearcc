@@ -1,10 +1,16 @@
 ; haribote-os boot asm
 ; TAB=4
 
-[INSTRSET "i486p"]
+;[INSTRSET "i486p"]
 
 ; bootpack的启动
-		[bits 32]
+		bits 32
+start:
+		cli
+		mov ebx,0x280000
+		LGDT [GDTR0+ebx]
+		jmp .next
+.next:
 		mov 	EBP,ESP
 		MOV		EBX,bootpack+0x280000
 		MOV		ECX,[EBX+16];数据段大小
@@ -16,13 +22,15 @@
 		MOV		EDI,[EBX+12]	; esp初始值
 		CALL	memcpy
 		
+		xor eax,eax
+		mov cr4,eax
+		
 skip:
 		MOV		ESP,[EBX+12]	; esp初期値
 		push  	dword[ebp+4]		;传入参数
 		push 	dword bootpack+0x280000
-		mov eax,0x28001b+bootpack;
+		mov eax,0x28001b+bootpack
 		call	eax
-		;LGDT [GDTR0]
 		;jmp far 0x10:0x1b
 		ret
 memcpy:
@@ -41,6 +49,6 @@ GDT0:
 		DW		0
 GDTR0:
 		DW		8*3-1
-		DD		GDT0
+		DD		GDT0+0x280000
 		ALIGNB	16
 bootpack:

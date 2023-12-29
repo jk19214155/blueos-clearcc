@@ -725,7 +725,7 @@
    725 00000674 C3                              	RET
    726 00000675                                 L222:
    727 00000675 E8 [00000000]                   	CALL	_task_now
-   728 0000067A FF 80 0000012E                  	INC	DWORD [302+EAX]
+   728 0000067A FF 80 0000016A                  	INC	DWORD [362+EAX]
    729 00000680 EB EB                           	JMP	L214
    730 00000682                                 	GLOBAL	_memman_free_page_32_m
    731 00000682                                 _memman_free_page_32_m:
@@ -765,7 +765,7 @@
    765 000006C2 85 C0                           	TEST	EAX,EAX
    766 000006C4 74 DE                           	JE	L228
    767 000006C6 E8 [00000000]                   	CALL	_task_now
-   768 000006CB FF 88 0000012E                  	DEC	DWORD [302+EAX]
+   768 000006CB FF 88 0000016A                  	DEC	DWORD [362+EAX]
    769 000006D1 EB D1                           	JMP	L228
    770 000006D3                                 	GLOBAL	_memman_free_page_32
    771 000006D3                                 _memman_free_page_32:
@@ -795,7 +795,7 @@
    795 00000705 85 C0                           	TEST	EAX,EAX
    796 00000707 74 E1                           	JE	L235
    797 00000709 E8 [00000000]                   	CALL	_task_now
-   798 0000070E FF 88 0000012E                  	DEC	DWORD [302+EAX]
+   798 0000070E FF 88 0000016A                  	DEC	DWORD [362+EAX]
    799 00000714 EB D4                           	JMP	L235
    800 00000716                                 	GLOBAL	_memman_copy_page_32_m
    801 00000716                                 _memman_copy_page_32_m:
@@ -865,7 +865,7 @@
    865 000007B7 6A 07                           	PUSH	7
    866 000007B9 52                              	PUSH	EDX
    867 000007BA E8 [00000000]                   	CALL	_task_now
-   868 000007BF FF 70 5C                        	PUSH	DWORD [92+EAX]
+   868 000007BF FF 70 78                        	PUSH	DWORD [120+EAX]
    869 000007C2 53                              	PUSH	EBX
    870 000007C3 E8 FFFFFB90                     	CALL	_memman_link_page_32
    871 000007C8 8B 5D FC                        	MOV	EBX,DWORD [-4+EBP]

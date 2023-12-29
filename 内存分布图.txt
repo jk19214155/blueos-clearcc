@@ -38,6 +38,7 @@
 0x0026f034 part_endl_lba
 0x0026f038 root_dir_addr
 0x0026f03c &sht_back[10]
+0x0026f040 &MOUSE_DEC
 
 00:00:10.565085 0000000000000000-000000000009ffff 0000000000000000 Conventional RAM
 00:00:10.565088 00000000000a0000-00000000000bffff 0000000000000000 VGA - VGA Video Buffer
@@ -92,3 +93,6 @@ mov byte [eax], 0x20 ; request TPM access
 mov eax, 1 ; exit system call
 xor ebx, ebx
 int 0x80
+
+/* reg[0] : EDI,   reg[1] : ESI,   reg[2] : EBP,   reg[3] : ESP */
+/* reg[4] : EBX,   reg[5] : EDX,   reg[6] : ECX,   reg[7] : EAX */

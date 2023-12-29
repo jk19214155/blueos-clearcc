@@ -50,6 +50,19 @@ void init_apic(void* apic_base)
 	//设置新的鼠标中断
 	io_write_io_apic(0x10+12*2,0x2c);
 	io_write_io_apic(0x10+12*2+1,*(char*)(apic_base+0x20)<<24);
+	//初始化高精度定时器
+	unsigned int rcba=pcie_get_rcba();
+	*(int*)(rcba+0x3404)|=(1<<7);//开启HPET
+	*(int*)(rcba+0x3404)&=0xfffffffc;//清除HPET AS区域
+	unsigned int HPET_base_address=0xfed00000;
+	//time0用于驱动系统定时器
+	*(int*)(HPET_base_address+0x100)=0x4c+(20<<9);//开启循环计数
+	*(int*)(HPET_base_address+0x104)=0;
+	*(int*)(HPET_base_address+0x108)=14318;//1ms/clock 1000fps
+	*(int*)(HPET_base_address+0x10c)=0;
+	//配置设备中断
+	io_write_io_apic(0x10+20*2,0x34);
+	io_write_io_apic(0x10+20*2+1,*(char*)(apic_base+0x20)<<24);
 	//初始化多处理器环境
 	store_gdt((void*)0xc202);
 	store_idt((void*)0xc20a);

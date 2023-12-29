@@ -741,7 +741,7 @@ L214:
 	ret
 L222:
 	call	_task_now
-	incl	302(%eax)
+	incl	362(%eax)
 	jmp	L214
 	.balign 2
 .globl _memman_free_page_32_m
@@ -783,7 +783,7 @@ L233:
 	testl	%eax, %eax
 	je	L228
 	call	_task_now
-	decl	302(%eax)
+	decl	362(%eax)
 	jmp	L228
 	.balign 2
 .globl _memman_free_page_32
@@ -815,7 +815,7 @@ L237:
 	testl	%eax, %eax
 	je	L235
 	call	_task_now
-	decl	302(%eax)
+	decl	362(%eax)
 	jmp	L235
 	.balign 2
 .globl _memman_copy_page_32_m
@@ -889,7 +889,7 @@ _inthandler0e:
 	pushl	$7
 	pushl	%edx
 	call	_task_now
-	pushl	92(%eax)
+	pushl	120(%eax)
 	pushl	%ebx
 	call	_memman_link_page_32
 	movl	-4(%ebp), %ebx
