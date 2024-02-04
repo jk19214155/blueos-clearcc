@@ -167,7 +167,7 @@ void init_page(struct PAGEMAN32 *man){
 	int addr_from,addr_to;
 	struct MEMINFO* meminfo=(struct MEMINFO*)0x26a000;//ADR_MEMINFO;
 	j=0;
-	//初始化内核4M二级页表
+	//初始化内核2M二级页表
 	for (i=0x400000;i<0x800000;i=i+4){
 		//*(int*)i=(j<<12) | 7;//4k页面，G全局访问标志，可读可写,存在标志,用户可以使用
 		//j++;
@@ -175,8 +175,8 @@ void init_page(struct PAGEMAN32 *man){
 	}
 	//初始化内核4K一级页表
 	j=0;
-	for (i=0x268000;i<0x269000-4;i+=4){
-		*(int*)i=(0x400000+0x1000*j) | 7;//4k页面，可读可写,存在标志,用户可以使用
+	for (i=0x268000;i<0x269000-8;i+=8){
+		*(unsigned long long*)i=(0x400000+0x1000*j) | 7;//4k页面，可读可写,存在标志,用户可以使用
 		j++;
 	}
 	*(int*)i=0x268007;
@@ -554,4 +554,34 @@ int inthandler0e(int cr2,int* esp){
 		}
 	}
 	return 0;
+}
+unsigned int memman_link_page64(struct PAGEMAN32* pageman,unsigned long long* cr3_address,unsigned long long linear_address,unsigned long long physical_address,unsigned int mode){
+	unsigned long long index,addr;
+	index=(linear_address>>36)&0xff8;
+	addr=index+cr3_address;
+	if((*(unsigned long long*)addr)&1==0){//要链接的目标页面不存在
+		*(unsigned long long*)addr=memman_alloc_page_32(pageman)|3;
+	}
+	addr=(*(unsigned long long*)addr)&0xfffffffffffff000;//获取页表的地址
+	index=((linear_address>>27)&0xff8);//保留中间10位索引
+	addr=addr+index;
+	if((*(unsigned long long*)addr)&1==0){//要链接的目标页面不存在
+		*(unsigned long long*)addr=memman_alloc_page_32(pageman)|3;
+	}
+	addr=(*(unsigned long long*)addr)&0xfffffffffffff000;//获取页表的地址
+	index=((linear_address>>18)&0xff8);//保留中间10位索引
+	addr=addr+index;
+	if((*(unsigned long long*)addr)&1==0){//要链接的目标页面不存在
+		*(unsigned long long*)addr=memman_alloc_page_32(pageman)|3;
+	}
+	addr=(*(unsigned long long*)addr)&0xfffffffffffff000;//获取页表的地址
+	index=((linear_address>>9)&0xff8);//保留中间10位索引
+	addr=addr+index;
+	if(mode==0){//没有想要链接的地址
+		physical_address=(physical_address&0xfff)|(memman_alloc_page_32(pageman));
+		*(int*)addr=physical_address;
+		return physical_address;
+	}
+	*(int*)addr=physical_address;
+	return *(int*)addr;
 }

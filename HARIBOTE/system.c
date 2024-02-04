@@ -19,19 +19,15 @@ struct TASK* system_start(){
 	memmam_link_page_32_m(pageman,0x268000,cons_fifo,7, 1,0);//
 	task->cons_stack = memman_alloc_4k(memman, 64 * 1024);//内存分配!!!
 	pageman_link_page_32_m(pageman,task->cons_stack,7,0x10,0);//
-	task->tss.esp = task->cons_stack + 64 * 1024 - 12;
-	task->tss.eip = ((int) &system_mainloop)+((int)get_this());
-	task->tss.es = 1 * 8;
-	task->tss.cs = 2 * 8;
-	task->tss.ss = 1 * 8;
-	task->tss.ds = 1 * 8;
-	task->tss.fs = 1 * 8;
-	task->tss.gs = 1 * 8;
+	task->tss.rsp = task->cons_stack + 64 * 1024 - 12;
+	task->tss.rip = ((int) &system_mainloop)+((int)get_this());
 	task->task_sheet_max=8;//最大图层数量
 	task->tss.cr3=0x268000;
 	
 	task->memman=memman;
-	task_run(task, 2, 2); /* level=2, priority=2 */
+	task_start(task);
+	unsigned int priority=(timer_get_fps(1)/50)>=1?(timer_get_fps(1)/50):1;
+	task_run(task, 2, priority); /* level=2, priority=2 */
 	fifo32_init(&task->fifo, 128, cons_fifo, task);
 	
 	system_running=1;//运行中

@@ -43,8 +43,8 @@ int ahci_find_device_in_pcie(PCI_DEV* pci_dev){
 		return recode;
 	}
 }
-#define PCI_RCMD_MM_ACCESS (1<<0)
-#define PCI_RCMD_DISABLE_INTR (1<<3)
+#define PCI_RCMD_MM_ACCESS (1<<1)
+#define PCI_RCMD_DISABLE_INTR (1<<10)
 #define PCI_RCMD_BUS_MASTER (1<<2)
 #define HBA_PxCMD_FRE (1 << 4)
 #define HBA_PxCMD_CR (1 << 15)
@@ -57,10 +57,10 @@ static AHCI_REGS* ahci_base_address;
 #pragma pack(push,16)
 	static char ahci_buff[4096];
 #pragma pack(pop)
+PCI_DEV ahci_dev;
 int ahci_init(){
 	struct PAGEMAN32* pageman=*((void** )ADR_PAGEMAN);
 	struct MEMMAN* memman=task_now()->memman;
-	PCI_DEV ahci_dev;
 	ahci_find_device_in_pcie(&ahci_dev);
 	unsigned int ahci_bar_6;
 	/*读取6号bar的数值*/
@@ -133,6 +133,17 @@ int ahci_init(){
 		(ahci_bar_6_base->port)[i].i.HBA_RPxSERR=-1;
 		
 	}
+	unsigned int msi_index = pcie_find_capbility_by_id(&ahci_dev,0x05);//寻找MSI中断扩展配置 MSI-X的编码为0x11
+	unsigned a=pcie_read_config(&ahci_dev,msi_index*4);
+	unsigned int msg_ctl=a>>16;
+	int offset= (!!(msg_ctl&0x80))*4;//这里判断MSI结构格式是否有另外的4个字节偏移 64位系统有4个字节的高地址 32位系统没有
+	pcie_write_config(&ahci_dev,msi_index*4+8+offset,0x80);//0x80是硬盘中断号 可自定义
+	if(msg_ctl&0x100){//如果支持中断MASK
+		pcie_write_config(&ahci_dev,msi_index*4+0x0c+offset,0);
+	}
+	a=(a&0xff8fffff)|0x10000;
+	pcie_write_config(&ahci_dev,msi_index*4,a);
+	return &ahci_dev;
 }
 unsigned int ahci_get_info(PCI_DEV* dev,unsigned int ahci_abi_regs_index,void* buff){
 	struct MEMMAN* memman=task_now()->memman;
@@ -167,6 +178,8 @@ unsigned int ahci_get_info(PCI_DEV* dev,unsigned int ahci_abi_regs_index,void* b
 			clb[i].prdtl=16;
 			clb[i].command_table_address_32=fis;//挂载
 			HBA_RPxCI&=(1<<i);//执行
+			
+			task_sleep(task_now());
 			//释放内存
 			pageman_unlink_page_32(pageman,fis,1);
 			memman_free_4k(memman,fis,4096);

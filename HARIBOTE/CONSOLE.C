@@ -6,6 +6,7 @@
 void cmd_fdir(struct CONSOLE *cons);
 extern struct TASK* system_task;
 char text_buff[100];
+
 unsigned int _cons_read_file(char* buff,unsigned int* size,unsigned int fat32_addr,unsigned part_base_lba,FAT32_HEADER* mbr,unsigned int start_lba_low,unsigned int start_lba_high){
 	unsigned int i;
 	for(i=0;;i++){
@@ -23,6 +24,128 @@ unsigned int _cons_read_file(char* buff,unsigned int* size,unsigned int fat32_ad
 	}
 	return 0;
 }
+void console_init(struct CONSOLE* cons,struct SHTCTL* shtctl,unsigned int cons_x,unsigned int cons_y){
+	int i;
+	/*描绘图层*/
+	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
+	struct PAGEMAN32 *pageman=*((struct PAGEMAN32 **)ADR_PAGEMAN);
+	if(cons->sht==0){//如果没有初始化图层的话 则先初始化图层
+		cons->sht=sheet_alloc(shtctl);
+		unsigned buff_size=cons_x*cons_y*(shtctl->colordept);
+		void* buff=memman_alloc_4k(memman,buff_size);
+		pageman_link_page_32_m(pageman,task_now()->root_dir_addr,1,(buff_size+4095)/4096,0);
+		sheet_setbuf(cons->sht,buff,cons_x,cons_y,-1);
+	}
+	make_window32(cons->sht->buf, cons_x, cons_y, "console", 0);
+	make_textbox32(cons->sht, 8, 28, cons_x-8*2, cons_y-28*2, COL8_000000);
+	cons->sht->flags |= 0x20;	/* カーソルあり */
+	/*准备任务环境*/
+	struct TASK* task;
+	if(cons->task==0){
+		task=task_alloc();
+		int *cons_fifo = (int *) memman_alloc_4k(memman, 128 * 4);//内存分配!!!
+		memmam_link_page_32_m(pageman,0x268000,cons_fifo,1, 1,0);//
+		void *cons_fifo_mouse =  memman_alloc_4k(memman, 4096);//内存分配!!!
+		memmam_link_page_32_m(pageman,0x268000,cons_fifo_mouse,1, 1,0);//
+		fifo32_init(&task->fifo, 128, cons_fifo, task);
+		fifo_mouse_init(&task->fifom, 128, cons_fifo_mouse, task);
+		task->cons_stack = memman_alloc_4k(memman, 64 * 1024);//内存分配!!!
+		pageman_link_page_32_m(pageman,task->cons_stack,7,0x10,0);//
+		task->name="console";
+		
+		task->tss.rsp = task->cons_stack + 64 * 1024 - 12;
+		task->tss.rip = (int) &console_task+((int)get_this());
+		cons->task=task;
+		task->cons=cons;
+	}
+	else{
+		task=cons->task;
+	}
+	/*制作分页*/
+	if(cons->task->tss.cr3==0){
+		int p=memman_alloc_4k(memman,4096);
+		int pp=memman_alloc_page_32(pageman);
+		pageman_link_page_32(pageman,p,pp|7,1);
+		for(i=0;i<4096;i++){
+			*(char*)(p+i)=0;//清空页表
+		}
+		//memmam_link_page_32_m(pageman,p,0xfffff000,pp&7,1,1);//顶端页面映射自身
+		*(int*)(p+0xfff-3)=pp|7;
+		for(i=0xc00;i<=0xfff-4;i++){
+			*(char*)(p+i)=*(char*)(0xfffff000+i);//复制高端页表
+		}
+		for(i=0x00;i<3;i++){
+			*(int*)(p+i*4)=*(int*)(0xfffff000+i*4);//复制低端页表12M
+		}
+		cons->task->tss.cr3=pp&0xfffff000;
+	}
+	/*应用程序的内存控制器*/
+	if(cons->task->memman==0){
+		cons->task->memman=memman_alloc_4k(memman,sizeof(struct MEMMAN));;//应用程序的内存控制器
+		memmam_link_page_32_m(pageman,0x268000,task->memman,1,(sizeof(struct MEMMAN)+0xfff)>>12,0);
+		memman_init(task->memman);
+		memman_free(task->memman,0x00c00000,0xbfffffff);
+	}
+	/*启动任务*/
+	task_start(task);
+	task_run(task,2,2);
+}
+void console_cleanup(struct CONSOLE* cons){
+	int i;
+	struct PAGEMAN32 *pageman=*(struct PAGEMAN32 **)ADR_PAGEMAN;
+	struct TASK* task=cons->task;
+	/*停止任务*/
+	if(cons->task!=0){
+		task_sleep(cons->task);
+		//释放应用程序内存控制器
+		if(cons->task->memman!=0){
+			io_cli();
+			for(i=0;i<((int)(sizeof(struct MEMMAN))+0xfff)>>12;i++){
+				void* po=pageman_unlink_page_32(pageman,(int)(cons->task->memman)+0x1000*i,1);
+				//memman_free_page_32(pageman,po);
+			}
+			cons->task->memman=0;
+			io_sti();
+		}
+		//释放栈
+		if(task->cons_stack!=0){
+			io_cli();
+			for(i=0;i<(64 * 1024+0xfff)>>12;i++){
+				void* po=pageman_unlink_page_32(pageman,(int)(cons->task->cons_stack)+0x1000*i,1);
+				//memman_free_page_32(pageman,po);
+			}
+			task->cons_stack=0;
+			io_sti();
+		}
+		//释放fifo
+		if(cons->task->fifo.buf!=0){
+			io_cli();
+			for(i=0;i<(128*4+0xfff)>>12;i++){
+				void* po=pageman_unlink_page_32(pageman,(int)(cons->task->fifo.buf)+0x1000*i,1);
+				//memman_free_page_32(pageman,po);
+			}
+			cons->task->fifo.buf=0;
+			io_sti();
+		}
+		cons->task=0;
+	}
+	if(cons->task->tss.cr3!=0){
+		io_cli();
+		pageman_unlink_page_32_m(pageman,cons->task->tss.cr3,1,1);
+		task->tss.cr3=0;
+		io_sti();
+	}
+	/*销毁图层*/
+	if(cons->sht!=0){
+		sheet_updown(cons->sht,-1);//首先使得命令行隐藏 注意如果需要打印信息 这个语句应该去除
+		io_cli();
+		unsigned buff_size=((cons->sht)->bxsize)*((cons->sht)->bysize)*((cons->sht)->colordept);
+		pageman_unlink_page_32_m(pageman,(cons->sht)->buf,(buff_size+4095)/4096,1);
+		sheet_free(cons->sht);
+		cons->sht=0;
+		io_sti();
+	}
+}
 void console_task(struct SHEET *sheet, int memtotal)
 {
 	struct PAGEMAN32 *pageman=*(struct PAGEMAN32 **)ADR_PAGEMAN;
@@ -30,21 +153,21 @@ void console_task(struct SHEET *sheet, int memtotal)
 	struct MEMMAN *memman = task_now()->memman;
 	int i, *fat = *(int**)0x0026f028;//(int *) memman_alloc_4k(memman, 4 * 2880);//内存分配!!!
 	//pageman_link_page_32_m(pageman,fat,7,3,0);//
-	struct CONSOLE cons;
+	struct CONSOLE *cons=task->cons;
 	struct FILEHANDLE fhandle[8];
 	char cmdline[30];
 	unsigned char *nihongo = (char *) *((int *) 0x0fe8);
 
-	cons.sht = sheet;
-	cons.cur_x =  8;
-	cons.cur_y = 28;
-	cons.cur_c = -1;
-	task->cons = &cons;
+	cons->sht = sheet;
+	cons->cur_x =  8;
+	cons->cur_y = 28;
+	cons->cur_c = -1;
+	//task->cons = &cons;
 	task->cmdline = cmdline;
-	if (cons.sht != 0) {
-		cons.timer = timer_alloc(0);
-		timer_init(cons.timer, &task->fifo, 1);
-		timer_settime(0,cons.timer, timer_get_fps(0)/2 ,0);
+	if (cons->sht != 0) {
+		cons->timer = timer_alloc(0);
+		timer_init(cons->timer, &task->fifo, 1);
+		timer_settime(0,cons->timer, timer_get_fps(0)/2 ,0);
 	}
 	//file_readfat(fat, (unsigned char *) (ADR_DISKIMG + 0x000200));
 	for (i = 0; i < 8; i++) {
@@ -78,7 +201,7 @@ void console_task(struct SHEET *sheet, int memtotal)
 	//int num=_get_file_number(root_dir_addr,8192);
 	//(int*)(0x0026f038)=num;
 	/* プロンプト表示 */
-	cons_putchar(&cons, '>', 1);
+	cons_putchar(cons, '>', 1);
 	/*启用鼠标点击事件*/
 	task->fifo32_mouse_event=0x20000000;
 	task->mouse_x=0;
@@ -92,56 +215,56 @@ void console_task(struct SHEET *sheet, int memtotal)
 		} else {
 			i = fifo32_get(&task->fifo);
 			io_sti();
-			if (i <= 1 && cons.sht != 0) { /* カーソル用タイマ */
+			if (i <= 1 && cons->sht != 0) { /* カーソル用タイマ */
 				if (i != 0) {
-					timer_init(cons.timer, &task->fifo, 0); /* 次は0を */
-					if (cons.cur_c >= 0) {
-						cons.cur_c = COL8_FFFFFF;
+					timer_init(cons->timer, &task->fifo, 0); /* 次は0を */
+					if (cons->cur_c >= 0) {
+						cons->cur_c = COL8_FFFFFF;
 					}
 				} else {
-					timer_init(cons.timer, &task->fifo, 1); /* 次は1を */
-					if (cons.cur_c >= 0) {
-						cons.cur_c = COL8_000000;
+					timer_init(cons->timer, &task->fifo, 1); /* 次は1を */
+					if (cons->cur_c >= 0) {
+						cons->cur_c = COL8_000000;
 					}
 				}
-				timer_settime(0,cons.timer, timer_get_fps(0)/2 ,0);
+				timer_settime(0,cons->timer, timer_get_fps(0)/2 ,0);
 			}
 			if (i == 2) {	//光标关闭
-				cons.cur_c = COL8_FFFFFF;
+				cons->cur_c = COL8_FFFFFF;
 			}
 			if (i == 3) {	//光标开启
-				if (cons.sht != 0) {
-					boxfill32(cons.sht->buf, cons.sht->bxsize, COL8_000000,
-						cons.cur_x, cons.cur_y, cons.cur_x + 7, cons.cur_y + 15);
+				if (cons->sht != 0) {
+					boxfill32(cons->sht->buf, cons->sht->bxsize, COL8_000000,
+						cons->cur_x, cons->cur_y, cons->cur_x + 7, cons->cur_y + 15);
 				}
-				cons.cur_c = -1;
+				cons->cur_c = -1;
 			}
 			if (i == 4) {	//退出信号
-				cmd_exit(&cons, fat);
+				cmd_exit(cons, fat);
 			}
 			if (256 <= i && i <= 511) {//键盘事件
 				if (i == 8 + 256) {
 					/* バックスペース */
-					if (cons.cur_x > 16) {
+					if (cons->cur_x > 16) {
 						cons_putchar(&cons, ' ', 0);
-						cons.cur_x -= 8;
+						cons->cur_x -= 8;
 					}
 				} else if (i == 10 + 256) {
 					/* Enter */
-					cons_putchar(&cons, ' ', 0);
-					cmdline[cons.cur_x / 8 - 2] = 0;
-					cons_newline(&cons);
-					cons_runcmd(cmdline, &cons, fat, memtotal);	/* コマンド実行 */
-					if (cons.sht == 0) {
-						cmd_exit(&cons, fat);
+					cons_putchar(cons, ' ', 0);
+					cmdline[cons->cur_x / 8 - 2] = 0;
+					cons_newline(cons);
+					cons_runcmd(cmdline, cons, fat, memtotal);	/* コマンド実行 */
+					if (cons->sht == 0) {
+						cmd_exit(cons, fat);
 					}
 					//显示提示符
-					cons_putchar(&cons, '>', 1);
+					cons_putchar(cons, '>', 1);
 				} else {
 					/* 一般文字 */
-					if (cons.cur_x < 240) {
-						cmdline[cons.cur_x / 8 - 2] = i - 256;
-						cons_putchar(&cons, i - 256, 1);
+					if (cons->cur_x < 240) {
+						cmdline[cons->cur_x / 8 - 2] = i - 256;
+						cons_putchar(cons, i - 256, 1);
 					}
 				}
 			}
@@ -153,13 +276,13 @@ void console_task(struct SHEET *sheet, int memtotal)
 				task->sheet_mouse_on=mouse_status->sht;
 			}
 			//光标的重新显示
-			if (cons.sht != 0) {
-				if (cons.cur_c >= 0) {
-					boxfill32(cons.sht->buf, cons.sht->bxsize, cons.cur_c, 
-						cons.cur_x, cons.cur_y, cons.cur_x + 7, cons.cur_y + 15);
+			if (cons->sht != 0) {
+				if (cons->cur_c >= 0) {
+					boxfill32(cons->sht->buf, cons->sht->bxsize, cons->cur_c, 
+						cons->cur_x, cons->cur_y, cons->cur_x + 7, cons->cur_y + 15);
 				}
-				if((cons.sht)->ctl==*(int*)0x0fe4)//当前图层的控制器与活动图层控制器相同
-					sheet_refresh(cons.sht, cons.cur_x, cons.cur_y, cons.cur_x + 8, cons.cur_y + 16);
+				if((cons->sht)->ctl==*(int*)0x0fe4)//当前图层的控制器与活动图层控制器相同
+					sheet_refresh(cons->sht, cons->cur_x, cons->cur_y, cons->cur_x + 8, cons->cur_y + 16);
 			}
 		}
 	}
@@ -255,39 +378,39 @@ void cons_runcmd(char *cmdline, struct CONSOLE *cons, int *fat, int memtotal)
 {
 	if (strcmp(cmdline, "mem") == 0 && cons->sht != 0) {
 		cmd_mem(cons, memtotal);
-	} else if (asm_sse_strcmp(cmdline, "cls",3) == 16 && cons->sht != 0) {
+	} else if (asm_sse_strcmp(cmdline, "cls",9999) == 0 && cons->sht != 0) {
 		cmd_cls(cons);
-	} else if (asm_sse_strcmp(cmdline, "dir",3) == 16 && cons->sht != 0) {
+	} else if (asm_sse_strcmp(cmdline, "dir",9999) == 0 && cons->sht != 0) {
 		cmd_dir(cons);
-	} else if (asm_sse_strcmp(cmdline, "exit",4) == 16) {
+	} else if (asm_sse_strcmp(cmdline, "exit",9999) == 0) {
 		cmd_exit(cons, fat);
-	} else if (strncmp(cmdline, "start ", 6) == 0) {
+	} else if (strncmp(cmdline, "start ", 5) == 0) {
 		cmd_start(cons, cmdline, memtotal);
 	} else if (strncmp(cmdline, "ncst ", 5) == 0) {
 		cmd_ncst(cons, cmdline, memtotal);
 	} else if (strncmp(cmdline, "langmode ", 9) == 0) {
 		cmd_langmode(cons, cmdline);
-	} else if (asm_sse_strcmp(cmdline, "reload",6) == 16) {
+	} else if (asm_sse_strcmp(cmdline, "reload",9999) == 0) {
 		sys_reboot();
-	} else if (asm_sse_strcmp(cmdline, "shutdown",8) == 16) {
+	} else if (asm_sse_strcmp(cmdline, "shutdown",9999) == 0) {
 		struct FIFO32 *fifo = &system_task->fifo;//intel南桥的关机方法
 		fifo32_put(fifo,8);
-	} else if (asm_sse_strcmp(cmdline, "rdrand",6) ==16){
+	} else if (asm_sse_strcmp(cmdline, "rdrand",9999) ==0){
 		cmd_rdrand(cons, cmdline);
 	}
-	else if (asm_sse_strcmp(cmdline,"desktop",7) ==16){//开启桌面
+	else if (asm_sse_strcmp(cmdline,"desktop",9999) ==0){//开启桌面
 		desktop_start();
 	}
-	else if (asm_sse_strcmp(cmdline,"fdir",4) ==16){//显示所有文件
+	else if (asm_sse_strcmp(cmdline,"fdir",9999) ==0){//显示所有文件
 		cmd_fdir(cons);
 	}
-	else if (strncmp(cmdline,"cd ",3) ==0){//切换目录
+	else if (asm_sse_strcmp(cmdline,"cd ",3) ==0){//切换目录
 		cmd_cd(cons,cmdline);
 	}
 	else if (strncmp(cmdline,"task ",4) ==0){//切换目录
 		cmd_task(cons,cmdline);
 	}
-	else if (asm_sse_strcmp(cmdline,"12341234",4) == 16){
+	else if (asm_sse_strcmp(cmdline,"12341234",8) == 0){//测试用例
 		cons_putstr0(cons, "sse OK.\n\n");
 	}
 	else if (cmdline[0] != 0) {
@@ -723,7 +846,7 @@ int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline)
 			for (i = 0; i < 8; i++) {//清空文件记录缓存
 				task->fhandle[i].buf = 0;
 			}
-			start_app(0x1b, 2 * 8 + 4, esp, 3 * 8 + 4, &(task->tss.esp0));/*eip,cs,esp,ss,esp0*/
+			start_app(0x1b, 2 * 8 + 4, esp, 3 * 8 + 4, &(taskctl->tasks0[0].tss.rsp0));/*eip,cs,esp,ss,esp0*/
 			struct SHTCTL** shtctl_base=*(int*)0x0026f018;
 			int j;
 			for(j=0;j<(*(int*)0x0026f01c);j++){//遍历所有图层控制器
@@ -796,7 +919,7 @@ int *hrb_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int 
 	} else if (edx == 3) {//命令行输出字符串指定长度
 		cons_putstr1(cons, (char *) ebx + ds_base, ecx);
 	} else if (edx == 4) {//结束应用程序api_end
-		return &(task->tss.esp0);
+		return &(task->tss.rsp0);
 	} else if (edx == 5) {//创建窗口
 	/*原来的代码分配的内存空间在用户空间，需要将这部分映射到高地址被全局访问*/
 		/*接下来链接目标页面*/
@@ -1101,7 +1224,7 @@ int *inthandler0c(int *esp)
 	cons_putstr0(cons, "\nINT 0C :\n Stack Exception.\n");
 	sprintf(s, "EIP = %08X\n", esp[11]);
 	cons_putstr0(cons, s);
-	return &(task->tss.esp0);	/* 異常終了させる */
+	return &(task->tss.rsp0);	/* 異常終了させる */
 }
 
 int *inthandler0d(int *esp)
@@ -1122,7 +1245,7 @@ int *inthandler0d(int *esp)
 	cons_putstr0(cons, s);
 	sprintf(s,"APP DS =%08X\n",esp[8]);
 	cons_putstr0(cons, s);
-	return &(task->tss.esp0);	/* 異常終了させる */
+	return &(task->tss.rsp0);	/* 異常終了させる */
 }
 
 

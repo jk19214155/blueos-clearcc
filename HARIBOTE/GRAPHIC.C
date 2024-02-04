@@ -155,14 +155,14 @@ void putfont32(int *vram, int xsize, int x, int y, int c, char *font)
 
 void putfonts8_asc(char *vram, int xsize, int x, int y, char c, unsigned char *s)
 {
-	extern char hankaku[4096];
+	extern char _hankaku[4096];
 	struct TASK *task = task_now();
 	char *nihongo = (char *) *((int *) 0x0fe8), *font;
 	int k, t;
 
 	if (task->langmode == 0) {
 		for (; *s != 0x00; s++) {
-			putfont8(vram, xsize, x, y, c, hankaku + *s * 16);
+			putfont8(vram, xsize, x, y, c, _hankaku + *s * 16);
 			x += 8;
 		}
 	}
@@ -220,14 +220,14 @@ void putfonts8_asc(char *vram, int xsize, int x, int y, char c, unsigned char *s
 
 void putfonts32_asc(int *vram, int xsize, int x, int y, int c, unsigned char *s)
 {
-	extern char hankaku[4096];
+	extern char _hankaku[4096];
 	struct TASK *task = task_now();
 	char *nihongo = (char *) *((int *) 0x0fe8), *font;
 	int k, t;
 
 	if (task->langmode == 0) {
 		for (; *s != 0x00; s++) {
-			putfont32(vram, xsize, x, y, c, hankaku + *s * 16);
+			putfont32(vram, xsize, x, y, c, _hankaku + *s * 16);
 			x += 8;
 		}
 	}

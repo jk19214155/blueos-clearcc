@@ -12,14 +12,8 @@ struct TASK *desktop_start()
 	memmam_link_page_32_m(pageman,0x268000,cons_fifo,7, 1,0);//
 	task->cons_stack = memman_alloc_4k(memman, 64 * 1024);//内存分配!!!
 	pageman_link_page_32_m(pageman,task->cons_stack,7,0x10,0);//
-	task->tss.esp = task->cons_stack + 64 * 1024 - 12;
-	task->tss.eip = ((int) &desktop_task)+((int)get_this());
-	task->tss.es = 1 * 8;
-	task->tss.cs = 2 * 8;
-	task->tss.ss = 1 * 8;
-	task->tss.ds = 1 * 8;
-	task->tss.fs = 1 * 8;
-	task->tss.gs = 1 * 8;
+	task->tss.rsp = task->cons_stack + 64 * 1024 - 12;
+	task->tss.rip = ((int) &desktop_task)+((int)get_this());
 	task->task_sheet_max=8;//最大图层数量
 	task->tss.cr3=0x268000;
 	
@@ -36,7 +30,7 @@ struct TASK *desktop_start()
 	pageman_link_page_32_m(pageman,sht->buf,7,((sht->bxsize)*(sht->bysize)+0xfff)>>12,0);
 	boxfill8(sht->buf, sht->bxsize, 15, 0,0,sht->bxsize-1,sht->bysize-1);//灰色底色
 	sheet_updown(sht,1);//0是底板图层
-	*((int *) (task->tss.esp + 4)) = (int) sht;
+	*((int *) (task->tss.rsp + 4)) = (int) sht;
 	//add_child_task(task_now0,task);//命令行是主进程的子进程
 	task_run(task, 2, 2); /* level=2, priority=2 */
 	fifo32_init(&task->fifo, 128, cons_fifo, task);

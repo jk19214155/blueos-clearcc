@@ -91,3 +91,21 @@ unsigned pcie_get_rcba(){
 	
 	return id;
 }
+unsigned int pcie_find_capbility_by_id(PCI_DEV* pci_dev,unsigned int id){
+	unsigned char capbility_pointer = pcie_read_config(pci_dev,0x34*4)&0xff;
+	if(capbility_pointer==0){
+		return 0;
+	}
+	for(;;){
+		unsigned i=pcie_read_config(pci_dev,capbility_pointer*4);
+		unsigned char capbility_id=i&0xff;
+		if(capbility_id==id){
+			return capbility_pointer;
+		}
+		unsigned char capbility_pointer = (i>>8)&0xff;
+		if(capbility_pointer==0){
+			return 0;
+		}
+	}
+	return 0;
+}

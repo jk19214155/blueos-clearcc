@@ -2,6 +2,7 @@
 
 
 
+
 unsigned int _read_file(char* buff,unsigned int* size,unsigned int fat32_addr,unsigned part_base_lba,FAT32_HEADER* mbr,unsigned int start_lba_low,unsigned int start_lba_high);
 typedef struct{
 	int lba;//当前访问的lba信息
@@ -14,6 +15,7 @@ void dmg_init(){
 	lock=0;
 	return;
 }
+char ahci_buff[513];
 StorageDeviceOperations dmg_StorageDeviceOperations;
 struct TASK* start_task_disk(){//磁盘访问守护程序
 	if(disk_running!=0){
@@ -28,18 +30,13 @@ struct TASK* start_task_disk(){//磁盘访问守护程序
 	memmam_link_page_32_m(pageman,0x268000,cons_fifo,7, 1,0);//
 	task->cons_stack = memman_alloc_4k(memman, 64 * 1024);//内存分配!!!
 	pageman_link_page_32_m(pageman,task->cons_stack,7,0x10,0);//
-	task->tss.esp = task->cons_stack + 64 * 1024 - 12;
-	task->tss.eip = ((int) &task_disk)+((int)get_this());
-	task->tss.es = 1 * 8;
-	task->tss.cs = 2 * 8;
-	task->tss.ss = 1 * 8;
-	task->tss.ds = 1 * 8;
-	task->tss.fs = 1 * 8;
-	task->tss.gs = 1 * 8;
+	task->tss.rsp = task->cons_stack + 64 * 1024 - 12;
+	task->tss.rip = ((int) &task_disk)+((int)get_this());
 	task->task_sheet_max=8;//最大图层数量
 	task->tss.cr3=0x268000;
 	
 	task->memman=memman;
+	task_start(task);
 	task_run(task, 2, 2); /* level=2, priority=2 */
 	fifo32_init(&task->fifo, 128, cons_fifo, task);
 	
@@ -55,6 +52,8 @@ void task_disk(){
 	struct MEMMAN *memman = task_now()->memman;
 	EFI_GUID part_type_uid=gUidPartTypeBaseData;//数据段
 	EFI_GUID part_own_uid={0x7a57c1e4,0xea59,0x49c0,{0xad,0x61,0x97,0x6f,0x85,0x30,0x85,0xa3}};//启动盘唯一GUID
+	short command[128];
+	int command_point=0;
 	int i;
 	void* fat32_addr;//启动区的fat地址
 	unsigned int part_base_lba=0;//启动区开始lba
@@ -65,12 +64,12 @@ void task_disk(){
 	unsigned int disk_part_base=disk_data_base+0x400;
 	for(i=0;i<16;i++){
 		GPT_ITEM* p=((GPT_ITEM*)disk_part_base)+i;
-		if(p->guid.g1==part_own_uid.g1){
-			if(p->guid.g2==part_own_uid.g2){
-				if(p->guid.g3==part_own_uid.g3){
+		if(p->guid.Data1==part_own_uid.Data1){
+			if(p->guid.Data2==part_own_uid.Data2){
+				if(p->guid.Data3==part_own_uid.Data3){
 					int j;
 					for(j=0;j<8;j++){
-						if(p->guid.g4[j]!=part_own_uid.g4[j]){
+						if(p->guid.Data4[j]!=part_own_uid.Data4[j]){
 							break;
 						}
 					}
@@ -120,7 +119,9 @@ void task_disk(){
 		info[i].status=0;
 	}*/
 	/*运行AHCI初始化函数*/
-	ahci_init();
+	PCI_DEV* ahci=ahci_init();
+	*(unsigned int*)0x0026f044=&ahci_buff;
+	ahci_get_info(ahci,0,ahci_buff);
 	for(;;){
 		io_cli();
 		if (fifo32_status(&task->fifo) == 0) {
@@ -129,6 +130,13 @@ void task_disk(){
 		} else {
 			int i = fifo32_get(&task->fifo);
 			io_sti();
+		}
+		if(i=='\d' || i=='\a'){
+			if(asm_sse_strcmp(command,'satainfo',8)==0){
+				
+			}
+		}else{
+			command[command_point++]=i;
 		}
 	}
 }
@@ -144,8 +152,8 @@ unsigned int _read_file(char* buff,unsigned int* size,unsigned int fat32_addr,un
 	unsigned int i;
 	for(i=0;;i++){
 		//如果多读一个簇就会超过size设定的大小
-		if((i+1)*(mbr->BPB_SecPerClus)*512>size){
-			size=i*(mbr->BPB_SecPerClus)*512;//设定已读内容数量
+		if((i+1)*(mbr->BPB_SecPerClus)*512>*size){
+			*size=i*(mbr->BPB_SecPerClus)*512;//设定已读内容数量
 			return 0;
 		}
 		//扇区位置:逻辑分区基地址+保留分区+FAT所占的分区*FAT数量+(簇号-2)*簇大小

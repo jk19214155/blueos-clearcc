@@ -1,587 +1,1028 @@
 ; naskfunc
-; TAB=4
+; tab=4
 
-;FORMAT "WCOFF"				; オブジェクトファイルを作るモーチE
-;INSTRSET "i486p"				; 486の命令まで使ぁE��ぁE��ぁE��記述
-BITS 32						; 32ビットモード用の機械語を作らせる
-;FILE "naskfunc.nas"			; ソースファイル名情報
+;format "wcoff"				; オブジェクトファイルを作るモーチe
+;instrset "i486p"				; 486の命令まで使ぁe��ぁe��ぁe��記述
+bits 64						; 32ビットモード用の機械語を作らせる
+;file "naskfunc.nas"			; ソースファイル名情報
 
-		GLOBAL	_io_hlt, _io_cli, _io_sti, _io_stihlt
-		GLOBAL	_io_in8,  _io_in16,  _io_in32
-		GLOBAL	_io_out8, _io_out16, _io_out32
-		GLOBAL	_io_load_eflags, _io_store_eflags
-		GLOBAL	_load_gdtr, _load_idtr
-		GLOBAL	_load_cr0, _store_cr0
-		GLOBAL	_load_cr3, _store_cr3
-		GLOBAL _load_cr4, _store_cr4
-		GLOBAL	_load_tr
-		GLOBAL	_asm_inthandler20, _asm_inthandler21
-		GLOBAL	_asm_inthandler2c, _asm_inthandler0c , _asm_inthandler34, _asm_inthandler0e
-		GLOBAL	_asm_inthandler0d, _asm_end_app
-		GLOBAL	_memtest_sub
-		GLOBAL	_farjmp, _farcall
-		GLOBAL	_asm_hrb_api, _start_app
-		GLOBAL _sys_nop , _asm_sse_strcmp
-		;GLOBAL	_memset,_strcpy,_strcmp
-		global	_support_apic, _io_wrmsr, _io_rdmsr, _test2, _get_lock, _rdrand
-		global	_store_gdt, _store_idt,_sys_reboot,_sys_call,_test3
-		EXTERN	_inthandler20, _inthandler21
-		EXTERN	_inthandler2c, _inthandler0d
-		EXTERN	_inthandler0c, _inthandler0e , _inthandler34
-		EXTERN	_hrb_api
-		tpm_command equ 0xfed40000      ;TPM命令寄存器地址
-		tpm_status equ 0xfed40014       ;TPM状态寄存器地址
-; 一个接收指针参数的 VMXON 指令宏定义
+		global	io_hlt, io_cli, io_sti, io_stihlt
+		global	io_in8,  io_in16,  io_in32
+		global	io_out8, io_out16, io_out32
+		global	io_load_eflags, io_store_eflags
+		global	load_gdtr, load_idtr
+		global	load_cr0, store_cr0
+		global	load_cr3, store_cr3
+		global load_cr4, store_cr4
+		global	load_tr
+		global	asm_inthandler20, asm_inthandler21
+		global	asm_inthandler2c, asm_inthandler0c , asm_inthandler34, asm_inthandler0e
+		global	asm_inthandler0d, asm_end_app
+		global	memtest_sub
+		global	farjmp, farcall
+		global	asm_hrb_api, start_app
+		global sys_nop , asm_sse_strcmp
+		;global	_memset,_strcpy,_strcmp
+		global	support_apic, io_wrmsr, io_rdmsr, test2, get_lock, rdrand
+		global	store_gdt, store_idt,sys_reboot,sys_call, test3, asm_task_switch32
+		global asm_x64_cs_init,asm_get_cs
+		extern	inthandler20, inthandler21
+		extern	inthandler2c, inthandler0d
+		extern	inthandler0c, inthandler0e , inthandler34
+		extern	hrb_api 
+		tpm_command equ 0xfed40000      ;tpm命令寄存器地址
+		tpm_status equ 0xfed40014       ;tpm状态寄存器地址
+; 一个接收指针参数的 vmxon 指令宏定义
 
-SECTION .text
+;ip_size equ 4
+;gpr_size equ 4
+;rax equ <eax>
+;rbx equ <ebx>
+;rcx equ <ecx>
+;rdx equ <edx>
+;rsi equ <esi>
+;rdi equ <edi>
+;rsp equ <esp>
+;rbp equ <ebp>
 
-_io_hlt:	; void io_hlt(void);
-		HLT
-		RET
 
-_io_cli:	; void io_cli(void);
-		CLI
-		RET
+ip_size equ 8
+gpr_size equ 8
 
-_io_sti:	; void io_sti(void);
-		STI
-		RET
 
-_io_stihlt:	; void io_stihlt(void);
-		STI
-		HLT
-		RET
+section .text
 
-_io_in8:	; int io_in8(int port);
-		MOV		EDX,[ESP+4]		; port
-		MOV		EAX,0
-		IN		AL,DX
-		RET
+io_hlt:	; void io_hlt(void);
+		hlt
+		ret
 
-_io_in16:	; int io_in16(int port);
-		MOV		EDX,[ESP+4]		; port
-		MOV		EAX,0
-		IN		AX,DX
-		RET
+io_cli:	; void io_cli(void);
+		cli
+		ret
 
-_io_in32:	; int io_in32(int port);
-		MOV		EDX,[ESP+4]		; port
-		IN		EAX,DX
-		RET
+io_sti:	; void io_sti(void);
+		sti
+		ret
 
-_io_out8:	; void io_out8(int port, int data);
-		MOV		EDX,[ESP+4]		; port
-		MOV		AL,[ESP+8]		; data
-		OUT		DX,AL
-		RET
+io_stihlt:	; void io_stihlt(void);
+		sti
+		hlt
+		ret
 
-_io_out16:	; void io_out16(int port, int data);
-		MOV		EDX,[ESP+4]		; port
-		MOV		EAX,[ESP+8]		; data
-		OUT		DX,AX
-		RET
+io_in8:	; int io_in8(int port);
+		mov		edx,[rsp+ip_size]		; port
+		mov		eax,0
+		in		al,dx
+		ret
 
-_io_out32:	; void io_out32(int port, int data);
-		MOV		EDX,[ESP+4]		; port
-		MOV		EAX,[ESP+8]		; data
-		OUT		DX,EAX
-		RET
+io_in16:	; int io_in16(int port);
+		mov		edx,[rsp+ip_size]		; port
+		mov		eax,0
+		in		ax,dx
+		ret
 
-_io_load_eflags:	; int io_load_eflags(void);
-		PUSHFD		; PUSH EFLAGS とぁE��意味
-		POP		EAX
-		RET
+io_in32:	; int io_in32(int port);
+		mov		edx,[rsp+ip_size]		; port
+		in		eax,dx
+		ret
 
-_io_store_eflags:	; void io_store_eflags(int eflags);
+io_out8:	; void io_out8(int port, int data);
+		mov		edx,[rsp+ip_size]		; port
+		mov		al,[rsp+ip_size+gpr_size*1]		; data
+		out		dx,al
+		ret
+
+io_out16:	; void io_out16(int port, int data);
+		mov		edx,[rsp+ip_size]		; port
+		mov		eax,[rsp+ip_size+gpr_size*1]		; data
+		out		dx,ax
+		ret
+
+io_out32:	; void io_out32(int port, int data);
+		mov		edx,[rsp+ip_size]		; port
+		mov		eax,[rsp+ip_size+gpr_size*1]		; data
+		out		dx,eax
+		ret
+
+io_load_eflags:	; int io_load_eflags(void);
+		pushfq		; push eflags とぁe��意味
+		pop rax
+		ret
+io_store_eflags:	; void io_store_eflags(int eflags);
 		;push eax
-		MOV		EAX,[ESP+4]
-		PUSH	EAX
-		POPFD		; POP EFLAGS とぁE��意味
+		mov		rax,[rsp+ip_size]
+		push rax
+		popfq		; pop eflags とぁe��意味
 		;pop eax
-		RET
+		ret
 
-_load_gdtr:		; void load_gdtr(int limit, int addr);
+load_gdtr:		; void load_gdtr(int limit, int addr);
 		;push eax
-		MOV		AX,[ESP+4]		; limit
-		MOV		[ESP+6],AX
-		LGDT	[ESP+6]
+		mov		ax,[rsp+ip_size]		; limit
+		mov		[rsp+ip_size+6],ax
+		lgdt	[rsp+ip_size+6]
 		;pop eax
-		RET
+		ret
 
-_load_idtr:		; void load_idtr(int limit, int addr);
+load_idtr:		; void load_idtr(int limit, int addr);
 		;push eax
-		MOV		AX,[ESP+4]		; limit
-		MOV		[ESP+6],AX
-		LIDT	[ESP+6]
+		mov		ax,[rsp+ip_size]		; limit
+		mov		[rsp+ip_size+6],ax
+		lidt	[rsp+ip_size+6]
 		;pop eax
-		RET
+		ret
 
-_load_cr0:		; int load_cr0(void);
-		MOV		EAX,CR0
-		RET
+load_cr0:		; int load_cr0(void);
+		mov		rax,cr0
+		ret
 
-_store_cr0:		; void store_cr0(int cr0);
+store_cr0:		; void store_cr0(int cr0);
 		;push eax
-		MOV		EAX,[ESP+4]
-		MOV		CR0,EAX
+		mov		rax,[rsp+ip_size]
+		mov		cr0,rax
 		;pop eax
 		nop
 		nop
-		RET
+		ret
 		
-_load_cr3:		; int load_cr3(void);
-		MOV		EAX,CR3
-		RET
+load_cr3:		; int load_cr3(void);
+		mov		rax,cr3
+		ret
 
-_store_cr3:		; void store_cr3(int cr0);
+store_cr3:		; void store_cr3(int cr0);
 		;push eax 
-		MOV		EAX,[ESP+4]
-		MOV		CR3,EAX
+		mov		rax,[rsp+ip_size]
+		mov		cr3,rax
 		;pop eax
-		RET
-
-_load_tr:		; void load_tr(int tr);
-		LTR		[ESP+4]			; tr
-		RET
-_load_cr4:
-		mov eax,[esp+4]
-		mov cr4,eax
 		ret
-_store_cr4:
-		mov eax,cr4
+
+load_tr:		; void load_tr(int tr);
+		ltr		[rsp+ip_size]			; tr
+		ret
+load_cr4:
+		mov rax,[rsp+ip_size]
+		mov cr4,rax
+		ret
+store_cr4:
+		mov rax,cr4
 		ret
 		
-_asm_inthandler20:
-		PUSH	ES
-		PUSH	DS
-		PUSHAD
-		MOV		EAX,ESP
-		PUSH	EAX
-		MOV		AX,SS
-		MOV		DS,AX
-		MOV		ES,AX
-		CALL	_inthandler20
-		POP		EAX
-		POPAD
-		POP		DS
-		POP		ES
-		IRETD
+asm_inthandler20:
+		mov eax,es
+		push rax
+		mov eax,ds
+		push rax
+		
+		push rax
+		push rcx
+		push rdx
+		push rbx
+		push rsi
+		push rdi
+		push rbp
+		push r8
+		push r9
+		push r10
+		push r11
+		
+		mov		rax,rsp
+		push	rax
+		mov		ax,ss
+		mov		ds,ax
+		mov		es,ax
+		call	inthandler20
+		pop		rax
+		
+		pop r11
+		pop r10
+		pop r9
+		pop r8
+		pop rbp
+		pop rdi
+		pop rsi
+		pop rbx
+		pop rdx
+		pop rcx
+		pop rax
+		
+		pop rax
+		mov ds,eax
+		pop rax
+		mov es,eax
+		iretd
 
-_asm_inthandler21:
-		PUSH	ES
-		PUSH	DS
-		PUSHAD
-		MOV		EAX,ESP
-		PUSH	EAX
-		MOV		AX,SS
-		MOV		DS,AX
-		MOV		ES,AX
-		CALL	_inthandler21
-		POP		EAX
-		POPAD
-		POP		DS
-		POP		ES
-		IRETD
+asm_inthandler21:
+		mov eax,es
+		push rax
+		mov eax,ds
+		push rax
+		
+		push rax
+		push rcx
+		push rdx
+		push rbx
+		push rsi
+		push rdi
+		push rbp
+		push r8
+		push r9
+		push r10
+		push r11
+		
+		mov		rax,rsp
+		push	rax
+		mov		ax,ss
+		mov		ds,ax
+		mov		es,ax
+		call	inthandler21
+		pop		rax
+		
+		pop r11
+		pop r10
+		pop r9
+		pop r8
+		pop rbp
+		pop rdi
+		pop rsi
+		pop rbx
+		pop rdx
+		pop rcx
+		pop rax
+		pop rax
+		
+		mov ds,eax
+		pop rax
+		mov es,eax
+		iretd
 
-_asm_inthandler2c:
-		PUSH	ES
-		PUSH	DS
-		PUSHAD
-		MOV		EAX,ESP
-		PUSH	EAX
-		MOV		AX,SS
-		MOV		DS,AX
-		MOV		ES,AX
-		CALL	_inthandler2c
-		POP		EAX
-		POPAD
-		POP		DS
-		POP		ES
-		IRETD
+asm_inthandler2c:
+		mov eax,es
+		push rax
+		mov eax,ds
+		push rax
+		
+		push rax
+		push rcx
+		push rdx
+		push rbx
+		push rsi
+		push rdi
+		push rbp
+		push r8
+		push r9
+		push r10
+		push r11
+		
+		mov		rax,rsp
+		push	rax
+		mov		ax,ss
+		mov		ds,ax
+		mov		es,ax
+		call	inthandler2c
+		pop		rax
+		pop r11
+		pop r10
+		pop r9
+		pop r8
+		pop rbp
+		pop rdi
+		pop rsi
+		pop rbx
+		pop rdx
+		pop rcx
+		pop rax
+		
+		pop rax
+		mov ds,eax
+		pop rax
+		mov es,eax
+		iretd
 
-_asm_inthandler34:
-		PUSH	ES
-		PUSH	DS
-		PUSHAD
-		MOV		EAX,ESP
-		PUSH	EAX
-		MOV		AX,SS
-		MOV		DS,AX
-		MOV		ES,AX
-		CALL	_inthandler34
-		POP		EAX
-		POPAD
-		POP		DS
-		POP		ES
-		IRETD
+asm_inthandler34:
+		mov eax,es
+		push rax
+		mov eax,ds
+		push rax
+		
+		push rax
+		push rcx
+		push rdx
+		push rbx
+		push rsi
+		push rdi
+		push rbp
+		push r8
+		push r9
+		push r10
+		push r11
+		
+		mov		rax,rsp
+		push	rax
+		mov		ax,ss
+		mov		ds,ax
+		mov		es,ax
+		call	inthandler34
+		pop		rax
+		pop r11
+		pop r10
+		pop r9
+		pop r8
+		pop rbp
+		pop rdi
+		pop rsi
+		pop rbx
+		pop rdx
+		pop rcx
+		pop rax
+		
+		pop rax
+		mov ds,eax
+		pop rax
+		mov es,eax
+		iretd
 
-_asm_inthandler0c:
-		STI
-		PUSH	ES
-		PUSH	DS
-		PUSHAD
-		MOV		EAX,ESP
-		PUSH	EAX
-		MOV		AX,SS
-		MOV		DS,AX
-		MOV		ES,AX
-		CALL	_inthandler0c
-		CMP		EAX,0
-		JNE		_asm_end_app
-		POP		EAX
-		POPAD
-		POP		DS
-		POP		ES
-		ADD		ESP,4			; INT 0x0c でも、これが忁E��E
-		IRETD
+asm_inthandler0c:
+		sti
+		mov eax,es
+		push rax
+		mov eax,ds
+		push rax
+		
+		push rax
+		push rcx
+		push rdx
+		push rbx
+		push rsi
+		push rdi
+		push rbp
+		push r8
+		push r9
+		push r10
+		push r11
+		
+		mov		rax,rsp
+		push	rax
+		mov		ax,ss
+		mov		ds,ax
+		mov		es,ax
+		call	inthandler0c
+		cmp		eax,0
+		jne		asm_end_app
+		pop		rax
+		pop r11
+		pop r10
+		pop r9
+		pop r8
+		pop rbp
+		pop rdi
+		pop rsi
+		pop rbx
+		pop rdx
+		pop rcx
+		pop rax
+		
+		pop rax
+		mov ds,eax
+		pop rax
+		mov es,eax
+		
+		add		esp,4			; int 0x0c でも、これが忁e��e
+		iretd
 
-_asm_inthandler0d:
-		STI
-		PUSH	ES
-		PUSH	DS
-		PUSHAD
-		MOV		EAX,ESP
-		PUSH	EAX
-		MOV		AX,SS
-		MOV		DS,AX
-		MOV		ES,AX
-		CALL	_inthandler0d
-		CMP		EAX,0			; ここだけ違ぁE
-		JNE		_asm_end_app	; ここだけ違ぁE
-		POP		EAX
-		POPAD
-		POP		DS
-		POP		ES
-		ADD		ESP,4			; INT 0x0d では、これが忁E��E
-		IRETD
+asm_inthandler0d:
+		sti
+		mov eax,es
+		push rax
+		mov eax,ds
+		push rax
+		
+		push rax
+		push rcx
+		push rdx
+		push rbx
+		push rsi
+		push rdi
+		push rbp
+		push r8
+		push r9
+		push r10
+		push r11
+		
+		mov		rax,rsp
+		push	rax
+		mov		ax,ss
+		mov		ds,ax
+		mov		es,ax
+		call	inthandler0d
+		cmp		eax,0			; ここだけ違ぁe
+		jne		asm_end_app	; ここだけ違ぁe
+		pop		rax
+		pop r11
+		pop r10
+		pop r9
+		pop r8
+		pop rbp
+		pop rdi
+		pop rsi
+		pop rbx
+		pop rdx
+		pop rcx
+		pop rax
+		
+		pop rax
+		mov ds,eax
+		pop rax
+		mov es,eax
+		
+		add		esp,4			; int 0x0d では、これが忁e��e
+		iretd
 
-_asm_inthandler0e:
-		STI
-		PUSH	ES
-		PUSH	DS
-		PUSHAD
-		MOV		EAX,ESP
-		PUSH	EAX
-		MOV		AX,SS
-		MOV		DS,AX
-		MOV		ES,AX
-		MOV 	eax,cr2 ;保存现场
-		PUSH 	eax
-		CALL	_inthandler0e
-		CMP		EAX,0
-		JNE		_asm_end_app
-		ADD 	ESP,4 ;渁E��栈中皁Er2
-		POP		EAX
-		POPAD
-		POP		DS
-		POP		ES
-		ADD		ESP,4
-		IRETD
-_memtest_sub:	; unsigned int memtest_sub(unsigned int start, unsigned int end)
-		PUSH	EDI						; �E�EBX, ESI, EDI も使ぁE��ぁE�Eで�E�E
-		PUSH	ESI
-		PUSH	EBX
-		MOV		ESI,0xaa55aa55			; pat0 = 0xaa55aa55;
-		MOV		EDI,0x55aa55aa			; pat1 = 0x55aa55aa;
-		MOV		EAX,[ESP+12+4]			; i = start;
+asm_inthandler0e:
+		sti
+		mov eax,es
+		push rax
+		mov eax,ds
+		push rax
+		
+		push rax
+		push rcx
+		push rdx
+		push rbx
+		push rsi
+		push rdi
+		push rbp
+		push r8
+		push r9
+		push r10
+		push r11
+		
+		mov		rax,rsp
+		push	rax
+		mov		ax,ss
+		mov		ds,ax
+		mov		es,ax
+		mov 	rax,cr2 ;保存现场
+		push 	rax
+		call	inthandler0e
+		cmp		eax,0
+		jne		asm_end_app
+		add 	esp,8 ;渁e��栈中皁er2
+		pop		rax
+		pop r11
+		pop r10
+		pop r9
+		pop r8
+		pop rbp
+		pop rdi
+		pop rsi
+		pop rbx
+		pop rdx
+		pop rcx
+		pop rax
+		
+		pop rax
+		mov ds,eax
+		pop rax
+		mov es,eax
+		
+		add		esp,4
+		iretd
+memtest_sub:	; unsigned int memtest_sub(unsigned int start, unsigned int end)
+		push	rdi						; �e�ebx, esi, edi も使ぁe��ぁe�eで�e�e
+		push	rsi
+		push	rbx
+		mov		esi,0xaa55aa55			; pat0 = 0xaa55aa55;
+		mov		edi,0x55aa55aa			; pat1 = 0x55aa55aa;
+		mov		eax,[rsp+12+4]			; i = start;
 mts_loop:
-		MOV		EBX,EAX
-		ADD		EBX,0xffc				; p = i + 0xffc;
-		MOV		EDX,[EBX]				; old = *p;
-		MOV		[EBX],ESI				; *p = pat0;
-		XOR		DWORD [EBX],0xffffffff	; *p ^= 0xffffffff;
-		CMP		EDI,[EBX]				; if (*p != pat1) goto fin;
-		JNE		mts_fin
-		XOR		DWORD [EBX],0xffffffff	; *p ^= 0xffffffff;
-		CMP		ESI,[EBX]				; if (*p != pat0) goto fin;
-		JNE		mts_fin
-		MOV		[EBX],EDX				; *p = old;
-		ADD		EAX,0x1000				; i += 0x1000;
-		CMP		EAX,[ESP+12+8]			; if (i <= end) goto mts_loop;
-		JBE		mts_loop
-		POP		EBX
-		POP		ESI
-		POP		EDI
-		RET
+		mov		ebx,eax
+		add		ebx,0xffc				; p = i + 0xffc;
+		mov		edx,[ebx]				; old = *p;
+		mov		[ebx],esi				; *p = pat0;
+		xor		dword [ebx],0xffffffff	; *p ^= 0xffffffff;
+		cmp		edi,[ebx]				; if (*p != pat1) goto fin;
+		jne		mts_fin
+		xor		dword [ebx],0xffffffff	; *p ^= 0xffffffff;
+		cmp		esi,[ebx]				; if (*p != pat0) goto fin;
+		jne		mts_fin
+		mov		[ebx],edx				; *p = old;
+		add		eax,0x1000				; i += 0x1000;
+		cmp		eax,[rsp+12+8]			; if (i <= end) goto mts_loop;
+		jbe		mts_loop
+		pop		rbx
+		pop		rsi
+		pop		rdi
+		ret
 mts_fin:
-		MOV		[EBX],EDX				; *p = old;
-		POP		EBX
-		POP		ESI
-		POP		EDI
-		RET
+		mov		[ebx],edx				; *p = old;
+		pop		rbx
+		pop		rsi
+		pop		rdi
+		ret
 
-_farjmp:		; void farjmp(int eip, int cs);
-		JMP		FAR	[ESP+4]				; eip, cs
-		RET
+farjmp:		; void farjmp(int eip, int cs);
+		jmp		far	[rsp+ip_size]				; eip, cs
+		ret
 
-_farcall:		; void farcall(int eip, int cs);
-		CALL	FAR	[ESP+4]				; eip, cs
-		RET
+farcall:		; void farcall(int eip, int cs);
+		call	far	[rsp+ip_size]				; eip, cs
+		ret
 
-_asm_hrb_api:
-		STI
-		PUSH	DS
-		PUSH	ES
-		PUSHAD		; 保存�EためのPUSH
-		PUSHAD		; hrb_apiにわたすため�EPUSH
-		MOV		AX,SS
-		MOV		DS,AX		; OS用のセグメントをDSとESにも�Eれる
-		MOV		ES,AX
-		CALL	_hrb_api
-		CMP		EAX,0		; EAXぁEでなければアプリ終亁E�E琁E
-		JNE		_asm_end_app
-		ADD		ESP,32
-		POPAD
-		POP		ES
-		POP		DS
-		IRETD
-_asm_end_app:
-;	EAXはtss.esp0の番地
-		MOV		ESP,[EAX]
-		MOV		DWORD [EAX+4],0
-		POPAD
-		RET					; cmd_appへ帰めE
+asm_hrb_api:
+		sti
+		mov eax,es
+		push rax
+		mov eax,ds
+		push rax
+		
 
-_start_app:		; void start_app(int eip, int cs, int esp, int ds, int *tss_esp0);
-		PUSHAD		; 32ビットレジスタを�E部保存しておく
-		MOV		EDX,[ESP+36]	; アプリ用のEIP
-		MOV		EAX,[ESP+40]	; アプリ用のCS
-		MOV		ECX,[ESP+44]	; アプリ用のESP
-		MOV		EBX,[ESP+48]	; アプリ用のDS/SS
-		MOV		EBP,[ESP+52]	; tss.esp0の番地
-		MOV		[EBP  ],ESP		; OS用のESPを保孁E
-		MOV		[EBP+4],SS		; OS用のSSを保孁E
-		MOV		ES,BX
-		MOV		DS,BX
-		MOV		FS,BX
-		MOV		GS,BX
+		push rax
+		push rcx
+		push rdx
+		push rbx
+		push rsi
+		push rdi
+		push rbp
+		push rsp; 保存�eためのpush
+		
+
+		push rax
+		push rcx
+		push rdx
+		push rbx
+		push rsi
+		push rdi
+		push rbp
+		push rsp; hrb_apiにわたすため�epush
+		mov		ax,ss
+		mov		ds,ax		; os用のセグメントをdsとesにも�eれる
+		mov		es,ax
+		call	hrb_api
+		cmp		eax,0		; eaxぁeでなければアプリ終亁e�e琁e
+		jne		asm_end_app
+		add		esp,32
+		
+		pop rsp
+		pop rbp
+		pop rdi
+		pop rsi
+		pop rbx
+		pop rdx
+		pop rcx
+		pop rax
+		
+		pop rax
+		mov ds,eax
+		pop rax
+		mov es,eax
+		
+		iretd
+asm_end_app:
+;	eaxはtss.esp0の番地
+		mov		rsp,[rax]
+		mov		dword [eax+4],0
+		pop rsp
+		pop rbp
+		pop rdi
+		pop rsi
+		pop rbx
+		pop rdx
+		pop rcx
+		pop rax
+		ret					; cmd_appへ帰めe
+
+start_app:		; void start_app(int eip, int cs, int esp, int ds, int *tss_esp0);
+		push rax
+		push rcx
+		push rdx
+		push rbx
+		push rsi
+		push rdi
+		push rbp
+		push rsp		; 32ビットレジスタを�e部保存しておく
+		
+		mov		edx,[rsp+ip_size+gpr_size*8]	; アプリ用のeip
+		mov		eax,[rsp+ip_size+gpr_size*9]	; アプリ用のcs
+		mov		ecx,[rsp+ip_size+gpr_size*10]	; アプリ用のesp
+		mov		ebx,[rsp+ip_size+gpr_size*11]	; アプリ用のds/ss
+		mov		ebp,[rsp+ip_size+gpr_size*12]	; tss.esp0の番地
+		mov		[ebp  ],rsp		; os用のespを保孁e
+		mov		[rbp+4],ss		; os用のssを保孁e
+		mov		es,bx
+		mov		ds,bx
+		mov		fs,bx
+		mov		gs,bx
 		;db 0x0f,0x35;sys_ret
-;	以下�ERETFでアプリに行かせるためのスタチE��調整
-		OR		EAX,3			; アプリ用のセグメント番号に3をORする
-		OR		EBX,3			; アプリ用のセグメント番号に3をORする
-		PUSH	EBX				; アプリのSS
-		PUSH	ECX				; アプリのESP
-		PUSH	EAX				; アプリのCS
-		PUSH	EDX				; アプリのEIP
-		RETF
-;	アプリが終亁E��てもここには来なぁE
-_strcmp:	;int strcmp(char* s,char* t,int longer);
-	push esi;
-	push edi;
-	push ecx;
-	mov esi,[esp+4]
-	mov edi,[esp+8]
-	mov ecx,[esp+12]
+;	以下�eretfでアプリに行かせるためのスタチe��調整
+		or		eax,3			; アプリ用のセグメント番号に3をorする
+		or		ebx,3			; アプリ用のセグメント番号に3をorする
+		push	rbx				; アプリのss
+		push	rcx				; アプリのesp
+		push	rax				; アプリのcs
+		push	rdx				; アプリのeip
+		retf
+;	アプリが終亁e��てもここには来なぁe
+strcmp:	;int strcmp(char* s,char* t,int longer);
+	push rsi;
+	push rdi;
+	push rcx;
+	mov rsi,[rsp+ip_size]
+	mov rdi,[rsp+ip_size+gpr_size]
+	mov rcx,[rsp+ip_size+gpr_size*2]
 	repne cmpsd
 	mov eax,ecx
-	pop ecx
-	pop edi
-	pop esi
+	pop rcx
+	pop rdi
+	pop rsi
 	ret
-_strcpy:	;void strcpy(char* s,char* t,int longer);
-	push esi;
-	push edi;
-	push ecx;
-	mov esi,[esp+4]
-	mov edi,[esp+8]
-	mov ecx,[esp+12]
+strcpy:	;void strcpy(char* s,char* t,int longer);
+	push rsi;
+	push rdi;
+	push rcx;
+	mov rsi,[rsp+ip_size]
+	mov rdi,[rsp+ip_size+gpr_size]
+	mov rcx,[rsp+ip_size+gpr_size*2]
 	;db 0xf3,0xa5;rep movsb
 	rep movsb
-	pop ecx
-	pop edi
-	pop esi
+	pop rcx
+	pop rdi
+	pop rsi
 	ret
-_memset:	;void memset(char* s,int num,int longer)
-	push edi
-	push eax
-	push ecx
-	mov edi,[esp+4]
-	mov eax,[esp+8]
-	mov ecx,[esp+12]
+memset:	;void memset(char* s,int num,int longer)
+	push rdi
+	push rax
+	push rcx
+	mov rdi,[rsp+ip_size]
+	mov rax,[rsp+ip_size+gpr_size]
+	mov rcx,[rsp+ip_size+gpr_size*2]
 	rep stosb
-	pop ecx
-	pop eax
-	pop edi
+	pop rcx
+	pop rax
+	pop rdi
 	ret
-_support_apic: ;int support_apic(void):
-	push edx
+support_apic: ;int support_apic(void):
+	push rdx
 	mov eax,1
 	;db 0x0f,0xa2 ;cpuid 
 	cpuid
 	bt edx,9
 	setc al
 	movzx eax,al
-	pop edx
+	pop rdx
 	ret
-_io_rdmsr: ;void io_rdmsr(int* edx,int* eax,int ecx)
-	push edx
-	push ecx
-	push eax
-	mov ecx,[esp+24]
+io_rdmsr: ;void io_rdmsr(int* edx,int* eax,int ecx)
+	mov ecx,[rsp+ip_size+gpr_size*2]
 	;db 0x0f,0x32 ;rdmsr
 	rdmsr
-	mov ecx,[esp+16]
+	mov ecx,[rsp+ip_size]
 	mov [ecx],edx
-	mov ecx,[esp+20]
+	mov ecx,[rsp+ip_size+gpr_size*2]
 	mov [ecx],eax
-	pop eax
-	pop ecx
-	pop edx
 	ret
-_io_wrmsr: ;void io_wrmsr(int edx,int eax,int ecx)
-	push edx
-	push ecx
-	push eax
-	mov edx,[esp+16]
-	mov eax,[esp+20]
-	mov ecx,[esp+24]
+io_wrmsr: ;void io_wrmsr(int edx,int eax,int ecx)
+	mov edx,[rsp+ip_size]
+	mov eax,[rsp+ip_size+gpr_size]
+	mov ecx,[rsp+ip_size+gpr_size*2]
 	;db 0x0f,0x30 ;wrmsr
 	wrmsr
-	pop eax
-	pop ecx
-	pop edx
 	ret
-_test2: ;void test(int eax,int ebx)
-	push eax
-	push ebx
-	mov eax,[esp+12]
-	mov ebx,[esp+16]
+test2: ;void test(int eax,int ebx)
+	push rax
+	push rbx
+	mov eax,[rsp+ip_size+gpr_size*2]
+	mov ebx,[rsp+ip_size+gpr_size*3]
 	db 0x0f,0x0b ;ud2
 .fin:
 	cli
 	hlt
 	jmp .fin
-	pop ebx
-	pop eax
+	pop rbx
+	pop rax
 	ret
-_get_lock: ;int get_lock(int* lock,int bit)
-	push ebp
-	mov ebp,esp
-	push ecx
-	push edx
-	mov ebx,[ebp+8]
-	mov ecx,[ebp+12]
-	lock bts dword [ebx],ecx
+get_lock: ;int get_lock(int* lock,int bit)
+	push rbp
+	mov rbp,rsp
+	push rcx
+	push rdx
+	mov ebx,[rbp+ip_size+gpr_size]
+	mov ecx,[rbp+ip_size+gpr_size*2]
+	lock bts dword [rbx],ecx
 	xor eax,eax
 	adc eax,eax
-	pop edx
-	pop ecx
+	pop rdx
+	pop rcx
 	mov esp,ebp
-	pop ebp
+	pop rbp
 	ret
-_store_gdt: ;void store_gdt(void* addr)
-	push eax
-	mov eax,[esp+8]
-	sgdt [eax]
-	pop eax
+store_gdt: ;void store_gdt(void* addr)
+	push rax
+	mov eax,[rsp+ip_size+gpr_size]
+	sgdt [rax]
+	pop rax
 	ret
-_store_idt: ;void store_gdt(void* addr)
-	push eax
-	mov eax,[esp+8]
-	sidt [eax]
-	pop eax
+store_idt: ;void store_gdt(void* addr)
+	push rax
+	mov eax,[rsp+ip_size+gpr_size]
+	sidt [rax]
+	pop rax
 	ret
-_sys_reboot: ;void sys_reboot(void)
+sys_reboot: ;void sys_reboot(void)
 	cli
-	mov eax,cr0
+	mov rax,cr0
 	mov dx,0x64
 	mov ax,0xfe
 	out dx,ax
 .fin:
 	hlt
 	jmp .fin
-_sys_call:
+sys_call:
 	db 0x0f,0x35 ;sysexit
-_test3:
+test3:
 	db 0xf4
 .fin:
 	jmp .fin
-_support_rand: ;int support_rand()
+support_rand: ;int support_rand()
+	xor eax,eax
+	inc eax
+	ret
 	
-	push ebx
-	push ecx
-	push edx
+	push rbx
+	push rcx
+	push rdx
 	mov eax,1
 	db 0x0f,0xa2 ;cpuid
-	and ecx,0x400000000
+	and ecx,0x40000000
 	db 0x0f,0x92,0xc0;setc al
-	pop edx
-	pop ecx
-	pop ebx
+	pop rdx
+	pop rcx
+	pop rbx
 	ret
-_rdrand: ;int rdrand()
-	db 0x0f,0xc7,0xf0 ;rnrand eax
+rdrand: ;int rdrand()
+	db 0x0f,0xc7,0xf0 ;rdrand eax
 	;rdrand
 	ret
 _invlpg:
 	ret
-_tpm_init:
-	;初始化TPM
-	push eax
+tpm_init:
+	;初始化tpm
+	push rax
     mov eax, 0x6f000
     mov dword [tpm_command], eax
-    call _tpm_wait_for_status
-	pop eax
+    call tpm_wait_for_status
+	pop rax
 	ret
-_tpm_get_a_key:
+tpm_get_a_key:
 	
-_tpm_wait_for_status:
-        ;等待TPM状态就绪
+tpm_wait_for_status:
+        ;等待tpm状态就绪
         mov eax, dword [tpm_status]
         and eax, 0x01800000
         cmp eax, 0x00800000
-        jne _tpm_wait_for_status
+        jne tpm_wait_for_status
 		ret
-_sys_nop:
+sys_nop:
 	nop
 	ret
 ;unsigned int asm_sse_strcmp(char* str,char* str,unsigned,int longer)
-_asm_sse_strcmp:
-	push ebp
-	mov ebp,esp
+asm_sse_strcmp:
+	push rbp
+	mov rbp,rsp
 	
-	mov eax,[ebp+8]
-	mov edx,[ebp+12]
-	mov ecx,[ebp+16]
-	push ebx
-	push esi
-	push edi
-	mov esi,eax
-	mov edi,edx
-	mov edx,ecx
+	mov eax,[rbp+gpr_size*2]
+	mov edx,[rbp+gpr_size*3]
+	mov ecx,[rbp+gpr_size*4]
+	push rbx
+	push rsi
+	push rdi
+	mov rsi,rax
+	mov rdi,rdx
+	mov rdx,rcx
 	;清零计数器
-	xor eax,eax 
+	xor rbx,rbx 
+	clts
+	pxor xmm2,xmm2
+.lp:
+	clts
+	;将字符串剩余长度读入
+	;lea eax,[edx-ebx]
+	mov rax,rdx
+	sub rax,rbx
+	mov rcx,rax
+	movdqu xmm0, [rsi+rbx]
+	movdqu xmm1, [rdi+rbx]
+	pcmpestri xmm0,xmm1,0x18
+	;不是16证明有不一样的部分
+	cmp rcx,16
+	jne .fin
+	
+	;检查两个字符串中是否有0 如果有 证明其中一个字符串已经结束
+	mov rbx,rcx
+	pcmpistri xmm0,xmm2,0x04
+	;如果不是16 证明有一个字符是空字符 字符串结束
+	cmp rcx,16
+	jne .fin2
+	
+	pcmpistri xmm1,xmm2,0x04
+	;如果不是16 证明有一个字符是空字符 字符串结束
+	cmp rcx,16
+	jne .fin2
+	
+	add rbx,16
+	;最后 比较是否达到了界限值
+	cmp rdx,rbx
+	jbe .fin2
+	
+	jmp .lp
+.fin2:
+	;没有异常
+	xor rax,rax
+	pop rdi
+	pop rsi
+	pop rbx
+	pop rbp
+	ret
+.fin:
+	lea rax,[rbx+rcx]
+	inc rax
+	
+	pcmpistri xmm0,xmm1,0x18
+	;最后判断一次是不是遇到了字符串结尾
+	cmp rcx,16
+	je .fin2
+	
+	pop rdi
+	pop rsi
+	pop rbx
+	pop rbp
+	ret
+;asm_sse_strtest(char* str,char test[16])
+_asm_sse_strtest:
+	push rbp
+	mov rbp,rsp
+	mov rax,[rbp+gpr_size*2]
+	mov rdx,[rbp+gpr_size*3]
+	push rbx
+	push rsi
+	push rdi
+	movdqu xmm1,[edx]
+	;清零计数器
+	xor rax,rax 
 	clts
 	pxor xmm2,xmm2
 .lp:
 	clts
 	movdqu xmm0, [esi+eax]
-	movdqu xmm1, [edi+eax]
-	pcmpistri xmm0,xmm1,0x18
-	
-	cmp ecx,16
+	pcmpistri xmm0,xmm1,0x14
+	cmp rcx,16
+	;0
 	jne .fin
 	
-	;检查两个字符串中是否有0 如果有 证明其中一个字符串已经结束
-	mov ebx,ecx
+	mov rbx,rcx
 	pcmpistri xmm0,xmm2,0x04
 	;如果是16 证明没有任何一个字符是空字符 字符串没有结束
-	cmp ecx,16
+	cmp rcx,16
 	jne .fin2
 	
-	pcmpistri xmm0,xmm2,0x04
-	;如果是16 证明没有任何一个字符是空字符 字符串没有结束
-	cmp ecx,16
-	jne .fin2
-	
-	add eax,16
+	add rax,16
 	jmp .lp
 .fin2:
-	mov ecx,ebx
+	mov rax,rbx
 .fin:
-	add eax,ecx
-	pop edi
-	pop esi
-	pop ebx
+	add rax,rcx
+	pop rdi
+	pop rsi
+	pop rbx
+	pop rbp
+	ret
+;asm_task_switch32(unsigned int *old_esp,unsigned int *new_esp)
+asm_task_switch32:
+	push rbp
+	mov ebp,esp
+	mov ecx,[rbp+8]
+	mov edx,[rbp+12]
+	call .start
+	;恢复环境的代码
+	pop rbp
+	ret
+.start:
+	;保存环境的代码
+	push rbx
+	push rsi
+	push rdi
+	push rbp
+	;cr3
+	mov rax,cr3
+	push rax
+	xor eax,eax
+	;flags
+	pushfq
+	;tr
+	push rax
+	str [rsp]
+	;ldtr
+	push rax
+	sldt [esp]
+	mov [ecx],rsp
+	;64位被调用者寄存器
+	push r12
+	push r13
+	push r14
+	push r15
+	;加载环境的代码
+	mov esp,[edx]
+	pop r15
+	pop r14
+	pop r13
+	pop r12
+	;ldtr
+	lldt [esp]
+	pop rax
+	;tr
+	;ltr [esp]
+	pop rax
+	;flags
+	popfq
+	;cr3
+	pop rax
+	mov cr3,rax
+	pop rbp
+	pop rdi
+	pop rsi
+	pop rbx
+	ret
+bits 32
+;asm_task_switch32_2(unsigned int *old_esp,tss32 *new_esp)
+asm_task_switch32_2:
+	push ebp
+	mov ebp,esp
+	mov ecx,[ebp+8]
+	mov edx,[ebp+12]
+	call .start
+	;恢复环境的代码
 	pop ebp
+	ret
+.start:
+	;保存环境的代码
+	push ebx
+	push esi
+	push edi
+	push ebp
+	mov eax,cr3
+	push eax
+	pushfd
+	push eax
+	mov [ecx],esp
+	;加载环境的代码
+	mov eax,[edx]
+	mov edx,[eax+15*4]
+	mov ebp,edx
+	mov edx,[eax+16*4]
+	mov esi,edx
+	mov edx,[eax+17*4]
+	mov edi,edx
+	mov edx,[eax+18*4]
+	mov es,edx
+	mov edx,[eax+22*4]
+	mov fs,edx
+	mov edx,[eax+23*4]
+	mov gs,edx
+	mov esp,eax
+	popad
+	retf
+	ret
+bits 64
+;void asm_vmptrld(unsigned int vmcs_point)
+asm_vmptrld:
+	mov rax,[rsp+ip_size]
+	vmptrld [rax]
+	ret
+;void asm_vmptrst(unsigned int* vmcs_point)
+asm_vmptrst:
+	mov rax,[rsp+ip_size]
+	vmptrst [rax]
+	ret
+;void asm_vmclear(unsigned int vmcs_point)
+asm_vmclear:
+	mov rax,[rsp+ip_size]
+	vmclear [rax]
+	ret
+;void asm_vmread(unsigned int index,void* data)
+asm_vmread:
+	mov rax,[rsp+ip_size]
+	mov rdx,[rsp+ip_size+gpr_size]
+	vmread [rdx],rax
+	ret
+;void asm_vmread(unsigned int index,void data)
+asm_vmwrite:
+	mov rax,[rsp+ip_size]
+	mov rdx,[rsp+ip_size+gpr_size]
+	vmwrite rax,rdx
+	ret
+asm_vmxon:
+	
+asm_x64_cs_init:
+	db 0x48
+	retf
+asm_get_cs:
+	mov rax,cs
 	ret

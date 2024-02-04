@@ -1,76 +1,6 @@
 //Thanks to ChatGPT 3.5 from OpenAI for the help
 //Thanks to Claude from Slack for the help
-typedef unsigned int UINTN;
-typedef UINTN EFI_HANDLE;
-typedef UINTN EFI_STATUS;
-
-typedef struct {
-  unsigned int  Signature_low;
-  unsigned int  Signature_high;
-  unsigned int  Revision;
-  unsigned int  HeaderSize;
-  unsigned int  CRC32;
-  unsigned int  Reserved;
-} EFI_TABLE_HEADER;
-
-typedef struct {
-	unsigned int g1;
-	unsigned short g2;
-	unsigned short g3;
-	unsigned char g4[8];
-}EFI_GUID;
-
-typedef struct {
-  EFI_TABLE_HEADER                Hdr;
-  //
-  // Time Services
-  //
-  UINTN                    (*GetTime)(void* Time,void* Capabilities);
-  UINTN                    (*SetTime)(void* Time);
-  UINTN             (*GetWakeupTime)(void* Enabled,void* Pending,void* Time);
-  UINTN             (*SetWakeupTime)(void* Enabled,void* Time);
-  //
-  // Virtual Memory Services
-  //
-  UINTN     (*SetVirtualAddressMap)(UINTN MemoryMapSize,UINTN DescriptorSize,unsigned int DescriptorVersion,void* VirtualMap);
-  UINTN             (*ConvertPointer)(UINTN DebugDisposition,void** address);
-  //
-  // Variable Services
-  //
-  EFI_STATUS                (*GetVariable)(short* VariableName,EFI_GUID* VendorGuid,unsigned int* Attributes,UINTN* DataSize,void* Data);
-  EFI_STATUS      (*GetNextVariableName)(UINTN* VariableNameSize,short* VariableName,EFI_GUID VendorGuid);
-  EFI_STATUS                (*SetVariable)(short* VariableName,EFI_GUID* VendorGuid,unsigned int Attributes,UINTN DataSize,void* Data);
-  //
-  // Miscellaneous Services
-  //
-  EFI_STATUS    (*GetNextHighMonotonicCount)();
-  EFI_STATUS                (*ResetSystem)();
-  //
-  // UEFI 2.0 Capsule Services
-  //
-  EFI_STATUS              (*UpdateCapsule)();
-  EFI_STATUS  (*QueryCapsuleCapabilities)();
-  //
-  // Miscellaneous UEFI 2.0 Service
-  //
-  EFI_STATUS         (*QueryVariableInfo)();
-} EFI_RUNTIME_SERVICES;
-
-typedef struct {
-  EFI_TABLE_HEADER                    	Hdr;
-  short                              	*FirmwareVendor;
-  unsigned int                      	FirmwareRevision;
-  EFI_HANDLE                          	ConsoleInHandle;
-  void      							*ConIn;
-  EFI_HANDLE                          	ConsoleOutHandle;
-  void     								*ConOut;
-  EFI_HANDLE                          	StandardErrorHandle;
-  void     								*StdErr;
-  EFI_RUNTIME_SERVICES                	*RuntimeServices;
-  void                   				*BootServices;
-  UINTN                               	NumberOfTableEntries;
-  void             						*ConfigurationTable;
-} EFI_SYSTEM_TABLE;
+#include<Uefi.h>
 int dmg_write(void* buff,int lba28,int block_number,int divice);
 EFI_SYSTEM_TABLE* get_sys_table_addr();
 EFI_GUID* get_var_guid();
@@ -201,14 +131,14 @@ int io_out8(int port, int data);
 int io_in16(int port);
 int io_out16(int port, int data);
 int io_load_eflags(void);
-int io_store_eflags(int eflags);
-int load_gdtr(int limit, int addr);
-int load_idtr(int limit, int addr);
-int load_cr0(void);
-int store_cr0(int cr0);
-int load_cr3(void);
-int store_cr3(int cr3);
-void load_tr(int tr);
+int io_store_eflags(unsigned long long eflags);
+int load_gdtr(unsigned long long limit, unsigned long long addr);
+int load_idtr(unsigned long long limit, unsigned long long addr);
+unsigned long long load_cr0(void);
+unsigned long long store_cr0(unsigned long long cr0);
+unsigned long long  load_cr3(void);
+unsigned long long  store_cr3(unsigned long long cr3);
+void load_tr(unsigned long long tr);
 void asm_inthandler0c(void);
 void asm_inthandler0d(void);
 void asm_inthandler20(void);
@@ -220,11 +150,11 @@ unsigned int memtest_sub(unsigned int start, unsigned int end);
 void farjmp(int eip, int cs);
 void farcall(int eip, int cs);
 void asm_hrb_api(void);
-void start_app(int eip, int cs, int esp, int ds, int *tss_esp0);
+void start_app(unsigned long long eip, unsigned long long cs, unsigned long long esp, unsigned long long ds, unsigned long long *tss_esp0);
 void asm_end_app(void);
 int support_apic(void);
-void io_wrmsr(int edx,int eax,int ecx);
-void io_rdmsr(int* edx,int* eax,int ecx);
+void io_wrmsr(unsigned long long edx,unsigned long long eax,unsigned long long ecx);
+void io_rdmsr(unsigned long long* edx,unsigned long long* eax,unsigned long long ecx);
 void test2(int eax,int ebx);
 void store_gdt(void* addr);
 void store_idt(void* addr);
@@ -232,6 +162,8 @@ void sys_reboot(void);
 void sys_call(void);
 int rdrand();
 unsigned int  asm_sse_strcmp(char* s,char* t,unsigned int longer);
+void asm_task_switch32(unsigned int *esp_s,unsigned int* esp_t);
+unsigned long long asm_get_cs();
 //void memset(char* s,int num,int longer);
 //void strcpy(char* s,char* t,int longer);
 //int strcmp(char* s,char* t,int longer);
@@ -303,19 +235,22 @@ void putblock8_32(int *vram, int vxsize, int pxsize,
 /* dsctbl.c */
 #pragma pack(1)
 struct SEGMENT_DESCRIPTOR {
-	short limit_low, base_low;
-	char base_mid, access_right;
-	char limit_high, base_high;
+			short limit_low, base_low;
+			char base_mid, access_right;
+			char limit_high, base_high;
 };
 #pragma pack(1)
 struct GATE_DESCRIPTOR {
 	short offset_low, selector;
 	char dw_count, access_right;
 	short offset_high;
+	unsigned int offset_64;
+	unsigned int res;
 };
 void init_gdtidt(UINTN main_this);
-void set_segmdesc(struct SEGMENT_DESCRIPTOR *sd, unsigned int limit, int base, int ar);
-void set_gatedesc(struct GATE_DESCRIPTOR *gd, int offset, int selector, int ar);
+void asm_x64_cs_init(unsigned long long cs_sel);
+void set_segmdesc(struct SEGMENT_DESCRIPTOR *sd, unsigned int limit, unsigned long long base, int ar);
+void set_gatedesc(struct GATE_DESCRIPTOR *gd, unsigned long long offset, int selector, int ar);
 #define ADR_IDT			0x0026f800
 #define LIMIT_IDT		0x000007ff
 #define ADR_GDT			0x00270000
@@ -327,6 +262,7 @@ void set_gatedesc(struct GATE_DESCRIPTOR *gd, int offset, int selector, int ar);
 #define AR_LDT			0x0082
 #define AR_TSS32		0x0089
 #define AR_INTGATE32	0x008e
+#define AR_CODE64_ER	0x209a
 
 /* int.c */
 void init_pic(void);
@@ -424,6 +360,7 @@ struct SHEET {
 	int red_size;//图层红色部分大小bit
 	int grenn_size;//
 	int yellow_size;//
+	unsigned int colordept;
 	unsigned int* (*mouse_down)(struct SHEET* self,int x,int y);//鼠标按下事件
 	unsigned int* (*mouse_up)(struct SHEET* self,int x,int y);//鼠标抬起事件
 	unsigned int* (*mouse_move)(struct SHEET* self,int x1,int y1,int x2,int y2);//鼠标移动事件
@@ -447,6 +384,7 @@ struct SHTCTL {
 	struct View *sheets0;//公共图层数据数组
 	struct SHEET *vram4sht;//该图层控制器的输出是否接到了一个图层上
 	struct DISPLAY func;//操作函数
+	unsigned int colordept;//色彩深度
 };
 struct SHTCTL *shtctl_init(struct MEMMAN *memman,struct PAGEMAN32 *pageman, unsigned char *vram, int xsize, int ysize);
 struct SHEET *sheet_alloc(struct SHTCTL *ctl);
@@ -533,6 +471,9 @@ struct task_abort{//应用程序终止列表
 struct TIMER {
 	struct TIMER *next;
 	unsigned int timeout, timeout64;
+	/*flags2
+	0:timeout是否被解释为高精度定时器计数值
+	*/
 	char flags, flags2;
 	struct FIFO32 *fifo;
 	int data;
@@ -540,9 +481,15 @@ struct TIMER {
 #pragma pack(1)
 struct TIMERCTL {
 	unsigned int count, count64, next, next64;
+	unsigned int timer_type;//计数器类型
+	/*关于计数器类型
+	1. 采用固定时钟源
+	*/
 	struct TIMER *t0;
 	struct TIMER timers0[MAX_TIMER];
 	unsigned int fps;//本定时器一秒产生多少次中断,系统组件需要根据这个值评估自身申请的定时器timeout的大小,填写近似值也被允许
+	EFI_STATUS (*timer_second2count)(unsigned int *time64,unsigned int *time);//这个函数将标准定点时间秒转换为计数值 定点格式为 time64.time
+	EFI_STATUS (*timer_msecond2count)(unsigned int *time64,unsigned int *time);//这个函数将标准定点时间毫秒转换为计数值
 };
 extern struct TIMERCTL timerctl[8];
 void init_pit(void);
@@ -595,14 +542,41 @@ struct TSS32 {
 	int es, cs, ss, ds, fs, gs;
 	int ldtr, iomap;
 };
+struct TSS64{
+	unsigned int res1;
+	unsigned long long rsp0;
+	unsigned long long rsp1;
+	unsigned long long rsp2;
+	unsigned long long res2;
+	unsigned long long ist[7];
+	unsigned long long res3;
+	unsigned int iomap;
+	//剩下的部分是TSS段外数据
+	unsigned long long rsp;
+	unsigned long long rip;
+	unsigned long long rbx;
+	unsigned long long rsi;
+	unsigned long long rdi;
+	unsigned long long rbp;
+	unsigned long long cr3;
+	unsigned long long rflages;
+	unsigned long long ldtr;
+};
+//flags_a 0:任务是0否1是第一次运行 1:任务发生资源连锁是1否报错
 #pragma pack(1)
 struct TASK {
-	int sel, flags; /* selはGDTの番号のこと */
+	/*flages_a
+	0:read only任务首次启动
+	1:任务是否要求快速切换
+	2:read only任务的上一次切换是否是抢占切换 置位情况下 当前任务是被中断事件抢占而放弃处理器 否则任务是主动放弃处理器
+	3:任务待摧毁标志 置位情况下切换到该任务 会立即摧毁这个任务
+	*/
+	int sel, flags,flags_a; /* selはGDTの番号のこと */
 	int level, priority;
 	struct FIFO32 fifo;
 	FIFOMOUSE fifom;
 	struct _TASK_MSG_BOX msg_box;
-	struct TSS32 tss;
+	struct TSS64 tss;
 	struct SEGMENT_DESCRIPTOR ldt[4];
 	struct CONSOLE *cons;
 	int ds_base, cons_stack;
@@ -645,6 +619,7 @@ struct TASKCTL {
 	int id_low;//下一个任务id低位
 	struct TASKLEVEL level[MAX_TASKLEVELS];//任务级别数组
 	struct TASK tasks0[MAX_TASKS];//所有任务池
+	struct TSS64 tss;//正在运行的任务的tss
 	
 };
 extern struct TASKCTL *taskctl;
@@ -656,6 +631,7 @@ struct TASK *task_alloc(void);
 void task_run(struct TASK *task, int level, int priority);
 void task_switch(void);
 void task_sleep(struct TASK *task);
+unsigned int task_get_esp0();
 /* window.c */
 void make_window8(unsigned char *buf, int xsize, int ysize, char *title, char act);
 void putfonts8_asc_sht(struct SHEET *sht, int x, int y, int c, int b, char *s, int l);
@@ -669,8 +645,10 @@ void make_wtitle32(unsigned int *buf, int xsize, char *title, char act);
 void change_wtitle32(struct SHEET *sht, char act);
 
 /* console.c */
+/*extend TASK*/
 struct CONSOLE {
 	struct SHEET *sht;
+	struct TASK* task;
 	int cur_x, cur_y, cur_c;//命令行输出坐标和光标颜色
 	int font_x,font_y;//命令行输出行数和字数
 	int font_x_max,font_y_max;//命令行的总x和总y
@@ -686,6 +664,16 @@ struct FILEHANDLE {
 	int size;
 	int pos;
 };
+typedef struct _SYSTEMTABLE_FILE{
+	
+}SYSTEMTABLE_FILE;
+typedef struct _SYSTEMTABLE{
+	EFI_STATUS (*stdout)(char* s);
+	EFI_STATUS (*stderr)(char* s);
+	EFI_STATUS (*stdin)(char* s);
+	struct _SYSTEMTABLE_FILE *file;
+}SYSTEMTABLE;
+void console_init(struct CONSOLE* cons,struct SHTCTL* shtctl,unsigned int cons_x,unsigned int cons_y);
 void console_task(struct SHEET *sheet, int memtotal);
 void cons_putchar(struct CONSOLE *cons, int chr, char move);
 void cons_newline(struct CONSOLE *cons);

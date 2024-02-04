@@ -2,6 +2,8 @@
 
 #include "bootpack.h"
 
+
+
 void init_gdtidt(UINTN main_this)
 {
 	struct SEGMENT_DESCRIPTOR *gdt = (struct SEGMENT_DESCRIPTOR *) ADR_GDT;
@@ -12,11 +14,15 @@ void init_gdtidt(UINTN main_this)
 	EFI_GUID* GUID=get_var_guid();
 	//Systemtable->RuntimeServices->GetVariable("xsize",GUID,);
 	/* GDT‚Ì‰Šú‰» */
+	unsigned long long now_cs=asm_get_cs();
 	for (i = 0; i <= LIMIT_GDT / 8; i++) {
 		set_segmdesc(gdt + i, 0, 0, 0);
 	}
+	for(i=0;i<256;i++){
+		//gdt_map[i]=0;
+	}
 	set_segmdesc(gdt + 1, 0xffffffff,   0x00000000, AR_DATA32_RW);
-	set_segmdesc(gdt + 2, 0xffffffff, 0x00000000, AR_CODE32_ER);
+	set_segmdesc(gdt + (now_cs/8), 0xffffffff, 0x00000000, AR_CODE64_ER);//64ˆÊ‘ã?’i
 	load_gdtr(LIMIT_GDT, ADR_GDT);
 
 	/* IDT‚Ì‰Šú‰» */
@@ -24,7 +30,6 @@ void init_gdtidt(UINTN main_this)
 		set_gatedesc(idt + i, 0, 0, 0);
 	}
 	load_idtr(LIMIT_IDT, ADR_IDT);
-
 	/* IDT‚Ìİ’è */
 	//set_gatedesc(idt + 0x0e, (int) asm_inthandler0e, 2 * 8, AR_INTGATE32);
 	set_gatedesc(idt + 0x0c, (int) asm_inthandler0c+main_this, 2 * 8, AR_INTGATE32);
@@ -38,7 +43,7 @@ void init_gdtidt(UINTN main_this)
 	return;
 }
 
-void set_segmdesc(struct SEGMENT_DESCRIPTOR *sd, unsigned int limit, int base, int ar)
+void set_segmdesc(struct SEGMENT_DESCRIPTOR *sd, unsigned int limit, unsigned long long base, int ar)
 {
 	if (limit > 0xfffff) {
 		ar |= 0x8000; /* G_bit = 1 */
@@ -53,12 +58,14 @@ void set_segmdesc(struct SEGMENT_DESCRIPTOR *sd, unsigned int limit, int base, i
 	return;
 }
 
-void set_gatedesc(struct GATE_DESCRIPTOR *gd, int offset, int selector, int ar)
+void set_gatedesc(struct GATE_DESCRIPTOR *gd, unsigned long long offset, int selector, int ar)
 {
 	gd->offset_low   = offset & 0xffff;
 	gd->selector     = selector;
 	gd->dw_count     = (ar >> 8) & 0xff;
 	gd->access_right = ar & 0xff;
 	gd->offset_high  = (offset >> 16) & 0xffff;
+	gd->offset_64	=(offset>>32)&0xffffffff;
+	gd->res=0;
 	return;
 }
