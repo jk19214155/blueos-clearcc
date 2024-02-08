@@ -15,10 +15,10 @@ void inthandler2c(int *esp)
 	*(int*)(0xfee000b0)=0;
 	data = io_in8(PORT_KEYDAT);
 	fifo32_put(mousefifo, data + mousedata0);
-	sprintf(buff,"inthandler2c data: %d\n",data);
-	com_out_string(0x3f8,buff);
-	sprintf(buff,"fifo_sattus: this:%x p:%d q:%d size:%d free:%d task:%x\n",mousefifo,mousefifo->p,mousefifo->q,mousefifo->size,mousefifo->free,mousefifo->task);
-	com_out_string(0x3f8,buff);
+	//sprintf(buff,"inthandler2c data: %d\n",data);
+	//com_out_string(0x3f8,buff);
+	//sprintf(buff,"fifo_sattus: this:%x p:%d q:%d size:%d free:%d task:%x\n",mousefifo,mousefifo->p,mousefifo->q,mousefifo->size,mousefifo->free,mousefifo->task);
+	//com_out_string(0x3f8,buff);
 	return;
 }
 
@@ -52,6 +52,7 @@ int mouse_decode(struct MOUSE_DEC *mdec, unsigned char dat)
 	if (mdec->phase == 0) {
 		/* マウスの0xfaを待っている段階 */
 		com_out_string(0x3f8,"mouse_decode 0\n");
+		*(unsigned long long*)0x0026f068=dat;
 		if (dat == 0xfa) {
 			mdec->phase = 1;
 		}
@@ -60,25 +61,34 @@ int mouse_decode(struct MOUSE_DEC *mdec, unsigned char dat)
 	if (mdec->phase == 1) {
 		/* マウスの1バイト目を待っている段階 */
 		com_out_string(0x3f8,"mouse_decode 1\n");
+		*(unsigned long long*)0x0026f050=dat;
 		if ((dat & 0xc8) == 0x08) {
 			/* 正しい1バイト目だった */
 			mdec->buf[0] = dat;
 			mdec->phase = 2;
+			sprintf(buff,"mouse:phese1:%d\n",( long long)dat);
+			com_out_string(0x3f8,buff);
 		}
 		return 0;
 	}
 	if (mdec->phase == 2) {
 		/* マウスの2バイト目を待っている段階 */
 		com_out_string(0x3f8,"mouse_decode 2\n");
+		*(unsigned long long*)0x0026f058=dat;
 		mdec->buf[1] = dat;
 		mdec->phase = 3;
+		sprintf(buff,"mouse:phese2:%d\n",( long long)dat);
+		com_out_string(0x3f8,buff);
 		return 0;
 	}
 	if (mdec->phase == 3) {
 		/* マウスの3バイト目を待っている段階 */
 		com_out_string(0x3f8,"mouse_decode 3\n");
+		*(unsigned long long*)0x0026f060=dat;
 		mdec->buf[2] = dat;
 		mdec->phase = 1;
+		sprintf(buff,"mouse:phese3:%d\n",( long long)dat);
+		com_out_string(0x3f8,buff);
 		mdec->btn = mdec->buf[0] & 0x07;
 		mdec->x = mdec->buf[1];
 		mdec->y = mdec->buf[2];
@@ -89,8 +99,11 @@ int mouse_decode(struct MOUSE_DEC *mdec, unsigned char dat)
 			mdec->y |= 0xffffff00;
 		}
 		mdec->y = - mdec->y; /* マウスではy方向の符号が画面と反対 */
+		sprintf(buff,"now: dx=%d dy=%d\n",( long long)mdec->x,( long long)mdec->y);
+		com_out_string(0x3f8,buff);
 		return 1;
 	}
+	*(unsigned long long*)0x0026f070=dat;
 	return -1; /* ここに来ることはないはず */
 }
 

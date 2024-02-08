@@ -1,7 +1,7 @@
 OBJS_BOOTPACK = bootpack.obj naskfunc.obj hankaku.obj graphic.obj dsctbl.obj \
 		int.obj fifo.obj keyboard.obj mouse.obj memory.obj sheet.obj timer.obj \
 		mtask.obj window.obj console.obj file.obj tek.obj dav.obj desktop.obj view.obj system.obj acpi.obj bmp.obj  dmg.obj drvier.obj \
-		fifo_mouse.obj com.obj vmx.obj ahci.obj pcie.obj sse.obj 
+		fifo_mouse.obj com.obj vmx.obj ahci.obj pcie.obj sse.obj sprintf.obj
 
 TOOLPATH = ../../z_tools/
 INCPATH  = ../../z_tools/haribote/
@@ -43,7 +43,7 @@ default :
 
 # ÉtÉ@ÉCÉãê∂ê¨ãKë•
 bootpack.sys : $(OBJS_BOOTPACK)
-	$(GCC64p) -o bootpack.sys   -Wl,--subsystem,10 -e HariMain -static-libgcc -shared $(OBJS_BOOTPACK)
+	$(GCC64p) -o bootpack.sys -nostdlib   -Wl,--subsystem,10 -e HariMain -static-libgcc -shared $(OBJS_BOOTPACK)
 ipl09.bin : ipl09.nas makefile
 	$(NASK) ipl09.nas ipl09.bin ipl09.lst
 

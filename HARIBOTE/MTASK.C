@@ -161,10 +161,11 @@ struct TASK *task_init(struct MEMMAN *memman)
 {
 	int i;
 	struct TASK *task, *idle;
+	unsigned long long cr3=load_cr3();
 	struct SEGMENT_DESCRIPTOR *gdt = (struct SEGMENT_DESCRIPTOR *) ADR_GDT;
 	struct PAGEMAN32 *pageman=*(struct PAGEMAN32 **)ADR_PAGEMAN;
 	taskctl = (struct TASKCTL *) memman_alloc_4k(memman, sizeof (struct TASKCTL));
-	memmam_link_page_32_m(pageman,0x268000,taskctl,7,(sizeof (struct TASKCTL)+0xfff)>>12,0);//
+	memman_link_page_64_m(pageman,cr3,taskctl,7,(sizeof (struct TASKCTL)+0xfff)>>12,0);//
 	for (i = 0; i < MAX_TASKS; i++) {
 		taskctl->tasks0[i].flags = 0;
 		
@@ -177,12 +178,11 @@ struct TASK *task_init(struct MEMMAN *memman)
 		taskctl->tasks0[i].name="NONAME";//没有名字
 	}
 	set_segmdesc(gdt + TASK_GDT0 , 103, ((unsigned long long) &(taskctl->tss))&0xffffffff, AR_TSS32);
-	set_segmdesc(gdt + TASK_GDT0 + 1, 103, (((unsigned long long) &(taskctl->tss))>>32)&0xffffffff, 0);
+	set_segmdesc(gdt + TASK_GDT0 + 1, (((unsigned long long) &(taskctl->tss))>>32)&0xffff,(((unsigned long long) &(taskctl->tss))>>48)&0xffff , 0);
 	for (i = 0; i < MAX_TASKLEVELS; i++) {
 		taskctl->level[i].running = 0;
 		taskctl->level[i].now = 0;
 	}
-	unsigned long long cr3=load_cr3();
 	taskctl->id_high=0;
 	taskctl->id_low=0;
 	zero_task_lock=0;//放开锁
@@ -195,13 +195,13 @@ struct TASK *task_init(struct MEMMAN *memman)
 	task->name="mainloop";
 	task_add(task);
 	task_switchsub();	/* レベル設定 */
-	load_tr(TASK_GDT0);
+	load_tr(TASK_GDT0*8);
 	task_timer = timer_alloc(1);
 	timer_settime(1,task_timer, task->priority,0);
 	idle = task_alloc();
 	idle->tss.rsp = memman_alloc_4k(memman, 64 * 1024) + 64 * 1024;
-	memmam_link_page_32_m(pageman,0x268000,idle->tss.rsp- 64 * 1024,7,(64*1024+0xfff)>>12,0);//
-	idle->tss.rip = ((int) &task_idle)+((int)get_this());
+	memman_link_page_64_m(pageman,cr3,idle->tss.rsp- 64 * 1024,7,(64*1024+0xfff)>>12,0);//
+	idle->tss.rip = ((unsigned long long) &task_idle)+((unsigned long long)get_this());
 	idle->tss.cr3=cr3;
 	idle->father_task=0;
 	idle->child_task=0;
@@ -229,6 +229,8 @@ struct TASK *task_alloc(void)
 			task->tss.rsi=0;
 			task->tss.rdi=0;
 			task->tss.rbp=0;
+			task->tss.ldtr=0;
+			task->tss.rsp=0;
 			task->tss.iomap = 0x40000000;
 			//void* p=memman_alloc_page_32(pageman);
 			//task->tss.cr3= 0x00268000;//暂时使用os的页表
@@ -260,7 +262,7 @@ unsigned int task_get_esp0(){//这个函数执行后 EAX会保存esp0的值 注�
 }
 
 void task_start(struct TASK *task){
-	unsigned int cr3=load_cr3();
+	unsigned long long cr3=load_cr3();
 	//切换到目标进程的cr3
 	store_cr3(task->tss.cr3);
 	unsigned long long* esp=(task->tss.rsp);
@@ -274,10 +276,10 @@ void task_start(struct TASK *task){
 	*(--esp)=(task->tss.rflages);
 	*(--esp)=(task->sel);
 	*(--esp)=(task->tss.ldtr);
-	*(--esp)=0;//r12
-	*(--esp)=0;//r13
-	*(--esp)=0;//r14
-	*(--esp)=0;//r15
+	*(--esp)=0x1212;//r12
+	*(--esp)=0x1313;//r13
+	*(--esp)=0x1414;//r14
+	*(--esp)=0x1515;//r15
 	task->tss.rsp=esp;
 	store_cr3(cr3);
 	return;
@@ -318,7 +320,7 @@ void task_sleep(struct TASK *task)
 			task_switchsub();
 			now_task = task_now(); /* 設定後での、「現在のタスク」を教えてもらう */
 			//farjmp(0, now_task->sel);
-			com_out_string(0x3f8,"task_sleep: task==now_task\n");
+			//com_out_string(0x3f8,"task_sleep: task==now_task\n");
 			now_task->flags_a&=~(1<<2);//发生了协同切换
 			struct TASK* task_a=&taskctl->tasks0[0];
 			task->tss.rsp0=taskctl->tss.rsp0;
@@ -333,7 +335,7 @@ void task_sleep(struct TASK *task)
 			asm_task_switch32(&(task->tss.rsp),&(now_task->tss.rsp));
 		}
 	}
-	com_out_string(0x3f8,"task_sleep: end\n");
+	//com_out_string(0x3f8,"task_sleep: end\n");
 	return;
 }
 
@@ -354,7 +356,7 @@ void task_switch(void)
 	new_task = tl->tasks[tl->now];
 	timer_settime(1,task_timer, new_task->priority,0);
 	if (new_task != now_task) {
-		com_out_string(0x3f8,"task switch ok\n");
+		//com_out_string(0x3f8,"task switch ok\n");
 		now_task->flags_a|=(1<<2);//发生了抢占切换
 		struct TASK* task_a=&taskctl->tasks0[0];
 		now_task->tss.rsp0=taskctl->tss.rsp0;

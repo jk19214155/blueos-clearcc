@@ -32,13 +32,13 @@ void init_gdtidt(UINTN main_this)
 	load_idtr(LIMIT_IDT, ADR_IDT);
 	/* IDTÇÃê›íË */
 	//set_gatedesc(idt + 0x0e, (int) asm_inthandler0e, 2 * 8, AR_INTGATE32);
-	set_gatedesc(idt + 0x0c, (int) asm_inthandler0c+main_this, 2 * 8, AR_INTGATE32);
-	set_gatedesc(idt + 0x0d, (int) asm_inthandler0d+main_this, 2 * 8, AR_INTGATE32);
-	set_gatedesc(idt + 0x20, (int) asm_inthandler20+main_this, 2 * 8, AR_INTGATE32);
-	set_gatedesc(idt + 0x21, (int) asm_inthandler21+main_this, 2 * 8, AR_INTGATE32);
-	set_gatedesc(idt + 0x2c, (int) asm_inthandler2c+main_this, 2 * 8, AR_INTGATE32);
-	set_gatedesc(idt + 0x34, (int) asm_inthandler34+main_this, 2 * 8, AR_INTGATE32);
-	set_gatedesc(idt + 0x40, (int) asm_hrb_api+main_this,      2 * 8, AR_INTGATE32 + 0x60);
+	//set_gatedesc(idt + 0x0c, (int) asm_inthandler0c+main_this, now_cs, AR_INTGATE32);
+	//set_gatedesc(idt + 0x0d, (int) asm_inthandler0d+main_this, now_cs, AR_INTGATE32);
+	set_gatedesc(idt + 0x20, (int) asm_inthandler20+main_this, now_cs, AR_INTGATE32);
+	set_gatedesc(idt + 0x21, (int) asm_inthandler21+main_this, now_cs, AR_INTGATE32);
+	set_gatedesc(idt + 0x2c, (int) asm_inthandler2c+main_this, now_cs, AR_INTGATE32);
+	set_gatedesc(idt + 0x34, (int) asm_inthandler34+main_this, now_cs, AR_INTGATE32);
+	set_gatedesc(idt + 0x40, (int) asm_hrb_api+main_this,      now_cs, AR_INTGATE32 + 0x60);
 	
 	return;
 }

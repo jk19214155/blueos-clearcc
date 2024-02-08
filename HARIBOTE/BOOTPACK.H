@@ -251,7 +251,7 @@ void init_gdtidt(UINTN main_this);
 void asm_x64_cs_init(unsigned long long cs_sel);
 void set_segmdesc(struct SEGMENT_DESCRIPTOR *sd, unsigned int limit, unsigned long long base, int ar);
 void set_gatedesc(struct GATE_DESCRIPTOR *gd, unsigned long long offset, int selector, int ar);
-#define ADR_IDT			0x0026f800
+#define ADR_IDT			0x0026f000
 #define LIMIT_IDT		0x000007ff
 #define ADR_GDT			0x00270000
 #define LIMIT_GDT		0x0000ffff
@@ -308,11 +308,11 @@ int mouse_decode_wheel(struct MOUSE_DEC *mdec, unsigned char dat);
 #define MEMMAN_CORE_ADDR	0x0026f014//指针位置
 #pragma pack(1)
 struct FREEINFO {	/* あき情報 */
-	unsigned int addr, size;
+	unsigned long long addr, size;
 };
 #pragma pack(1)
 struct MEMMAN {		/* メモリ管理 */
-	int frees, maxfrees, lostsize, losts;
+	unsigned long long frees, maxfrees, lostsize, losts;
 	struct FREEINFO free[MEMMAN_FREES];
 };
 #pragma pack(1)
@@ -323,11 +323,11 @@ struct PAGEMAN32 {
 };
 unsigned int memtest(unsigned int start, unsigned int end);
 void memman_init(struct MEMMAN *man);
-unsigned int memman_total(struct MEMMAN *man);
-unsigned int memman_alloc(struct MEMMAN *man, unsigned int size);
-int memman_free(struct MEMMAN *man, unsigned int addr, unsigned int size);
-unsigned int memman_alloc_4k(struct MEMMAN *man, unsigned int size);
-int memman_free_4k(struct MEMMAN *man, unsigned int addr, unsigned int size);
+unsigned long long memman_total(struct MEMMAN *man);
+unsigned long long memman_alloc(struct MEMMAN *man, unsigned long long size);
+int memman_free(struct MEMMAN *man, unsigned long long addr, unsigned long long size);
+unsigned long long memman_alloc_4k(struct MEMMAN *man, unsigned long long size);
+int memman_free_4k(struct MEMMAN *man, unsigned long long addr, unsigned long long size);
 void init_page(struct PAGEMAN32 *man);
 unsigned int memmam_link_page_32_m(struct PAGEMAN32 *man,unsigned int cr3_address,unsigned int linear_address,unsigned int physical_address,int page_num,int mode);
 unsigned int memman_link_page_32(struct PAGEMAN32 *man,unsigned int cr3_address,unsigned int linear_address,unsigned int physical_address,int mode);
@@ -337,6 +337,7 @@ unsigned int pageman_link_page_32(struct PAGEMAN32 *man,unsigned int linear_addr
 unsigned int pageman_link_page_32_m(struct PAGEMAN32 *man,unsigned int linear_address,unsigned int physical_address,int page_num,int mode);
 unsigned int pageman_unlink_page_32_m(struct PAGEMAN32 *man,unsigned int linear_address,int page_num,int mode);
 unsigned pageman_unlink_page_32(struct PAGEMAN32 *man,unsigned int linear_address,int mode);
+unsigned int memman_link_page_64_m(struct PAGEMAN32 *man,unsigned long long cr3_address,unsigned long long linear_address,unsigned long long physical_address,int page_num,int mode);
 int inthandler0e(int cr2,int* esp);
 unsigned int get_physical_by_linear_32(unsigned int linear_address);
 /* sheet.c */

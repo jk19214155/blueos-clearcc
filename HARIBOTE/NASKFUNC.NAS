@@ -70,37 +70,37 @@ io_stihlt:	; void io_stihlt(void);
 		ret
 
 io_in8:	; int io_in8(int port);
-		mov		edx,[rsp+ip_size]		; port
-		mov		eax,0
+		mov		edx,ecx		; port
+		xor		eax,eax
 		in		al,dx
 		ret
 
 io_in16:	; int io_in16(int port);
-		mov		edx,[rsp+ip_size]		; port
-		mov		eax,0
+		mov		edx,ecx		; port
+		xor		eax,eax
 		in		ax,dx
 		ret
 
 io_in32:	; int io_in32(int port);
-		mov		edx,[rsp+ip_size]		; port
+		mov		edx,ecx		; port
 		in		eax,dx
 		ret
 
 io_out8:	; void io_out8(int port, int data);
-		mov		edx,[rsp+ip_size]		; port
-		mov		al,[rsp+ip_size+gpr_size*1]		; data
+		mov		eax,edx		; data
+		mov		edx,ecx	; port
 		out		dx,al
 		ret
 
 io_out16:	; void io_out16(int port, int data);
-		mov		edx,[rsp+ip_size]		; port
-		mov		eax,[rsp+ip_size+gpr_size*1]		; data
+		mov		eax,edx		; data
+		mov		edx,ecx		; port
 		out		dx,ax
 		ret
 
 io_out32:	; void io_out32(int port, int data);
-		mov		edx,[rsp+ip_size]		; port
-		mov		eax,[rsp+ip_size+gpr_size*1]		; data
+		mov		eax,edx		; datas
+		mov		edx,ecx		; port
 		out		dx,eax
 		ret
 
@@ -110,26 +110,32 @@ io_load_eflags:	; int io_load_eflags(void);
 		ret
 io_store_eflags:	; void io_store_eflags(int eflags);
 		;push eax
-		mov		rax,[rsp+ip_size]
-		push rax
+		push rcx
 		popfq		; pop eflags とぁe��意味
 		;pop eax
 		ret
 
 load_gdtr:		; void load_gdtr(int limit, int addr);
 		;push eax
-		mov		ax,[rsp+ip_size]		; limit
-		mov		[rsp+ip_size+6],ax
-		lgdt	[rsp+ip_size+6]
+		push rdx
+		push cx
+		lgdt [rsp]
+		add rsp,10
+		;64位0特权级所有段寄存器清零
+		xor eax,eax
+		mov ds,eax
+		mov es,eax
+		mov ss,eax
+		mov gs,eax
+		mov fs,eax
 		;pop eax
 		ret
 
 load_idtr:		; void load_idtr(int limit, int addr);
-		;push eax
-		mov		ax,[rsp+ip_size]		; limit
-		mov		[rsp+ip_size+6],ax
-		lidt	[rsp+ip_size+6]
-		;pop eax
+		push rdx
+		push cx
+		lidt [rsp]
+		add rsp,10
 		ret
 
 load_cr0:		; int load_cr0(void);
@@ -137,12 +143,7 @@ load_cr0:		; int load_cr0(void);
 		ret
 
 store_cr0:		; void store_cr0(int cr0);
-		;push eax
-		mov		rax,[rsp+ip_size]
-		mov		cr0,rax
-		;pop eax
-		nop
-		nop
+		mov		cr0,rcx
 		ret
 		
 load_cr3:		; int load_cr3(void);
@@ -150,24 +151,22 @@ load_cr3:		; int load_cr3(void);
 		ret
 
 store_cr3:		; void store_cr3(int cr0);
-		;push eax 
-		mov		rax,[rsp+ip_size]
-		mov		cr3,rax
-		;pop eax
+		mov		cr3,rcx
 		ret
 
 load_tr:		; void load_tr(int tr);
-		ltr		[rsp+ip_size]			; tr
+		ltr		cx
 		ret
 load_cr4:
-		mov rax,[rsp+ip_size]
-		mov cr4,rax
+		mov cr4,rcx
 		ret
 store_cr4:
 		mov rax,cr4
 		ret
 		
 asm_inthandler20:
+		push rax
+		
 		mov eax,es
 		push rax
 		mov eax,ds
@@ -184,15 +183,22 @@ asm_inthandler20:
 		push r9
 		push r10
 		push r11
+		push r12
+		push r13
+		push r14
+		push r15
 		
 		mov		rax,rsp
-		push	rax
+		mov 	rcx,rax
 		mov		ax,ss
 		mov		ds,ax
 		mov		es,ax
 		call	inthandler20
-		pop		rax
 		
+		pop r15
+		pop r14
+		pop r13
+		pop r12
 		pop r11
 		pop r10
 		pop r9
@@ -209,9 +215,14 @@ asm_inthandler20:
 		mov ds,eax
 		pop rax
 		mov es,eax
-		iretd
+		
+		pop rax
+		db 0x48
+		iret
 
 asm_inthandler21:
+		push rax
+		
 		mov eax,es
 		push rax
 		mov eax,ds
@@ -228,15 +239,22 @@ asm_inthandler21:
 		push r9
 		push r10
 		push r11
+		push r12
+		push r13
+		push r14
+		push r15
 		
 		mov		rax,rsp
-		push	rax
+		mov		rcx,rax
 		mov		ax,ss
 		mov		ds,ax
 		mov		es,ax
 		call	inthandler21
-		pop		rax
 		
+		pop r15
+		pop r14
+		pop r13
+		pop r12
 		pop r11
 		pop r10
 		pop r9
@@ -247,15 +265,18 @@ asm_inthandler21:
 		pop rbx
 		pop rdx
 		pop rcx
-		pop rax
+		pop rcx
 		pop rax
 		
 		mov ds,eax
 		pop rax
 		mov es,eax
-		iretd
+		pop rax
+		db 0x48
+		iret
 
 asm_inthandler2c:
+		push rax
 		mov eax,es
 		push rax
 		mov eax,ds
@@ -272,14 +293,20 @@ asm_inthandler2c:
 		push r9
 		push r10
 		push r11
+		push r12
+		push r13
+		push r14
+		push r15
 		
-		mov		rax,rsp
-		push	rax
-		mov		ax,ss
+		mov		rcx,rsp
+		xor		rax,rax
 		mov		ds,ax
 		mov		es,ax
 		call	inthandler2c
-		pop		rax
+		pop r15
+		pop r14
+		pop r13
+		pop r12
 		pop r11
 		pop r10
 		pop r9
@@ -296,9 +323,12 @@ asm_inthandler2c:
 		mov ds,eax
 		pop rax
 		mov es,eax
-		iretd
+		pop rax
+		db 0x48
+		iret
 
 asm_inthandler34:
+		push rax
 		mov eax,es
 		push rax
 		mov eax,ds
@@ -315,14 +345,20 @@ asm_inthandler34:
 		push r9
 		push r10
 		push r11
+		push r12
+		push r13
+		push r14
+		push r15
 		
-		mov		rax,rsp
-		push	rax
+		mov		rcx,rsp
 		mov		ax,ss
 		mov		ds,ax
 		mov		es,ax
 		call	inthandler34
-		pop		rax
+		pop r15
+		pop r14
+		pop r13
+		pop r12
 		pop r11
 		pop r10
 		pop r9
@@ -339,10 +375,12 @@ asm_inthandler34:
 		mov ds,eax
 		pop rax
 		mov es,eax
-		iretd
+		pop rax
+		db 0x48
+		iret
 
 asm_inthandler0c:
-		sti
+		push rax
 		mov eax,es
 		push rax
 		mov eax,ds
@@ -359,16 +397,22 @@ asm_inthandler0c:
 		push r9
 		push r10
 		push r11
+		push r12
+		push r13
+		push r14
+		push r15
 		
-		mov		rax,rsp
-		push	rax
+		mov		rcx,rsp
 		mov		ax,ss
 		mov		ds,ax
 		mov		es,ax
 		call	inthandler0c
 		cmp		eax,0
 		jne		asm_end_app
-		pop		rax
+		pop r15
+		pop r14
+		pop r13
+		pop r12
 		pop r11
 		pop r10
 		pop r9
@@ -385,12 +429,13 @@ asm_inthandler0c:
 		mov ds,eax
 		pop rax
 		mov es,eax
-		
+		pop rax
 		add		esp,4			; int 0x0c でも、これが忁e��e
-		iretd
+		db 0x48
+		iret
 
 asm_inthandler0d:
-		sti
+		push rax
 		mov eax,es
 		push rax
 		mov eax,ds
@@ -407,16 +452,22 @@ asm_inthandler0d:
 		push r9
 		push r10
 		push r11
+		push r12
+		push r13
+		push r14
+		push r15
 		
-		mov		rax,rsp
-		push	rax
+		mov		rcx,rsp
 		mov		ax,ss
 		mov		ds,ax
 		mov		es,ax
 		call	inthandler0d
 		cmp		eax,0			; ここだけ違ぁe
 		jne		asm_end_app	; ここだけ違ぁe
-		pop		rax
+		pop r15
+		pop r14
+		pop r13
+		pop r12
 		pop r11
 		pop r10
 		pop r9
@@ -433,12 +484,14 @@ asm_inthandler0d:
 		mov ds,eax
 		pop rax
 		mov es,eax
-		
+		pop rax
 		add		esp,4			; int 0x0d では、これが忁e��e
-		iretd
+		db 0x48
+		iret
 
 asm_inthandler0e:
 		sti
+		push rax
 		mov eax,es
 		push rax
 		mov eax,ds
@@ -455,19 +508,24 @@ asm_inthandler0e:
 		push r9
 		push r10
 		push r11
+		push r12
+		push r13
+		push r14
+		push r15
 		
-		mov		rax,rsp
-		push	rax
+		mov		rcx,rsp
 		mov		ax,ss
 		mov		ds,ax
 		mov		es,ax
-		mov 	rax,cr2 ;保存现场
+		mov 	rdx,cr2 ;保存现场
 		push 	rax
 		call	inthandler0e
 		cmp		eax,0
 		jne		asm_end_app
-		add 	esp,8 ;渁e��栈中皁er2
-		pop		rax
+		pop r15
+		pop r14
+		pop r13
+		pop r12
 		pop r11
 		pop r10
 		pop r9
@@ -484,9 +542,10 @@ asm_inthandler0e:
 		mov ds,eax
 		pop rax
 		mov es,eax
-		
+		pop rax
 		add		esp,4
-		iretd
+		db 0x48
+		iret
 memtest_sub:	; unsigned int memtest_sub(unsigned int start, unsigned int end)
 		push	rdi						; �e�ebx, esi, edi も使ぁe��ぁe�eで�e�e
 		push	rsi
@@ -575,8 +634,8 @@ asm_hrb_api:
 		mov ds,eax
 		pop rax
 		mov es,eax
-		
-		iretd
+		db 0x48
+		iret
 asm_end_app:
 ;	eaxはtss.esp0の番地
 		mov		rsp,[rax]
@@ -601,12 +660,8 @@ start_app:		; void start_app(int eip, int cs, int esp, int ds, int *tss_esp0);
 		push rbp
 		push rsp		; 32ビットレジスタを�e部保存しておく
 		
-		mov		edx,[rsp+ip_size+gpr_size*8]	; アプリ用のeip
-		mov		eax,[rsp+ip_size+gpr_size*9]	; アプリ用のcs
-		mov		ecx,[rsp+ip_size+gpr_size*10]	; アプリ用のesp
-		mov		ebx,[rsp+ip_size+gpr_size*11]	; アプリ用のds/ss
-		mov		ebp,[rsp+ip_size+gpr_size*12]	; tss.esp0の番地
-		mov		[ebp  ],rsp		; os用のespを保孁e
+		mov		rbp,[rsp+ip_size+gpr_size*8]	; tss.esp0の番地
+		mov		[rbp  ],rsp		; os用のespを保孁e
 		mov		[rbp+4],ss		; os用のssを保孁e
 		mov		es,bx
 		mov		ds,bx
@@ -616,37 +671,25 @@ start_app:		; void start_app(int eip, int cs, int esp, int ds, int *tss_esp0);
 ;	以下�eretfでアプリに行かせるためのスタチe��調整
 		or		eax,3			; アプリ用のセグメント番号に3をorする
 		or		ebx,3			; アプリ用のセグメント番号に3をorする
-		push	rbx				; アプリのss
-		push	rcx				; アプリのesp
-		push	rax				; アプリのcs
-		push	rdx				; アプリのeip
+		push	r9				; アプリのss
+		push	r8				; アプリのesp
+		push	rdx				; アプリのcs
+		push	rcx				; アプリのeip
 		retf
 ;	アプリが終亁e��てもここには来なぁe
 strcmp:	;int strcmp(char* s,char* t,int longer);
-	push rsi;
-	push rdi;
-	push rcx;
-	mov rsi,[rsp+ip_size]
-	mov rdi,[rsp+ip_size+gpr_size]
-	mov rcx,[rsp+ip_size+gpr_size*2]
+	mov rsi,rcx
+	mov rdi,rdx
+	mov rcx,r8
 	repne cmpsd
 	mov eax,ecx
-	pop rcx
-	pop rdi
-	pop rsi
 	ret
 strcpy:	;void strcpy(char* s,char* t,int longer);
-	push rsi;
-	push rdi;
-	push rcx;
-	mov rsi,[rsp+ip_size]
-	mov rdi,[rsp+ip_size+gpr_size]
-	mov rcx,[rsp+ip_size+gpr_size*2]
+	mov rsi,rcx
+	mov rdi,rdx
+	mov rcx,r8
 	;db 0xf3,0xa5;rep movsb
 	rep movsb
-	pop rcx
-	pop rdi
-	pop rsi
 	ret
 memset:	;void memset(char* s,int num,int longer)
 	push rdi
@@ -671,18 +714,17 @@ support_apic: ;int support_apic(void):
 	pop rdx
 	ret
 io_rdmsr: ;void io_rdmsr(int* edx,int* eax,int ecx)
-	mov ecx,[rsp+ip_size+gpr_size*2]
+	mov r15,rcx
+	mov rcx,r8
 	;db 0x0f,0x32 ;rdmsr
 	rdmsr
-	mov ecx,[rsp+ip_size]
-	mov [ecx],edx
-	mov ecx,[rsp+ip_size+gpr_size*2]
-	mov [ecx],eax
+	mov [r15],edx
+	mov [rdx],eax
 	ret
 io_wrmsr: ;void io_wrmsr(int edx,int eax,int ecx)
-	mov edx,[rsp+ip_size]
-	mov eax,[rsp+ip_size+gpr_size]
-	mov ecx,[rsp+ip_size+gpr_size*2]
+	mov rax,rdx
+	mov rdx,rcx
+	mov rcx,r8
 	;db 0x0f,0x30 ;wrmsr
 	wrmsr
 	ret
@@ -700,31 +742,15 @@ test2: ;void test(int eax,int ebx)
 	pop rax
 	ret
 get_lock: ;int get_lock(int* lock,int bit)
-	push rbp
-	mov rbp,rsp
-	push rcx
-	push rdx
-	mov ebx,[rbp+ip_size+gpr_size]
-	mov ecx,[rbp+ip_size+gpr_size*2]
-	lock bts dword [rbx],ecx
-	xor eax,eax
+	lock bts dword [rcx],edx
+	xor rax,rax
 	adc eax,eax
-	pop rdx
-	pop rcx
-	mov esp,ebp
-	pop rbp
 	ret
 store_gdt: ;void store_gdt(void* addr)
-	push rax
-	mov eax,[rsp+ip_size+gpr_size]
-	sgdt [rax]
-	pop rax
+	sgdt [rcx]
 	ret
 store_idt: ;void store_gdt(void* addr)
-	push rax
-	mov eax,[rsp+ip_size+gpr_size]
-	sidt [rax]
-	pop rax
+	sidt [rcx]
 	ret
 sys_reboot: ;void sys_reboot(void)
 	cli
@@ -788,9 +814,9 @@ asm_sse_strcmp:
 	push rbp
 	mov rbp,rsp
 	
-	mov eax,[rbp+gpr_size*2]
-	mov edx,[rbp+gpr_size*3]
-	mov ecx,[rbp+gpr_size*4]
+	mov rax,rcx
+	;mov edx,rdx
+	mov rcx,r8
 	push rbx
 	push rsi
 	push rdi
@@ -859,8 +885,8 @@ asm_sse_strcmp:
 _asm_sse_strtest:
 	push rbp
 	mov rbp,rsp
-	mov rax,[rbp+gpr_size*2]
-	mov rdx,[rbp+gpr_size*3]
+	mov rax,rcx
+	;mov rdx,[rbp+gpr_size*3]
 	push rbx
 	push rsi
 	push rdi
@@ -897,9 +923,8 @@ _asm_sse_strtest:
 ;asm_task_switch32(unsigned int *old_esp,unsigned int *new_esp)
 asm_task_switch32:
 	push rbp
-	mov ebp,esp
-	mov ecx,[rbp+8]
-	mov edx,[rbp+12]
+	;mov ecx,[rbp+8]
+	;mov edx,[rbp+12]
 	call .start
 	;恢复环境的代码
 	pop rbp
@@ -913,7 +938,7 @@ asm_task_switch32:
 	;cr3
 	mov rax,cr3
 	push rax
-	xor eax,eax
+	xor rax,rax
 	;flags
 	pushfq
 	;tr
@@ -921,21 +946,21 @@ asm_task_switch32:
 	str [rsp]
 	;ldtr
 	push rax
-	sldt [esp]
-	mov [ecx],rsp
+	sldt [rsp]
 	;64位被调用者寄存器
 	push r12
 	push r13
 	push r14
 	push r15
+	mov [rcx],rsp
 	;加载环境的代码
-	mov esp,[edx]
+	mov rsp,[rdx]
 	pop r15
 	pop r14
 	pop r13
 	pop r12
 	;ldtr
-	lldt [esp]
+	lldt [rsp]
 	pop rax
 	;tr
 	;ltr [esp]

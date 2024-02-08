@@ -22,7 +22,7 @@ struct TASK* system_start(){
 	task->tss.rsp = task->cons_stack + 64 * 1024 - 12;
 	task->tss.rip = ((int) &system_mainloop)+((int)get_this());
 	task->task_sheet_max=8;//最大图层数量
-	task->tss.cr3=0x268000;
+	task->tss.cr3=load_cr3();
 	
 	task->memman=memman;
 	task_start(task);

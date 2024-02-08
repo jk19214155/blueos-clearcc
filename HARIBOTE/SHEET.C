@@ -9,13 +9,14 @@ struct SHTCTL *shtctl_init(struct MEMMAN *memman, struct PAGEMAN32 *pageman, uns
 {
 	struct SHTCTL *ctl;
 	int i;
+	unsigned long long cr3=load_cr3();
 	ctl = (struct SHTCTL *) memman_alloc_4k(memman, sizeof (struct SHTCTL));//mem_alloc!!!
-	memmam_link_page_32_m(pageman,0x268000,ctl,0x07,(sizeof (struct SHTCTL)+0xfff)>>12,0);
+	memman_link_page_64_m(pageman,cr3,ctl,0x07,(sizeof (struct SHTCTL)+0xfff)>>12,0);
 	if (ctl == 0) {
 		goto err;
 	}
 	ctl->map = (unsigned char *) memman_alloc_4k(memman, xsize * ysize * 4);
-	memmam_link_page_32_m(pageman,0x268000,ctl->map,0x07,(xsize * ysize * 4+0xfff)>>12,0);
+	memman_link_page_64_m(pageman,cr3,ctl->map,0x07,(xsize * ysize * 4+0xfff)>>12,0);
 	if (ctl->map == 0) {
 		memman_free_4k(memman, (int) ctl, sizeof (struct SHTCTL));
 		goto err;

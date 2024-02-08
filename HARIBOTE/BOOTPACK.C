@@ -1,16 +1,19 @@
 /* bootpackのメイン */
 
 #include "bootpack.h"
-
+#include <stdio.h>
 #define KEYCMD_LED		0xed
 
 void keywin_off(struct SHEET *key_win);
 void keywin_on(struct SHEET *key_win);
 void close_console(struct SHEET *sht);
 void close_constask(struct TASK *task);
-
+extern char buff[256];
 EFI_GUID varGuid = {0xb105cc01, 0x2018, 0x0401, {0x12, 0x34, 0x56, 0x78, 0xab, 0xcd, 0xef, 0x00}};;
 EFI_SYSTEM_TABLE* Systemtable_base;
+static void* active_sheet_ctl;
+static unsigned long long cr3_address;
+static struct MOUSE_DEC mdec;
 void* gThis;
 void WinMain(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable){
 	Systemtable->ConOut->OutputString(Systemtable->ConOut,L"hello Winmain\r\n");
@@ -19,24 +22,32 @@ void WinMain(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable){
 	HariMain(gImageHandle,Systemtable);
 	
 }
+void ExitBootServer(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable){
+	unsigned int MapKey;
+	unsigned int DescriptorSize;
+	unsigned int DescriptorVersion;
+	unsigned int MapSize;
+	Systemtable->ConOut->OutputString(Systemtable->ConOut,L"hello Harimain\r\n");
+	Systemtable->BootServices->GetMemoryMap(&MapSize, 0x900000, &MapKey, &DescriptorSize, &DescriptorVersion);
+	Systemtable->BootServices->ExitBootServices(gImageHandle,MapKey);//退出boot service
+}
 void HariMain(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable)
 {
-	Systemtable->ConOut->OutputString(Systemtable->ConOut,L"hello Harimain\r\n");
-	for(;;){
-		
-	}
+	io_cli();//为了防止UEFI的定时器扰乱初始化，关闭所有中断
+	//SystemTable->RuntimeServices->GetVariable("xsize",&varGuid,EFI_VARIABLE_RUNTIME_ACCESS|EFI_VARIABLE_BOOTSERVICE_ACCESS,4,);
+	//SystemTable->RuntimeServices->GetVariable("ysize",&varGuid,EFI_VARIABLE_RUNTIME_ACCESS|EFI_VARIABLE_BOOTSERVICE_ACCESS,4,&(ModeInfo->VerticalResolution));
+	ExitBootServer(gImageHandle,Systemtable);
 	//com_out_string(0x3f8,"hello\n");
 	struct BOOTINFO *binfo = (struct BOOTINFO *) ADR_BOOTINFO;
 	struct SHTCTL *shtctl[10];//图层管理器
 	struct SHEET sheet_temp;//临时图层
-	int shtctl_point=0;
+	unsigned long long shtctl_point=0;
 	char s[40];
 	int s_p;
 	struct FIFO32 fifo, keycmd;
 	int fifobuf[128], keycmd_buf[32];
 	int mx, my, i, new_mx = -1, new_my = 0, new_wx = 0x7fffffff, new_wy = 0;
-	unsigned int memtotal;
-	struct MOUSE_DEC mdec;
+	unsigned long long memtotal;
 	*(unsigned int*)0x0026f040=&mdec;
 	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
 	struct MEMMAN *memman_core;
@@ -97,31 +108,29 @@ void HariMain(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable)
 	memman_init(memman);
 	//memman_free(memman, 0x00001000, 0x0009e000); /* 0x00001000 - 0x0009efff */
 	//memman_free(memman, 0x00900000, memtotal - 0xb0000000);
-	memman_free(memman, 0xc0200000, 0xdfffffff);//虚拟空间的地址大小
-	
+	//memman_free(memman, 0xc0200000, 0xdfffffff);//虚拟空间的地址大小
+	memman_free(memman,0x0000010000000000,0x00007fffffffffff);
 	init_page(pageman);//初始化分页
-	memmam_link_page_32_m(pageman,0x268000,0xc0000000,0x00270001,16,1);//gdt映射到本来的位置
-	memmam_link_page_32_m(pageman,0x268000,0xc0020000,0x0026f001,1,1);//idt映射到本来的位置
-	memmam_link_page_32_m(pageman,0x268000,0xc0100000,0x00280001,128,1);//haribote.hrb映射到高地址
-	memmam_link_page_32_m(pageman,0x268000,0x07,0x01,0x900,1);//低地址映射到本来的位置
-	memmam_link_page_32_m(pageman,0x268000,0xe0000000,0xe0000001,0x20000-1024,1);//高地址映射到本来的位置
-	//memmam_link_page_32_m(pageman,0x268000,0xfffff000,0x268007,1,1);//顶端页面映射自身
+	cr3_address=load_cr3();
+	//memman_link_page_64_m(pageman,0x268000,0xc0000000,0x00270001,16,1);//gdt映射到本来的位置
+	//memman_link_page_64_m(pageman,0x268000,0xc0020000,0x0026f001,1,1);//idt映射到本来的位置
+	//memman_link_page_64_m(pageman,0x268000,0xc0100000,0x00280001,128,1);//haribote.hrb映射到高地址
+	//memman_link_page_64_m(pageman,0x268000,0x07,0x01,0x900,1);//低地址映射到本来的位置
+	//memman_link_page_64_m(pageman,0x268000,0xe0000000,0xe0000001,0x20000-1024,1);//高地址映射到本来的位置
+	//memman_link_page_64_m(pageman,0x268000,0xfffff000,0x268007,1,1);//顶端页面映射自身
 	*((struct PAGEMAN32 **)ADR_PAGEMAN)=pageman;//保存变量
 	
-	store_cr3(0x268000);//内核页表加载
-	j=load_cr0();
-	j|=0x80000000;//开启分页
-	store_cr0(j);
-	load_gdtr(0xffff,0xc0000000);//重载gdt至高位内存
-	load_idtr(0xffff,0xc0020800);//重载idt至高位内存
+	//store_cr3(0x268000);//内核页表加载
+	//j=load_cr0();
+	//j|=0x80000000;//开启分页
+	//store_cr0(j);
+	//load_gdtr(0xffff,0xc0000000);//重载gdt至高位内存
+	//load_idtr(0xffff,0xc0020800);//重载idt至高位内存
 	//if(support_apic()==1){//存在local_apic?使用local-apic?理中断
-		init_apic((void*)0xfee00000);
 	//}
 	//else{
 	//	init_pic();//初始化pic
 	//}
-	init_pit();//定时器在任务之前初始化
-	init_hpet_timer();//初始化高精度定时器
 	init_sse42();
 	sprintf(s,"fifobuff:%x\n",fifobuf);
 	com_out_string(0x3f8,s);
@@ -136,31 +145,33 @@ void HariMain(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable)
 	//	io_out8(PIC1_IMR, 0xef); /* マウスを許可(11101111) */
 	//}
 	fifo32_init(&keycmd, 32, keycmd_buf, 0);
+	init_pit();
+	init_hpet_timer();//初始化高精度定时器
 	//运行第一个任务
 	task_a = task_init(memman);
 	task_a->memman=memman;//注册内存控制器
-	task->tss.cr3=0x268000;
+	task->tss.cr3=cr3_address;
 	fifo.task = task_a;
 	task_run(task_a, 1, 2);
 	task_a->langmode = 0;
 	//创建公共图层数组
 	struct View* p=(unsigned char *) memman_alloc_4k(memman, sizeof(struct View [512]));//内存分配!!!
-	memmam_link_page_32_m(pageman,0x268000,p,1,(sizeof(struct View [512])+0xfff)>>12,0);//没有目的链接地址
+	memman_link_page_64_m(pageman,cr3_address,p,3,(sizeof(struct View [512])+0xfff)>>12,0);//没有目的链接地址
 	//准备两个图层控制器
 	*(int*)0x0026f01c=2;//两个桌面图层控制器
 	for(i=0;i<2;i++){//10个图层管理器
 		shtctl[i] = shtctl_init(memman,pageman, binfo->vram, binfo->scrnx, binfo->scrny);
 		shtctl[i]->sheets0=p;
 		shtctl[i]->sheets0_size=512;
-		(shtctl[i]->func).sheet_refreshsub=((unsigned int)(shtctl[i]->func).sheet_refreshsub)+this;//增加偏移量
+		(shtctl[i]->func).sheet_refreshsub=((unsigned long long)(shtctl[i]->func).sheet_refreshsub)+this;//增加偏移量
 	}
-	*((int *) 0x0fe4) = (int) shtctl[shtctl_point];//当前正在显示的图层
+	active_sheet_ctl = (unsigned long long) shtctl[shtctl_point];//当前正在显示的图层
 	*((int*)0x0026f018)=shtctl;//保存图层数组
 	/* sht_back */
 	//第一屏幕背景
 	sht_back[0]  = sheet_alloc(shtctl[0]);
 	buf_back  = (unsigned int *) memman_alloc_4k(memman, binfo->scrnx * binfo->scrny * 4);//内存分配!!!
-	memmam_link_page_32_m(pageman,0x268000,buf_back,1,((binfo->scrnx * binfo->scrny * 4)+0xfff)>>12,0);//没有目的链接地址
+	memman_link_page_64_m(pageman,cr3_address,buf_back,3,((binfo->scrnx * binfo->scrny * 4)+0xfff)>>12,0);//没有目的链接地址
 	////
 	sheet_setbuf(sht_back[0], buf_back, binfo->scrnx, binfo->scrny, -1); /* 透明色なし */
 	init_screen32(buf_back, binfo->scrnx, binfo->scrny);
@@ -169,7 +180,7 @@ void HariMain(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable)
 	//第二屏幕背景
 	sht_back[1]  = sheet_alloc(shtctl[1]);
 	buf_back  = (unsigned int *) memman_alloc_4k(memman, binfo->scrnx * binfo->scrny * 4);//内存分配!!!
-	memmam_link_page_32_m(pageman,0x268000,buf_back,1,((binfo->scrnx * binfo->scrny * 4)+0xfff)>>12,0);//没有目的链接地址
+	memman_link_page_64_m(pageman,cr3_address,buf_back,3,((binfo->scrnx * binfo->scrny * 4)+0xfff)>>12,0);//没有目的链接地址
 	////
 	sheet_setbuf(sht_back[1], buf_back, binfo->scrnx, binfo->scrny, -1); /* 透明色なし */
 	init_screen32(buf_back, binfo->scrnx, binfo->scrny);
@@ -206,10 +217,11 @@ void HariMain(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable)
 	fifo32_put(&keycmd, KEYCMD_LED);
 	fifo32_put(&keycmd, key_leds);
 	*(unsigned int*)0x0026f03c =&sht_back;
+	init_apic((void*)0xfee00000);
 goto st_next;
 	/* nihongo.fntの読み込み */
 	//fat = (int *) memman_alloc_4k(memman, 4 * 2880);//内存分配!!!
-	//memmam_link_page_32_m(pageman,0x268000,fat,7,3,0);//
+	//memman_link_page_64_m(pageman,0x268000,fat,7,3,0);//
 	
 	//file_readfat(fat, (unsigned char *) (ADR_DISKIMG + 0x000200));
 
@@ -220,7 +232,7 @@ goto st_next;
 		nihongo = file_loadfile2(finfo->clustno, &i, fat);
 	} else {
 		nihongo = (unsigned char *) memman_alloc_4k(memman, 16 * 256 + 32 * 94 * 47);//内存分配!!!
-		memmam_link_page_32_m(pageman,0x268000,nihongo,1,  22841,0);//
+		memman_link_page_64_m(pageman,cr3_address,nihongo,1,  22841,0);//
 		for (i = 0; i < 16 * 256; i++) {
 			nihongo[i] = hankaku[i]; /* フォントがなかったので半角部分をコピー */
 		}
@@ -235,9 +247,9 @@ goto st_next;
 	}
 	memman_free_4k(memman, (int) fat, 4 * 2880);
 st_next:
-	system_start();//启动系统进程
+	//system_start();//启动系统进程
 	//device_init();//初始化存储设备驱动
-	start_task_disk();//启动磁盘服务
+	//start_task_disk();//启动磁盘服务
 	io_sti();
 	for (;;) {
 		if (fifo32_status(&keycmd) > 0 && keycmd_wait < 0) {
@@ -251,11 +263,14 @@ st_next:
 			// FIFOがからっぽになったので、保留している描画があれば実行する 
 			if (new_mx >= 0) {
 				io_sti();
+				sprintf(buff,"bootpack:sheet_slide:  nx= %d ny= %d\n",(long long)new_mx,(long long)new_my);
+				com_out_string(0x3f8,buff);
 				sheet_slide(sht_mouse, new_mx, new_my);
+				
 				new_mx = -1;
 			} else if (new_wx != 0x7fffffff) {
 				io_sti();
-				sheet_slide(sht, new_wx, new_wy);
+				//sheet_slide(sht, new_wx, new_wy);
 				new_wx = 0x7fffffff;
 			} else {
 				task_sleep(task_a);
@@ -365,7 +380,7 @@ st_next:
 							sht_mouse->ctl=shtctl[index];//链接到新的图层控制器
 							sheet_updown(sht_mouse,254);//移到顶端
 						}
-						*(int*)0x0fe4=shtctl[index];
+						active_sheet_ctl=shtctl[index];
 						shtctl_point=index;
 						shtctl[index]->func.sheet_refreshsub(shtctl[index], 0, 0, shtctl[index]->xsize, shtctl[index]->ysize, 0, shtctl[index]->top);//刷新整个页面
 					}
@@ -421,6 +436,8 @@ st_next:
 					}
 					new_mx = mx;
 					new_my = my;
+					sprintf(buff,"bootpack:  dx=%d dy=%d nx= %d ny= %d\n",(long long)mdec.x,(long long)mdec.y,(long long)new_mx,(long long)new_my);
+					com_out_string(0x3f8,buff);
 					for (j = shtctl[shtctl_point]->top - 1; j > 0; j--) {//遍历当前控制器所有图层,除了鼠标图层和背景图层
 							sht = shtctl[shtctl_point]->sheets[j];//获取图层
 							x = mx - sht->vx0;//基于图层的x坐标
@@ -585,9 +602,9 @@ struct TASK *open_constask(struct SHEET *sht, unsigned int memtotal)
 	struct TASK *task = task_alloc(),*task_now0=task_now();
 	int i;
 	int *cons_fifo = (int *) memman_alloc_4k(memman, 128 * 4);//内存分配!!!
-	memmam_link_page_32_m(pageman,0x268000,cons_fifo,1, 1,0);//
+	memman_link_page_64_m(pageman,cr3_address,cons_fifo,1, 1,0);//
 	void *cons_fifo_mouse =  memman_alloc_4k(memman, 4096);//内存分配!!!
-	memmam_link_page_32_m(pageman,0x268000,cons_fifo_mouse,1, 1,0);//
+	memman_link_page_64_m(pageman,cr3_address,cons_fifo_mouse,1, 1,0);//
 	task->cons_stack = memman_alloc_4k(memman, 64 * 1024);//内存分配!!!
 	pageman_link_page_32_m(pageman,task->cons_stack,7,0x10,0);//
 	task->tss.rsp = task->cons_stack + 64 * 1024 - 12;
@@ -600,7 +617,7 @@ struct TASK *open_constask(struct SHEET *sht, unsigned int memtotal)
 	for(i=0;i<4096;i++){
 		*(char*)(p+i)=0;//清空页表
 	}
-	//memmam_link_page_32_m(pageman,p,0xfffff000,pp&7,1,1);//顶端页面映射自身
+	//memman_link_page_64_m(pageman,p,0xfffff000,pp&7,1,1);//顶端页面映射自身
 	*(int*)(p+0xfff-3)=pp|7;
 	for(i=0xc00;i<=0xfff-4;i++){
 		*(char*)(p+i)=*(char*)(0xfffff000+i);//复制高端页表
@@ -611,7 +628,7 @@ struct TASK *open_constask(struct SHEET *sht, unsigned int memtotal)
 	task->tss.cr3=pp&0xfffff000;
 	
 	task->memman=memman_alloc_4k(memman,sizeof(struct MEMMAN));;//应用程序的内存控制器
-	memmam_link_page_32_m(pageman,0x268000,task->memman,1,(sizeof(struct MEMMAN)+0xfff)>>12,0);
+	memman_link_page_64_m(pageman,cr3_address,task->memman,1,(sizeof(struct MEMMAN)+0xfff)>>12,0);
 	memman_init(task->memman);
 	memman_free(task->memman,0x00c00000,0xbfffffff);
 	
@@ -633,7 +650,7 @@ struct SHEET *open_console(struct SHTCTL *shtctl, unsigned int memtotal)
 	struct PAGEMAN32 *pageman=*((struct PAGEMAN32 **)ADR_PAGEMAN);
 	struct SHEET *sht = sheet_alloc(shtctl);
 	unsigned char *buf = (unsigned char *) memman_alloc_4k(memman, 1024 * 768 *4);//内存分配!!!
-	memmam_link_page_32_m(pageman,0x268000,buf,1,768+10,0);//
+	memman_link_page_64_m(pageman,cr3_address,buf,1,768+10,0);//
 	sheet_setbuf(sht, buf, 1024, 768, -1); /* 不使用透明色 */
 	make_window32(buf, 1024, 768, "console", 0);
 	make_textbox32(sht, 8, 28, 1024-8*2, 768-28*2, COL8_000000);
