@@ -25,7 +25,7 @@ bits 64						; 32ビットモード用の機械語を作らせる
 		;global	_memset,_strcpy,_strcmp
 		global	support_apic, io_wrmsr, io_rdmsr, test2, get_lock, rdrand
 		global	store_gdt, store_idt,sys_reboot,sys_call, test3, asm_task_switch32
-		global asm_x64_cs_init,asm_get_cs
+		global asm_x64_cs_init,asm_get_cs,asm_sheet_refreshsub32
 		extern	inthandler20, inthandler21
 		extern	inthandler2c, inthandler0d
 		extern	inthandler0c, inthandler0e , inthandler34
@@ -57,10 +57,12 @@ io_hlt:	; void io_hlt(void);
 		ret
 
 io_cli:	; void io_cli(void);
+
 		cli
 		ret
 
 io_sti:	; void io_sti(void);
+	
 		sti
 		ret
 
@@ -1017,37 +1019,166 @@ asm_task_switch32_2:
 	ret
 bits 64
 ;void asm_vmptrld(unsigned int vmcs_point)
+global asm_vmptrld
 asm_vmptrld:
-	mov rax,[rsp+ip_size]
-	vmptrld [rax]
+	vmptrld [rcx]
 	ret
 ;void asm_vmptrst(unsigned int* vmcs_point)
+global asm_vmptrst
 asm_vmptrst:
-	mov rax,[rsp+ip_size]
-	vmptrst [rax]
+	vmptrst [rcx]
 	ret
 ;void asm_vmclear(unsigned int vmcs_point)
+global asm_vmclear
 asm_vmclear:
-	mov rax,[rsp+ip_size]
-	vmclear [rax]
+	vmclear [rcx]
 	ret
-;void asm_vmread(unsigned int index,void* data)
+;unsigned long long asm_vmread(unsigned int index)
+global asm_vmread
 asm_vmread:
-	mov rax,[rsp+ip_size]
-	mov rdx,[rsp+ip_size+gpr_size]
-	vmread [rdx],rax
+	vmread rax,rcx
 	ret
 ;void asm_vmread(unsigned int index,void data)
+global asm_vmwrite
 asm_vmwrite:
-	mov rax,[rsp+ip_size]
-	mov rdx,[rsp+ip_size+gpr_size]
-	vmwrite rax,rdx
+	vmwrite rcx,rdx
 	ret
+global asm_vmxon
 asm_vmxon:
-	
+	vmxon [rcx]
 asm_x64_cs_init:
 	db 0x48
 	retf
 asm_get_cs:
 	mov rax,cs
+	ret
+;void asm_sheet_refreshsub32(void* struct SHEET_REFRESH_PACK_32 pack);
+asm_sheet_refreshsub32:
+	push rbx
+	push rsi
+	push rdi
+	push r12
+	push r13
+	push r14
+	push r15
+	mov rsi,[rcx];源变址
+	mov rdi,[rcx+8];目的变址
+	mov r8,[rcx+16];源图层宽度
+	mov r9,[rcx+24];目的图层宽度
+	mov r10,[rcx+32];刷新窗口宽度
+	mov r11,[rcx+40];刷新窗口高度
+	mov r12,[rcx+48];sid_addr
+	mov r13,[rcx+56];sid
+	mov [rcx+56+4],r13d;低端32位sid数据复制到高32位
+	mov r13,[rcx+56];sid
+	mov [rcx+64],r13;sid
+	movdqu xmm4,[rcx+56]
+	xor rax,rax
+	xor rdx,rdx
+	
+.start:	
+	movdqu xmm1,[rsi+rax*4]
+	movdqu xmm2,[rdi+rax*4]
+	movdqu xmm3,[r12+rax*4];sid序列
+	cmpps xmm3,xmm4,0
+	pand xmm1,xmm3;清空无效数据
+	pandn xmm3,xmm2;清空无效数据
+	por xmm1,xmm3;混合
+	movdqu [rdi+rax*4],xmm1
+	add eax,4
+	cmp rax,r10
+	jb .start
+	je .fin;正好相等
+	sub eax,4
+.continued:
+	;这里说明本行剩下的不足4个像素
+	mov ebx,[rsi+rax*4]
+	mov r14d,[rdi+rax*4]
+	mov r15d,[r12+rax*4]
+	cmp r15d,r13d
+	cmovne rbx,r14
+	mov [rdi+rax*4],ebx
+	inc rax
+	cmp rax,r10
+	jne .continued
+.fin:
+	xor eax,eax
+	inc rdx
+	lea rsi,[rsi+r8*4]
+	lea rdi,[rdi+r9*4]
+	lea r12,[r12+r9*4]
+	cmp rdx,r11
+	jb .start
+	pop r15
+	pop r14
+	pop r13
+	pop r12
+	pop rdi
+	pop rsi
+	pop rbx
+	ret
+
+
+;void asm_sheet_refreshsub32a(void* struct SHEET_REFRESH_PACK_32 pack);
+asm_sheet_refreshsub32a:
+	push rbx
+	push rsi
+	push rdi
+	push r12
+	push r13
+	push r14
+	push r15
+	mov rsi,[rcx];源变址
+	mov rdi,[rcx+8];目的变址
+	mov r8,[rcx+16];源图层宽度
+	mov r9,[rcx+24];目的图层宽度
+	mov r10,[rcx+32];刷新窗口宽度
+	mov r11,[rcx+40];刷新窗口高度
+	mov r12,[rcx+48];sid_addr
+	mov r13,[rcx+56];sid
+	movlpd xmm4,[rcx+56]
+	pshufd xmm4,xmm4,0;低端32位sid数据复制扩展到整个xmm
+	xor rax,rax
+	xor rdx,rdx
+	
+.start:	
+	movdqa xmm1,[rsi+rax*4]
+	movdqa xmm2,[rdi+rax*4]
+	movdqa xmm3,[r12+rax*4];sid序列
+	cmpps xmm3,xmm4,0
+	pand xmm1,xmm3;清空无效数据
+	pandn xmm3,xmm2;清空无效数据
+	por xmm1,xmm3;混合
+	movdqa [rdi+rax*4],xmm1
+	add eax,4
+	cmp rax,r10
+	jb .start
+	je .fin;正好相等
+	sub eax,4
+.continued:
+	;这里说明本行剩下的不足4个像素
+	mov ebx,[rsi+rax*4]
+	mov r14d,[rdi+rax*4]
+	mov r15d,[r12+rax*4]
+	cmp r15d,r13d
+	cmovne rbx,r14
+	mov [rdi+rax*4],ebx
+	inc rax
+	cmp rax,r10
+	jne .continued
+.fin:
+	xor eax,eax
+	inc rdx
+	lea rsi,[rsi+r8*4]
+	lea rdi,[rdi+r9*4]
+	lea r12,[r12+r9*4]
+	cmp rdx,r11
+	jb .start
+	pop r15
+	pop r14
+	pop r13
+	pop r12
+	pop rdi
+	pop rsi
+	pop rbx
 	ret

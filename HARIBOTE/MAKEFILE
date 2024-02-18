@@ -37,13 +37,13 @@ LIB_HOME	= C:\Users\hp\Documents\GitHub\Z_TOOLS\HARIBOTE
 # デフォルト動作
 
 default :
-#	$(MAKE) ipl09.bin
-#	$(MAKE) haribote.sys
+#	$(MAKE) ipl09.bin 本系?不使用IPL??方法
+#	$(MAKE) haribote.sys 本系?不使用原本的工具? 
 	$(MAKE) bootpack.sys
 
 # ファイル生成規則
 bootpack.sys : $(OBJS_BOOTPACK)
-	$(GCC64p) -o bootpack.sys -nostdlib   -Wl,--subsystem,10 -e HariMain -static-libgcc -shared $(OBJS_BOOTPACK)
+	$(GCC64p) -o bootpack.sys -nostdlib  -s -Wl,--subsystem,10 -e HariMain -static-libgcc -shared $(OBJS_BOOTPACK)
 ipl09.bin : ipl09.nas makefile
 	$(NASK) ipl09.nas ipl09.bin ipl09.lst
 

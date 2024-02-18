@@ -316,6 +316,7 @@ void sheet_refreshsub24(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, 
 
 void sheet_refreshsub32(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, int h0, int h1)//屏幕局部刷新函数，指定h0和h1(刷新上界和刷新下界)
 {
+	struct SHEET_REFRESH_PACK_32 pack;
 	int h, bx, by, vx, vy, bx0, by0, bx1, by1, bx2, sid4, i, i1, *p, *q, *r;
 	unsigned int *buf;
 	char *vram = ctl->vram;
@@ -344,6 +345,18 @@ void sheet_refreshsub32(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, 
 		if (by0 < 0) { by0 = 0; }
 		if (bx1 > sht->bxsize) { bx1 = sht->bxsize; }
 		if (by1 > sht->bysize) { by1 = sht->bysize; }
+		//SIMD.SSE加速绘图
+		pack.from_vram_addr=(unsigned long long)buf+(by0 * sht->bxsize + bx0)*4;
+		pack.to_vram_addr=(unsigned long long)vram+((sht->vy0+by0) * (ctl->xsize) + sht->vx0 + bx0)*4;
+		pack.from_xsize=sht->bxsize;
+		pack.to_xsize=ctl->xsize;
+		pack.x_width=bx1-bx0;
+		pack.y_width=by1-by0;
+		pack.to_sid_map=(unsigned long long)map+((sht->vy0+by0) * ctl->xsize + sht->vx0 + bx0)*4;
+		pack.from_sid=sht->sid;
+		asm_sheet_refreshsub32(&pack);
+		continue;
+old:
 		//没有快速算法
 		for (by = by0; by < by1; by++) {
 			vy = sht->vy0 + by;

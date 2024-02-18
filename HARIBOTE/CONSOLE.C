@@ -153,6 +153,11 @@ void console_task(struct SHEET *sheet, int memtotal)
 	struct MEMMAN *memman = task_now()->memman;
 	int i, *fat = *(int**)0x0026f028;//(int *) memman_alloc_4k(memman, 4 * 2880);//内存分配!!!
 	//pageman_link_page_32_m(pageman,fat,7,3,0);//
+	
+	struct CONSOLE cons0;
+	task->cons=&cons0;
+	task->cons->task=task;
+	
 	struct CONSOLE *cons=task->cons;
 	struct FILEHANDLE fhandle[8];
 	char cmdline[30];
@@ -175,13 +180,17 @@ void console_task(struct SHEET *sheet, int memtotal)
 	}
 	task->fhandle = fhandle;
 	task->fat = fat;
-	if (nihongo[4096] != 0xff) {	/* 日本語フォントファイルを読み込めたか？ */
+	/*
+	if (nihongo[4096] != 0xff) {	// 日本語フォントファイルを読み込めたか？ 
 		task->langmode = 0;
 	} else {
 		task->langmode = 0;
 	}
+	*/
+	task->langmode = 0;
 	task->langbyte1 = 0;
 	//打开文件根目录
+	/*
 	if(*(unsigned int*)0x0026f030!=0){
 		FAT32_HEADER* mbr=*(unsigned int*)0x0026f024;
 		unsigned int fat32_addr=*(unsigned int*)0x0026f028;
@@ -197,6 +206,8 @@ void console_task(struct SHEET *sheet, int memtotal)
 	else{
 		task_now()->root_dir_addr=0;
 	}
+	*/
+	task->root_dir_addr=0;
 	/*接下来获取文件夹里的文件数量*/
 	//int num=_get_file_number(root_dir_addr,8192);
 	//(int*)(0x0026f038)=num;
@@ -296,7 +307,7 @@ void cons_putchar(struct CONSOLE *cons, int chr, char move)
 	if (s[0] == 0x09) {	/* 空格 */
 		for (;;) {
 			if (cons->sht != 0) {
-				putfonts8_asc_sht32(cons->sht, cons->cur_x, cons->cur_y, COL8_FFFFFF, COL8_000000, " ", 1);
+				//putfonts8_asc_sht32(cons->sht, cons->cur_x, cons->cur_y, COL8_FFFFFF, COL8_000000, " ", 1);
 			}
 			cons->cur_x += 8;
 			if (cons->cur_x >= 8 + 1024) {
@@ -312,7 +323,7 @@ void cons_putchar(struct CONSOLE *cons, int chr, char move)
 		/* 不进行任何处理 */
 	} else {	/* 普通文字 */
 		if (cons->sht != 0) {
-			putfonts8_asc_sht32(cons->sht, cons->cur_x, cons->cur_y, COL8_FFFFFF, COL8_000000, s, 1);
+			//putfonts8_asc_sht32(cons->sht, cons->cur_x, cons->cur_y, COL8_FFFFFF, COL8_000000, s, 1);
 		}
 		if (move != 0) {
 			/* 当移动量为0时,不移动光标 */

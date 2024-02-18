@@ -6,6 +6,7 @@ struct TASKCTL *taskctl=0;
 struct TIMER *task_timer;
 int zero_task_lock=0;//零号任务锁
 unsigned task_ready=0;
+extern char buff[1024];
 struct TASKCTL *task_ctl_now(void){
 	return taskctl;
 }
@@ -266,7 +267,8 @@ void task_start(struct TASK *task){
 	//切换到目标进程的cr3
 	store_cr3(task->tss.cr3);
 	unsigned long long* esp=(task->tss.rsp);
-	
+	sprintf(buff,"task_start:rsp=%x\n",task->tss.rsp);
+	com_out_string(0x3f8,buff);
 	*(--esp)=(task->tss.rip);
 	*(--esp)=(task->tss.rbx);
 	*(--esp)=(task->tss.rsi);
@@ -310,7 +312,8 @@ void task_run(struct TASK *task, int level, int priority)
 void task_sleep(struct TASK *task)
 {
 	struct TASK *now_task;
-	com_out_string(0x3f8,"task_sleep: start\n");
+	sprintf(buff,"task_sleep:start task=%s\n",task->name);
+	com_out_string(0x3f8,buff);
 	if (task->flags == 2) {
 		/*正在运行*/
 		now_task = task_now();
@@ -321,6 +324,8 @@ void task_sleep(struct TASK *task)
 			now_task = task_now(); /* 設定後での、「現在のタスク」を教えてもらう */
 			//farjmp(0, now_task->sel);
 			//com_out_string(0x3f8,"task_sleep: task==now_task\n");
+			sprintf(buff,"task_sleep:now task=%s new task=%s\n",task->name,now_task->name);
+			com_out_string(0x3f8,buff);
 			now_task->flags_a&=~(1<<2);//发生了协同切换
 			struct TASK* task_a=&taskctl->tasks0[0];
 			task->tss.rsp0=taskctl->tss.rsp0;
@@ -331,7 +336,6 @@ void task_sleep(struct TASK *task)
 			taskctl->tss.rsp0=now_task->tss.rsp0;
 			taskctl->tss.rsp1=now_task->tss.rsp1;
 			taskctl->tss.rsp2=now_task->tss.rsp2;
-
 			asm_task_switch32(&(task->tss.rsp),&(now_task->tss.rsp));
 		}
 	}
@@ -366,7 +370,9 @@ void task_switch(void)
 		taskctl->tss.rsp0=new_task->tss.rsp0;
 		taskctl->tss.rsp1=new_task->tss.rsp1;
 		taskctl->tss.rsp2=new_task->tss.rsp2;
-
+		sprintf(buff,"task_switch:now fromtask =%s to=%s\n",now_task->name,new_task->name);
+		com_out_string(0x3f8,buff);
+		
 		asm_task_switch32(&(now_task->tss.rsp),&(new_task->tss.rsp));
 		//task_switch32(old_tss32,&(new_task->tss));
 	}

@@ -337,6 +337,7 @@ unsigned int pageman_link_page_32(struct PAGEMAN32 *man,unsigned int linear_addr
 unsigned int pageman_link_page_32_m(struct PAGEMAN32 *man,unsigned int linear_address,unsigned int physical_address,int page_num,int mode);
 unsigned int pageman_unlink_page_32_m(struct PAGEMAN32 *man,unsigned int linear_address,int page_num,int mode);
 unsigned pageman_unlink_page_32(struct PAGEMAN32 *man,unsigned int linear_address,int mode);
+unsigned long long memman_link_page_64(struct PAGEMAN32* pageman,unsigned long long cr3_address,unsigned long long linear_address,unsigned long long physical_address,unsigned int mode);
 unsigned int memman_link_page_64_m(struct PAGEMAN32 *man,unsigned long long cr3_address,unsigned long long linear_address,unsigned long long physical_address,int page_num,int mode);
 int inthandler0e(int cr2,int* esp);
 unsigned int get_physical_by_linear_32(unsigned int linear_address);
@@ -386,6 +387,18 @@ struct SHTCTL {
 	struct SHEET *vram4sht;//该图层控制器的输出是否接到了一个图层上
 	struct DISPLAY func;//操作函数
 	unsigned int colordept;//色彩深度
+};
+#pragma pack(1)
+struct SHEET_REFRESH_PACK_32{
+	unsigned long long from_vram_addr;
+	unsigned long long to_vram_addr;
+	unsigned long long from_xsize;
+	unsigned long long to_xsize;
+	unsigned long long x_width;//刷新窗口宽度
+	unsigned long long y_width;//刷新窗口高度
+	unsigned long long to_sid_map;
+	unsigned long long from_sid;
+	unsigned long long from_sid_ext;
 };
 struct SHTCTL *shtctl_init(struct MEMMAN *memman,struct PAGEMAN32 *pageman, unsigned char *vram, int xsize, int ysize);
 struct SHEET *sheet_alloc(struct SHTCTL *ctl);
@@ -572,7 +585,7 @@ struct TASK {
 	2:read only任务的上一次切换是否是抢占切换 置位情况下 当前任务是被中断事件抢占而放弃处理器 否则任务是主动放弃处理器
 	3:任务待摧毁标志 置位情况下切换到该任务 会立即摧毁这个任务
 	*/
-	int sel, flags,flags_a; /* selはGDTの番号のこと */
+	unsigned long long sel, flags,flags_a; /* selはGDTの番号のこと */
 	int level, priority;
 	struct FIFO32 fifo;
 	FIFOMOUSE fifom;
@@ -580,7 +593,7 @@ struct TASK {
 	struct TSS64 tss;
 	struct SEGMENT_DESCRIPTOR ldt[4];
 	struct CONSOLE *cons;
-	int ds_base, cons_stack;
+	unsigned long long int ds_base, cons_stack;
 	struct FILEHANDLE *fhandle;//打开的文件列表
 	int *fat;
 	char *cmdline;
@@ -597,8 +610,8 @@ struct TASK {
 	struct SHTCTL* shtctl;//应用程序图层管理器
 	int id_high;//任务唯一id值高位
 	int id_low;//任务唯一id值低位
-	unsigned int mem_use;//内存使用量
-	unsigned int root_dir_addr;//文件根目录
+	unsigned long long mem_use;//内存使用量
+	unsigned long long root_dir_addr;//文件根目录
 	char *name;//进程名称
 	unsigned int fifo32_mouse_event;//鼠标事件发生时向FIFO传入的数据的base
 	UINTN mouse_x;//鼠标位置
@@ -657,13 +670,13 @@ struct CONSOLE {
 	int mode;/*命令行模式 0：普通文本模式*/
 	char* message;/*message为cmd中的内容，根据mode进行相应解析*/
 	int language;/*命令行所用的语言*/
-	int cons_stdout_mode;/*标准输出绑定情况*/
-	int cons_stderr_mode;/*标准错误绑定情况*/
+	void* cons_stdout_mode;/*标准输出绑定情况*/
+	void* cons_stderr_mode;/*标准错误绑定情况*/
 };
 struct FILEHANDLE {
 	char *buf;
-	int size;
-	int pos;
+	long long size;
+	long long pos;
 };
 typedef struct _SYSTEMTABLE_FILE{
 	
@@ -1125,3 +1138,9 @@ typedef struct _atask{
 typedef struct _ataskctl{
 	struct TASKCTL taskctl;
 }ATASKCTL;
+/*vmx.c*/
+
+typedef struct _blueos_vmcs{
+	void* vmcs;//VMCS字段
+	void* ept;//扩展页表
+} BLUEOS_VMCS;

@@ -1,7 +1,7 @@
 /* ƒEƒBƒ“ƒhƒEŠÖŒW */
 
 #include "bootpack.h"
-
+extern void* active_sheet_ctl;
 void make_window8(unsigned char *buf, int xsize, int ysize, char *title, char act)
 {
 	boxfill8(buf, xsize, COL8_C6C6C6, 0,         0,         xsize - 1, 0        );
@@ -156,11 +156,11 @@ void putfonts8_asc_sht32(struct SHEET *sht, int x, int y, int c, int b, char *s,
 	boxfill32(sht->buf, sht->bxsize, b, x, y, x + l * 8 - 1, y + 15);
 	if (task->langmode != 0 && task->langbyte1 != 0) {
 		putfonts32_asc(sht->buf, sht->bxsize, x, y, c, s);
-		if(sht->ctl==*(int*)0x0fe4)//“–‘O??“IT§Ší—^Šˆ???T§Ší‘Š“¯
+		if(sht->ctl==active_sheet_ctl)//“–‘O??“IT§Ší—^Šˆ???T§Ší‘Š“¯
 			sheet_refresh(sht, x - 8, y, x + l * 8, y + 16);
 	} else {
 		putfonts32_asc(sht->buf, sht->bxsize, x, y, c, s);
-		if(sht->ctl==*(int*)0x0fe4)//“–‘O??“IT§Ší—^Šˆ???T§Ší‘Š“¯
+		if(sht->ctl==active_sheet_ctl)//“–‘O??“IT§Ší—^Šˆ???T§Ší‘Š“¯
 			sheet_refresh(sht, x, y, x + l * 8, y + 16);
 	}
 	return;
