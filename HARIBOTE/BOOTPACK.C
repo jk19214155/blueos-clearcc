@@ -250,6 +250,7 @@ st_next:
 	//system_start();//启动系统进程
 	//device_init();//初始化存储设备驱动
 	//start_task_disk();//启动磁盘服务
+	new_mx=-1;
 	io_sti();
 	for (;;) {
 		if (fifo32_status(&keycmd) > 0 && keycmd_wait < 0) {
@@ -567,6 +568,312 @@ st_next:
 			}
 		}
 	}
+	for (;;) {
+		if (fifo32_status(&keycmd) > 0 && keycmd_wait < 0) {
+			// キーボードコントローラに送るデータがあれば、送る 
+			keycmd_wait = fifo32_get(&keycmd);
+			wait_KBC_sendready();
+			io_out8(PORT_KEYDAT, keycmd_wait);
+		}
+		io_cli();
+		if (fifo32_status(&fifo) == 0) {
+			// FIFOがからっぽになったので、保留している描画があれば実行する 
+			if (new_mx >= 0) {
+				io_sti();
+				sprintf(buff,"bootpack:sheet_slide:  nx= %d ny= %d\n",(long long)new_mx,(long long)new_my);
+				com_out_string(0x3f8,buff);
+				sheet_slide(sht_mouse, new_mx, new_my);
+				
+				new_mx = -1;
+			} else if (new_wx != 0) {
+				io_sti();
+				//sheet_slide(sheet_mouse_on, new_wx+sheet_mouse_on->vx0, new_wy+sheet_mouse_on->vy0);
+				new_wx = 0;
+			} else {
+				task_sleep(task_a);
+				io_sti();
+			}
+		} else {
+			i = fifo32_get(&fifo);
+			//i = get_a_key(&fifo);
+			io_sti();
+			if (key_win != 0 && key_win->flags == 0) {	/* ウィンドウが閉じられた */
+				if (shtctl[shtctl_point]->top == 1) {	/* もうマウスと背景しかない */
+					key_win = 0;
+				} else {
+					key_win = shtctl[shtctl_point]->sheets[shtctl[shtctl_point]->top - 1];
+					keywin_on(key_win);
+				}
+			}
+			if (256 <= i && i <= 511) { /* キーボードデータ */
+				if(i == 0xe0 + 256){//e0扩展码
+					s[0]=keytable2[i - 256];
+				}
+				else if (i < 0x80 + 256) { //标准编码
+					if (key_shift == 0) {//shift状态
+						s[0] = keytable0[i - 256];
+					} else {
+						s[0] = keytable1[i - 256];
+					}
+				} else {
+					s[0] = 0;
+				}
+				if ('A' <= s[0] && s[0] <= 'Z') {	/* 入力文字がアルファベット */
+					if (((key_leds & 4) == 0 && key_shift == 0) ||
+							((key_leds & 4) != 0 && key_shift != 0)) {
+						s[0] += 0x20;	/* 大文字を小文字に変換 */
+					}
+				}
+				if (s[0] != 0 && key_win != 0) { /* 通常文字、バックスペース、Enter */
+					fifo32_put(&key_win->task->fifo, s[0] + 256);
+				}
+				if (i == 256 + 0x0f && key_win != 0) {	/* Tab */
+					keywin_off(key_win);
+					j = key_win->height - 1;
+					if (j == 0) {
+						j = shtctl[shtctl_point]->top - 1;
+					}
+					key_win = shtctl[shtctl_point]->sheets[j];
+					keywin_on(key_win);
+				}
+				if (i == 256 + 0x2a) {	/* 左シフト ON */
+					key_shift |= 1;
+				}
+				if (i == 256 + 0x36) {	/* 右シフト ON */
+					key_shift |= 2;
+				}
+				if (i == 256 + 0xaa) {	/* 左シフト OFF */
+					key_shift &= ~1;
+				}
+				if (i == 256 + 0xb6) {	/* 右シフト OFF */
+					key_shift &= ~2;
+				}
+				if (i == 256 + 0x3a) {	/* CapsLock */
+					key_leds ^= 4;
+					fifo32_put(&keycmd, KEYCMD_LED);
+					fifo32_put(&keycmd, key_leds);
+				}
+				if (i == 256 + 0x45) {	/* NumLock */
+					key_leds ^= 2;
+					fifo32_put(&keycmd, KEYCMD_LED);
+					fifo32_put(&keycmd, key_leds);
+				}
+				if (i == 256 + 0x46) {	/* ScrollLock */
+					key_leds ^= 1;
+					fifo32_put(&keycmd, KEYCMD_LED);
+					fifo32_put(&keycmd, key_leds);
+				}
+				//这里是有问题的，没有考虑左右ctrl分别处理的情况
+				if(i==256+0x1d){//ctrl on
+					key_ctrl|=1;
+				}
+				if(i==256+0x9d){//ctrl off
+					key_ctrl&=~1;
+				}
+				if(i==256+0x38){//alt left
+					key_alt|=1;
+				}
+				if(i==256+0x38+0x80){//alt left
+					key_alt&=~1;
+				}
+				if(key_alt!=0 && i>=(0x3b+256) && i<=(0x44+256)){//ctrl + shfit + 1~9
+					int index=i-0x3b-256;//0~8
+					if(index<*(int*)0x0026f01c){//正确的切换范围
+						if(sheet_mouse_on!=0){//有一个窗口被选择
+							sheet_updown(sheet_mouse_on,-1);//隐藏原图层
+							sheet_mouse_on->ctl=shtctl[index];//链接到新的图层控制器
+							sheet_mouse_on->height=-1;//保持-1;
+							sheet_updown(sheet_mouse_on,shtctl[index]->top+1);//移到顶端
+							sheet_updown(sht_mouse,-1);//隐藏鼠标
+							sht_mouse->ctl=shtctl[index];//链接到新的图层控制器
+							sheet_updown(sht_mouse,254);//移到顶端
+						}
+						else{//没有选中图层就切换
+							if (key_win != 0) {//释放窗口焦点
+								keywin_off(key_win);
+							}
+							key_win=0;//当前没有窗口被选中
+							sheet_updown(sht_mouse,-1);
+							sht_mouse->ctl=shtctl[index];//链接到新的图层控制器
+							sheet_updown(sht_mouse,254);//移到顶端
+						}
+						active_sheet_ctl=shtctl[index];
+						shtctl_point=index;
+						shtctl[index]->func.sheet_refreshsub(shtctl[index], 0, 0, shtctl[index]->xsize, shtctl[index]->ysize, 0, shtctl[index]->top);//刷新整个页面
+					}
+				}
+				if (i == 256 + 0x3b && key_shift != 0 && key_win != 0) {	/* Shift+F1 */
+					task = key_win->task;
+					if (task != 0 && task->tss.rsp0 != 0) {
+						cons_putstr0(task->cons, "\nBreak(key) :\n");
+						io_cli();	/* 強制終了処理中にタスクが変わると困るから */
+						//task->tss.eax = (int) &(task->tss.esp0);
+						//task->tss.eip = (int) asm_end_app;
+						io_sti();
+						//task_run(task, -1, 0);	/* 終了処理を確実にやらせるために、寝ていたら起こす */
+					}
+				}
+				if (i == 256 + 0x3c && key_shift != 0) {	/* Shift+F2 */
+					/* 新しく作ったコンソールを入力選択状態にする（そのほうが親切だよね？） */
+					if (key_win != 0) {
+						keywin_off(key_win);
+					}
+					key_win = open_console(shtctl[shtctl_point], memtotal);
+					//console_init(struct CONSOLE* cons,shtctl[shtctl_point],1024,768);
+					sheet_slide(key_win, 32, 32);
+					sheet_updown(key_win, shtctl[shtctl_point]->top);
+					keywin_on(key_win);
+				}
+				if (i == 256 + 0x57) {	/* F11 */
+					sheet_updown(shtctl[shtctl_point]->sheets[1], shtctl[shtctl_point]->top - 1);
+				}
+				if (i == 256 + 0xfa) {	/* キーボードがデータを無事に受け取った */
+					keycmd_wait = -1;
+				}
+				if (i == 256 + 0xfe) {	/* キーボードがデータを無事に受け取れなかった */
+					wait_KBC_sendready();
+					io_out8(PORT_KEYDAT, keycmd_wait);
+				}
+			} else if (512 <= i && i <= 767) { /* マウスデータ */
+				if (mouse_decode(&mdec, i - 512) != 0) {
+					/* 鼠标移动 */
+					int dx=mx,dy=my;
+					mx += mdec.x;
+					my += mdec.y;
+					if (mx < 0) {
+						mx = 0;
+					}
+					if (my < 0) {
+						my = 0;
+					}
+					if (mx > binfo->scrnx - 1) {
+						mx = binfo->scrnx - 1;
+					}
+					if (my > binfo->scrny - 1) {
+						my = binfo->scrny - 1;
+					}
+					new_mx = mx;
+					new_my = my;
+					dx=new_mx-dx;
+					dy=new_my-dy;
+					sprintf(buff,"bootpack:  dx=%d dy=%d nx= %d ny= %d\n",(long long)mdec.x,(long long)mdec.y,(long long)new_mx,(long long)new_my);
+					com_out_string(0x3f8,buff);
+					for (j = shtctl[shtctl_point]->top - 1; j > 0; j--) {//遍历当前控制器所有图层,除了鼠标图层和背景图层
+							sht = shtctl[shtctl_point]->sheets[j];//获取图层
+							x = mx - sht->vx0;//基于图层的x坐标
+							y = my - sht->vy0;//基于图层的y坐标
+							if (0 <= x && x < sht->bxsize && 0 <= y && y < sht->bysize) {//鼠标位于其范围内
+								if (sht->buf32[y * sht->bxsize + x] != sht->col_inv) {//透明色判断，点击区域不是透明色
+									/*查看是否发生了鼠标当前位于图层的切换*/
+									if(sheet_mouse_on_last!=sht&&sheet_mouse_on_last!=0&&sheet_mouse_on_last->task!=0&&sheet_mouse_on_last->task->fifo32_mouse_event!=0){//更换了图层
+										fifo_mouse_put(&(sheet_mouse_on_last->task->fifom),0,0,mdec.btn)->sht=0;//传入鼠标数据
+										fifo32_put(&(sheet_mouse_on_last->task->fifo),(sheet_mouse_on_last->task->fifo32_mouse_event));//传入鼠标事件标志
+									}
+									/*查看图层是否支持传入数据*/
+									if(sht->task!=0 && sht->task->fifo32_mouse_event!=0){//允许传入鼠标数据
+										io_cli();
+										fifo_mouse_put(&(sht->task->fifom),x,y,mdec.btn)->sht=sht;//传入鼠标数据
+										fifo32_put(&(sht->task->fifo),(sht->task->fifo32_mouse_event));//传入鼠标事件标志
+										io_sti();
+									}
+									sheet_mouse_on_last=sht;
+									break;
+								}
+							}
+					}
+					
+					if ((mdec.btn & 0x01) == 0){//左键抬起
+						sheet_mouse_on=0;//释放锁
+						mouse_on_header=0;
+						if(sheet_mouse_on!=0){//左键抬起的情况
+							
+						}
+						//sheet_updown(sht_mouse,254);//移到顶端
+					}
+					if ((mdec.btn & 0x01) != 0) {//左键按下
+						/* 左ボタンを押している */
+						/* 通常モードの場合 */
+						/* 上の下じきから順番にマウスが指している下じきを探す */
+						for (j = shtctl[shtctl_point]->top - 1; j > 0; j--) {//遍历当前控制器所有图层,除了鼠标图层和背景图层
+							sht = shtctl[shtctl_point]->sheets[j];//获取图层
+							x = mx - sht->vx0;//基于图层的x坐标
+							y = my - sht->vy0;//基于图层的y坐标
+							if (0 <= x && x < sht->bxsize && 0 <= y && y < sht->bysize) {//鼠标位于其范围内
+								if (sht->buf32[y * sht->bxsize + x] != sht->col_inv) {//透明色判断，点击区域不是透明色
+									if(sheet_mouse_on!=sht && sheet_mouse_on!=0){//不是同一个图层,且鼠标当前有图层选择
+									
+									}
+									//if((sht->flags)&0x02!=0x02){//图层锁定位没有生效
+									//}
+									if(sheet_mouse_on==0){//此代码只在点击时触发一次
+										sheet_mouse_on=sht;
+										sheet_updown(sht, shtctl[shtctl_point]->top - 1);//当前图层上移
+										if (sht != key_win) {//点击的窗口不是当前活动窗口
+											if(key_win!=0){//当前有活动窗口
+												keywin_off(key_win);//取消活动状态
+											}
+												key_win = sht;//焦点位于新窗口
+											keywin_on(key_win);
+										}
+										if (3 <= x && x < sht->bxsize - 3 && 3 <= y && y < 21){
+											mouse_on_header=0;//窗口移动模式
+										}
+										else{
+											mouse_on_header=-1;//禁用窗口移动模式
+										}
+										if (sht->ctl->vram4sht==0 && sht->bxsize - 21 <= x && x < sht->bxsize - 5 && 5 <= y && y < 19) {//图层是基础图层鼠标位于X按钮位置强制结束程序
+											/* 「×」ボタンクリック */
+											if ((sht->flags & 0x10) != 0) {		//应用程序的窗口
+												task = sht->task;
+												cons_putstr0(task->cons, "\nBreak(mouse) :\n");
+												io_cli();	/* 强制结束期间关闭中断 */
+												//task->tss.eax = (int) &(task->tss.esp0);
+													//task->tss.eip = (int) asm_end_app+get_this();
+												task->flags_a|=1<<3;
+												io_sti();
+												task_run(task, -1, 0);
+											} else {	//是一个命令行窗口，向其发送终止信号
+												task = sht->task;
+												//sheet_updown(sht, -1); /* とりあえず非表示にしておく */
+												//keywin_off(key_win);
+												//key_win = shtctl[shtctl_point]->sheets[shtctl[shtctl_point]->top - 1];
+												//keywin_on(key_win);
+												io_cli();
+												fifo32_put(&task->fifo, 4);
+												io_sti();
+											}
+										}
+									}
+									if (mouse_on_header==0) {//窗口移动模式
+										new_wx = new_wx+dx;
+										new_wy = new_wx+dy;
+										//sheet_updown(sht_mouse,-1);//移到底端
+									}
+									break;
+								}
+							}
+						}
+						if(j<=0){//鼠标没有命中任何一个窗口
+							sheet_mouse_on=-1;//那就不再命中任何图层直到松手
+						}
+
+					} 
+				}
+			} else if (768 <= i && i <= 1023) {	/* 命令行关闭 */
+				close_console(shtctl[shtctl_point]->sid[i - 768]);
+			} else if (1024 <= i && i <= 2023) {
+				close_constask(taskctl->tasks0 + (i - 1024));
+			} else if (2024 <= i && i <= 2279) {	/* 仅关闭命令行 */
+				sht2 = shtctl[shtctl_point]->sid[i - 2024];
+				for(i=0;i<(256 * 165+0xfff)>>12;i++){
+					void* po=pageman_unlink_page_32(pageman,(int)(sht2->buf)+0x1000*i,1);
+					//memman_free_page_32(pageman,po);
+				}
+				memman_free_4k(memman, (int) sht2->buf, 256 * 165);
+				sheet_free(sht2);
+			}
+		}
+	}
 }
 
 int get_a_key(struct FIFO32* fifo){
@@ -612,7 +919,7 @@ struct TASK *open_constask(struct SHEET *sht, unsigned int memtotal)
 	task->cons_stack = memman_alloc_4k(memman, 64 * 1024);//内存分配!!!
 	memman_link_page_64_m(pageman,cr3_address,task->cons_stack,7,0x10,0);//
 	task->tss.rsp = task->cons_stack + 64 * 1024 - 24;
-	task->tss.rip = (unsigned long long) &console_task+((int)get_this());
+	task->tss.rip = (unsigned long long) &asm_console_task_start_64+((int)get_this());
 	task->task_sheet_max=8;//最大图层数量
 	task->name="console";
 	unsigned long long p=memman_alloc_4k(memman,4096);

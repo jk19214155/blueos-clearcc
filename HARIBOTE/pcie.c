@@ -22,10 +22,10 @@ void pcie_write_config(PCI_DEV* dev,int reg_offset,unsigned int config){
 	return;
 }
 int  pcie_find_dev_by_class(PCI_DEV *pci_dev, int class_id){
-	for(int bus = 0; bus < 256; bus++){
+	for(int bus = pci_dev->bus; bus < 256; bus++){
         // 枚举每一总线上的所有设备
-        for(int dev = 0; dev < 32; dev++){
-			for(int func=0;func<8;func++){
+        for(int dev = pci_dev->device; dev < 32; dev++){
+			for(int func=pci_dev->function;func<8;func++){
 				unsigned int id = (bus<<16) | (dev<<11) | (1<<31) | (func<<8);
 				io_out32(PCI_CONFIG_PORT,id); 
 				unsigned int u = io_in32(PCI_DATA_PORT);
@@ -35,7 +35,22 @@ int  pcie_find_dev_by_class(PCI_DEV *pci_dev, int class_id){
 				}
 				io_out32(PCI_CONFIG_PORT,id|0x08);
 				u = io_in32(PCI_DATA_PORT);
-				if(u == class_id){
+				if((u>>16) == class_id){
+					extern char buff[1024];
+					struct TASK* task=task_now();
+					struct CONSOLE* cons=task->cons;
+					if(cons!=0){
+						sprintf(buff,"pcie_find_dev_by_class| class id %x\n",class_id);
+						cons_putstr0(cons,buff);
+						sprintf(buff,"pcie_find_dev_by_class| class u>>16 %x\n",(u>>16));
+						cons_putstr0(cons,buff);
+						sprintf(buff,"pcie_find_dev_by_class| class bus %x\n",bus);
+						cons_putstr0(cons,buff);
+						sprintf(buff,"pcie_find_dev_by_class| class dev %x\n",dev);
+						cons_putstr0(cons,buff);
+						sprintf(buff,"pcie_find_dev_by_class| class func %x\n",func);
+						cons_putstr0(cons,buff);
+					}
 					pci_dev->bus=bus;
 					pci_dev->device=dev;
 					pci_dev->function=func;

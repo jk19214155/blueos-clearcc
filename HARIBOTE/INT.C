@@ -31,9 +31,9 @@ void init_apic(void* apic_base)
 	io_out8(PIC0_IMR, 0xff);//禁用8259中断控制器
 	io_out8(PIC0_IMR, 0xff);
 	//Enabling xAPIC(IA32_APIC_BASE[10]) and 2xAPIC(IA32_APIC_BASE[11])
-    io_rdmsr(&tmp_high,&tmp_low,0x1b);
+    io_rdmsr(0x1b,&tmp_high,&tmp_low);
     tmp_low = ((int)apic_base)|(1 << 11);
-    io_wrmsr(tmp_high,tmp_low,0x1b);
+    io_wrmsr(0x1b,tmp_high,tmp_low);
     //Enabling LAPIC(SVR[8])
     *(int*)(apic_base+0xf0)|=(1<<8);
 	io_write_io_apic(0,0x0f00000);

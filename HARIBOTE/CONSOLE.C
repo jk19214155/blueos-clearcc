@@ -6,7 +6,8 @@
 void cmd_fdir(struct CONSOLE *cons);
 extern struct TASK* system_task;
 char text_buff[100];
-
+extern void* active_sheet_ctl;
+extern buff[1024];
 unsigned int _cons_read_file(char* buff,unsigned int* size,unsigned int fat32_addr,unsigned part_base_lba,FAT32_HEADER* mbr,unsigned int start_lba_low,unsigned int start_lba_high){
 	unsigned int i;
 	for(i=0;;i++){
@@ -257,7 +258,7 @@ void console_task(struct SHEET *sheet, int memtotal)
 				if (i == 8 + 256) {
 					/* バックスペース */
 					if (cons->cur_x > 16) {
-						cons_putchar(&cons, ' ', 0);
+						cons_putchar(&cons, ' ', 1);
 						cons->cur_x -= 8;
 					}
 				} else if (i == 10 + 256) {
@@ -292,7 +293,7 @@ void console_task(struct SHEET *sheet, int memtotal)
 					boxfill32(cons->sht->buf, cons->sht->bxsize, cons->cur_c, 
 						cons->cur_x, cons->cur_y, cons->cur_x + 7, cons->cur_y + 15);
 				}
-				if((cons->sht)->ctl==*(int*)0x0fe4)//当前图层的控制器与活动图层控制器相同
+				if((cons->sht)->ctl==active_sheet_ctl)//当前图层的控制器与活动图层控制器相同
 					sheet_refresh(cons->sht, cons->cur_x, cons->cur_y, cons->cur_x + 8, cons->cur_y + 16);
 			}
 		}
@@ -307,7 +308,7 @@ void cons_putchar(struct CONSOLE *cons, int chr, char move)
 	if (s[0] == 0x09) {	/* 空格 */
 		for (;;) {
 			if (cons->sht != 0) {
-				//putfonts8_asc_sht32(cons->sht, cons->cur_x, cons->cur_y, COL8_FFFFFF, COL8_000000, " ", 1);
+				putfonts8_asc_sht32(cons->sht, cons->cur_x, cons->cur_y, COL8_FFFFFF, COL8_000000, " ", 1);
 			}
 			cons->cur_x += 8;
 			if (cons->cur_x >= 8 + 1024) {
@@ -323,7 +324,7 @@ void cons_putchar(struct CONSOLE *cons, int chr, char move)
 		/* 不进行任何处理 */
 	} else {	/* 普通文字 */
 		if (cons->sht != 0) {
-			//putfonts8_asc_sht32(cons->sht, cons->cur_x, cons->cur_y, COL8_FFFFFF, COL8_000000, s, 1);
+			putfonts8_asc_sht32(cons->sht, cons->cur_x, cons->cur_y, COL8_FFFFFF, COL8_000000, s, 1);
 		}
 		if (move != 0) {
 			/* 当移动量为0时,不移动光标 */
@@ -423,6 +424,20 @@ void cons_runcmd(char *cmdline, struct CONSOLE *cons, int *fat, int memtotal)
 	}
 	else if (asm_sse_strcmp(cmdline,"12341234",8) == 0){//测试用例
 		cons_putstr0(cons, "sse OK.\n\n");
+	}
+	else if (asm_sse_strcmp(cmdline,"vmxenable",9) == 0){//开启命令行虚拟机环境
+		vmx_enable();
+	}
+	else if (asm_sse_strcmp(cmdline,"dmgtask",7) == 0){//开启命令行虚拟机环境
+		task_disk();
+	}
+	else if (asm_sse_strcmp(cmdline,"ahciinit",8) == 0){
+		sprintf(buff,"buff address is %x\n",buff);
+		cons_putstr0(cons, buff);
+		PCI_DEV* ahci_dev=ahci_init();
+		ahci_get_info(ahci_dev,0,buff);
+		cons_putstr0(cons, "ok!");
+		
 	}
 	else if (cmdline[0] != 0) {
 		if (cmd_app(cons, fat, cmdline) == 0) {

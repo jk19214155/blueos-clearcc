@@ -716,471 +716,474 @@
    716 000003CF 5A                      	pop rdx
    717 000003D0 C3                      	ret
    718                                  io_rdmsr: ;void io_rdmsr(int* edx,int* eax,int ecx)
-   719 000003D1 4989CF                  	mov r15,rcx
-   720 000003D4 4C89C1                  	mov rcx,r8
-   721                                  	;db 0x0f,0x32 ;rdmsr
-   722 000003D7 0F32                    	rdmsr
-   723 000003D9 418917                  	mov [r15],edx
-   724 000003DC 8902                    	mov [rdx],eax
-   725 000003DE C3                      	ret
-   726                                  io_wrmsr: ;void io_wrmsr(int edx,int eax,int ecx)
-   727 000003DF 4889D0                  	mov rax,rdx
-   728 000003E2 4889CA                  	mov rdx,rcx
-   729 000003E5 4C89C1                  	mov rcx,r8
-   730                                  	;db 0x0f,0x30 ;wrmsr
-   731 000003E8 0F30                    	wrmsr
-   732 000003EA C3                      	ret
-   733                                  test2: ;void test(int eax,int ebx)
-   734 000003EB 50                      	push rax
-   735 000003EC 53                      	push rbx
-   736 000003ED 8B442418                	mov eax,[rsp+ip_size+gpr_size*2]
-   737 000003F1 8B5C2420                	mov ebx,[rsp+ip_size+gpr_size*3]
-   738 000003F5 0F0B                    	db 0x0f,0x0b ;ud2
-   739                                  .fin:
-   740 000003F7 FA                      	cli
-   741 000003F8 F4                      	hlt
-   742 000003F9 EBFC                    	jmp .fin
-   743 000003FB 5B                      	pop rbx
-   744 000003FC 58                      	pop rax
-   745 000003FD C3                      	ret
-   746                                  get_lock: ;int get_lock(int* lock,int bit)
-   747 000003FE F00FAB11                	lock bts dword [rcx],edx
-   748 00000402 4831C0                  	xor rax,rax
-   749 00000405 11C0                    	adc eax,eax
-   750 00000407 C3                      	ret
-   751                                  store_gdt: ;void store_gdt(void* addr)
-   752 00000408 0F0101                  	sgdt [rcx]
-   753 0000040B C3                      	ret
-   754                                  store_idt: ;void store_gdt(void* addr)
-   755 0000040C 0F0109                  	sidt [rcx]
-   756 0000040F C3                      	ret
-   757                                  sys_reboot: ;void sys_reboot(void)
-   758 00000410 FA                      	cli
-   759 00000411 0F20C0                  	mov rax,cr0
-   760 00000414 66BA6400                	mov dx,0x64
-   761 00000418 66B8FE00                	mov ax,0xfe
-   762 0000041C 66EF                    	out dx,ax
-   763                                  .fin:
-   764 0000041E F4                      	hlt
-   765 0000041F EBFD                    	jmp .fin
-   766                                  sys_call:
-   767 00000421 0F35                    	db 0x0f,0x35 ;sysexit
-   768                                  test3:
-   769 00000423 F4                      	db 0xf4
-   770                                  .fin:
-   771 00000424 EBFE                    	jmp .fin
-   772                                  support_rand: ;int support_rand()
-   773 00000426 31C0                    	xor eax,eax
-   774 00000428 FFC0                    	inc eax
-   775 0000042A C3                      	ret
-   776                                  	
-   777 0000042B 53                      	push rbx
-   778 0000042C 51                      	push rcx
-   779 0000042D 52                      	push rdx
-   780 0000042E B801000000              	mov eax,1
-   781 00000433 0FA2                    	db 0x0f,0xa2 ;cpuid
-   782 00000435 81E100000040            	and ecx,0x40000000
-   783 0000043B 0F92C0                  	db 0x0f,0x92,0xc0;setc al
-   784 0000043E 5A                      	pop rdx
-   785 0000043F 59                      	pop rcx
-   786 00000440 5B                      	pop rbx
-   787 00000441 C3                      	ret
-   788                                  rdrand: ;int rdrand()
-   789 00000442 0FC7F0                  	db 0x0f,0xc7,0xf0 ;rdrand eax
-   790                                  	;rdrand
-   791 00000445 C3                      	ret
-   792                                  _invlpg:
-   793 00000446 C3                      	ret
-   794                                  tpm_init:
-   795                                  	;初始化tpm
-   796 00000447 50                      	push rax
-   797 00000448 B800F00600                  mov eax, 0x6f000
-   798 0000044D 8904250000D4FE              mov dword [tpm_command], eax
-   799          ******************       warning: dword data exceeds bounds
-   800 00000454 E802000000                  call tpm_wait_for_status
-   801 00000459 58                      	pop rax
-   802 0000045A C3                      	ret
-   803                                  tpm_get_a_key:
-   804                                  	
-   805                                  tpm_wait_for_status:
-   806                                          ;等待tpm状态就绪
-   807 0000045B 8B04251400D4FE                  mov eax, dword [tpm_status]
-   808          ******************       warning: dword data exceeds bounds
-   809 00000462 2500008001                      and eax, 0x01800000
-   810 00000467 3D00008000                      cmp eax, 0x00800000
-   811 0000046C 75ED                            jne tpm_wait_for_status
-   812 0000046E C3                      		ret
-   813                                  sys_nop:
-   814 0000046F 90                      	nop
-   815 00000470 C3                      	ret
-   816                                  ;unsigned int asm_sse_strcmp(char* str,char* str,unsigned,int longer)
-   817                                  asm_sse_strcmp:
-   818 00000471 55                      	push rbp
-   819 00000472 4889E5                  	mov rbp,rsp
-   820                                  	
-   821 00000475 4889C8                  	mov rax,rcx
-   822                                  	;mov edx,rdx
-   823 00000478 4C89C1                  	mov rcx,r8
-   824 0000047B 53                      	push rbx
-   825 0000047C 56                      	push rsi
-   826 0000047D 57                      	push rdi
-   827 0000047E 4889C6                  	mov rsi,rax
-   828 00000481 4889D7                  	mov rdi,rdx
-   829 00000484 4889CA                  	mov rdx,rcx
-   830                                  	;清零计数器
-   831 00000487 4831DB                  	xor rbx,rbx 
-   832 0000048A 0F06                    	clts
-   833 0000048C 660FEFD2                	pxor xmm2,xmm2
-   834                                  .lp:
-   835 00000490 0F06                    	clts
-   836                                  	;将字符串剩余长度读入
-   837                                  	;lea eax,[edx-ebx]
-   838 00000492 4889D0                  	mov rax,rdx
-   839 00000495 4829D8                  	sub rax,rbx
-   840 00000498 4889C1                  	mov rcx,rax
-   841 0000049B F30F6F041E              	movdqu xmm0, [rsi+rbx]
-   842 000004A0 F30F6F0C1F              	movdqu xmm1, [rdi+rbx]
-   843 000004A5 660F3A61C118            	pcmpestri xmm0,xmm1,0x18
-   844                                  	;不是16证明有不一样的部分
-   845 000004AB 4883F910                	cmp rcx,16
-   846 000004AF 752E                    	jne .fin
-   847                                  	
-   848                                  	;检查两个字符串中是否有0 如果有 证明其中一个字符串已经结束
-   849 000004B1 4889CB                  	mov rbx,rcx
-   850 000004B4 660F3A63C204            	pcmpistri xmm0,xmm2,0x04
-   851                                  	;如果不是16 证明有一个字符是空字符 字符串结束
-   852 000004BA 4883F910                	cmp rcx,16
-   853 000004BE 7517                    	jne .fin2
-   854                                  	
-   855 000004C0 660F3A63CA04            	pcmpistri xmm1,xmm2,0x04
-   856                                  	;如果不是16 证明有一个字符是空字符 字符串结束
-   857 000004C6 4883F910                	cmp rcx,16
-   858 000004CA 750B                    	jne .fin2
-   859                                  	
-   860 000004CC 4883C310                	add rbx,16
-   861                                  	;最后 比较是否达到了界限值
-   862 000004D0 4839DA                  	cmp rdx,rbx
-   863 000004D3 7602                    	jbe .fin2
-   864                                  	
-   865 000004D5 EBB9                    	jmp .lp
-   866                                  .fin2:
-   867                                  	;没有异常
-   868 000004D7 4831C0                  	xor rax,rax
-   869 000004DA 5F                      	pop rdi
-   870 000004DB 5E                      	pop rsi
-   871 000004DC 5B                      	pop rbx
-   872 000004DD 5D                      	pop rbp
-   873 000004DE C3                      	ret
-   874                                  .fin:
-   875 000004DF 488D040B                	lea rax,[rbx+rcx]
-   876 000004E3 48FFC0                  	inc rax
-   877                                  	
-   878 000004E6 660F3A63C118            	pcmpistri xmm0,xmm1,0x18
-   879                                  	;最后判断一次是不是遇到了字符串结尾
-   880 000004EC 4883F910                	cmp rcx,16
-   881 000004F0 74E5                    	je .fin2
-   882                                  	
-   883 000004F2 5F                      	pop rdi
-   884 000004F3 5E                      	pop rsi
-   885 000004F4 5B                      	pop rbx
-   886 000004F5 5D                      	pop rbp
-   887 000004F6 C3                      	ret
-   888                                  ;asm_sse_strtest(char* str,char test[16])
-   889                                  _asm_sse_strtest:
-   890 000004F7 55                      	push rbp
-   891 000004F8 4889E5                  	mov rbp,rsp
-   892 000004FB 4889C8                  	mov rax,rcx
-   893                                  	;mov rdx,[rbp+gpr_size*3]
-   894 000004FE 53                      	push rbx
-   895 000004FF 56                      	push rsi
-   896 00000500 57                      	push rdi
-   897 00000501 67F30F6F0A              	movdqu xmm1,[edx]
-   898                                  	;清零计数器
-   899 00000506 4831C0                  	xor rax,rax 
-   900 00000509 0F06                    	clts
-   901 0000050B 660FEFD2                	pxor xmm2,xmm2
-   902                                  .lp:
-   903 0000050F 0F06                    	clts
-   904 00000511 67F30F6F0406            	movdqu xmm0, [esi+eax]
-   905 00000517 660F3A63C114            	pcmpistri xmm0,xmm1,0x14
-   906 0000051D 4883F910                	cmp rcx,16
-   907                                  	;0
-   908 00000521 7518                    	jne .fin
-   909                                  	
-   910 00000523 4889CB                  	mov rbx,rcx
-   911 00000526 660F3A63C204            	pcmpistri xmm0,xmm2,0x04
-   912                                  	;如果是16 证明没有任何一个字符是空字符 字符串没有结束
-   913 0000052C 4883F910                	cmp rcx,16
-   914 00000530 7506                    	jne .fin2
-   915                                  	
-   916 00000532 4883C010                	add rax,16
-   917 00000536 EBD7                    	jmp .lp
-   918                                  .fin2:
-   919 00000538 4889D8                  	mov rax,rbx
-   920                                  .fin:
-   921 0000053B 4801C8                  	add rax,rcx
-   922 0000053E 5F                      	pop rdi
-   923 0000053F 5E                      	pop rsi
-   924 00000540 5B                      	pop rbx
-   925 00000541 5D                      	pop rbp
-   926 00000542 C3                      	ret
-   927                                  ;asm_task_switch32(unsigned int *old_esp,unsigned int *new_esp)
-   928                                  asm_task_switch32:
-   929 00000543 55                      	push rbp
-   930                                  	;mov ecx,[rbp+8]
-   931                                  	;mov edx,[rbp+12]
-   932 00000544 E802000000              	call .start
-   933                                  	;恢复环境的代码
-   934 00000549 5D                      	pop rbp
-   935 0000054A C3                      	ret
-   936                                  .start:
-   937                                  	;保存环境的代码
-   938 0000054B 53                      	push rbx
-   939 0000054C 56                      	push rsi
-   940 0000054D 57                      	push rdi
-   941 0000054E 55                      	push rbp
-   942                                  	;cr3
-   943 0000054F 0F20D8                  	mov rax,cr3
-   944 00000552 50                      	push rax
-   945 00000553 4831C0                  	xor rax,rax
-   946                                  	;flags
-   947 00000556 9C                      	pushfq
-   948                                  	;tr
-   949 00000557 50                      	push rax
-   950 00000558 0F000C24                	str [rsp]
-   951                                  	;ldtr
-   952 0000055C 50                      	push rax
-   953 0000055D 0F000424                	sldt [rsp]
-   954                                  	;64位被调用者寄存器
-   955 00000561 4154                    	push r12
-   956 00000563 4155                    	push r13
-   957 00000565 4156                    	push r14
-   958 00000567 4157                    	push r15
-   959 00000569 488921                  	mov [rcx],rsp
-   960                                  	;加载环境的代码
-   961 0000056C 488B22                  	mov rsp,[rdx]
-   962 0000056F 415F                    	pop r15
-   963 00000571 415E                    	pop r14
-   964 00000573 415D                    	pop r13
-   965 00000575 415C                    	pop r12
-   966                                  	;ldtr
-   967 00000577 0F001424                	lldt [rsp]
-   968 0000057B 58                      	pop rax
-   969                                  	;tr
-   970                                  	;ltr [esp]
-   971 0000057C 58                      	pop rax
-   972                                  	;flags
-   973 0000057D 9D                      	popfq
-   974                                  	;cr3
-   975 0000057E 58                      	pop rax
-   976 0000057F 0F22D8                  	mov cr3,rax
-   977 00000582 5D                      	pop rbp
-   978 00000583 5F                      	pop rdi
-   979 00000584 5E                      	pop rsi
-   980 00000585 5B                      	pop rbx
-   981 00000586 C3                      	ret
-   982                                  bits 32
-   983                                  ;asm_task_switch32_2(unsigned int *old_esp,tss32 *new_esp)
-   984                                  asm_task_switch32_2:
-   985 00000587 55                      	push ebp
-   986 00000588 89E5                    	mov ebp,esp
-   987 0000058A 8B4D08                  	mov ecx,[ebp+8]
-   988 0000058D 8B550C                  	mov edx,[ebp+12]
-   989 00000590 E802000000              	call .start
-   990                                  	;恢复环境的代码
-   991 00000595 5D                      	pop ebp
-   992 00000596 C3                      	ret
-   993                                  .start:
-   994                                  	;保存环境的代码
-   995 00000597 53                      	push ebx
-   996 00000598 56                      	push esi
-   997 00000599 57                      	push edi
-   998 0000059A 55                      	push ebp
-   999 0000059B 0F20D8                  	mov eax,cr3
-  1000 0000059E 50                      	push eax
-  1001 0000059F 9C                      	pushfd
-  1002 000005A0 50                      	push eax
-  1003 000005A1 8921                    	mov [ecx],esp
-  1004                                  	;加载环境的代码
-  1005 000005A3 8B02                    	mov eax,[edx]
-  1006 000005A5 8B503C                  	mov edx,[eax+15*4]
-  1007 000005A8 89D5                    	mov ebp,edx
-  1008 000005AA 8B5040                  	mov edx,[eax+16*4]
-  1009 000005AD 89D6                    	mov esi,edx
-  1010 000005AF 8B5044                  	mov edx,[eax+17*4]
-  1011 000005B2 89D7                    	mov edi,edx
-  1012 000005B4 8B5048                  	mov edx,[eax+18*4]
-  1013 000005B7 8EC2                    	mov es,edx
-  1014 000005B9 8B5058                  	mov edx,[eax+22*4]
-  1015 000005BC 8EE2                    	mov fs,edx
-  1016 000005BE 8B505C                  	mov edx,[eax+23*4]
-  1017 000005C1 8EEA                    	mov gs,edx
-  1018 000005C3 89C4                    	mov esp,eax
-  1019 000005C5 61                      	popad
-  1020 000005C6 CB                      	retf
-  1021 000005C7 C3                      	ret
-  1022                                  bits 64
-  1023                                  ;void asm_vmptrld(unsigned int vmcs_point)
-  1024                                  global asm_vmptrld
-  1025                                  asm_vmptrld:
-  1026 000005C8 0FC731                  	vmptrld [rcx]
-  1027 000005CB C3                      	ret
-  1028                                  ;void asm_vmptrst(unsigned int* vmcs_point)
-  1029                                  global asm_vmptrst
-  1030                                  asm_vmptrst:
-  1031 000005CC 0FC739                  	vmptrst [rcx]
-  1032 000005CF C3                      	ret
-  1033                                  ;void asm_vmclear(unsigned int vmcs_point)
-  1034                                  global asm_vmclear
-  1035                                  asm_vmclear:
-  1036 000005D0 660FC731                	vmclear [rcx]
-  1037 000005D4 C3                      	ret
-  1038                                  ;unsigned long long asm_vmread(unsigned int index)
-  1039                                  global asm_vmread
-  1040                                  asm_vmread:
-  1041 000005D5 0F78C8                  	vmread rax,rcx
-  1042 000005D8 C3                      	ret
-  1043                                  ;void asm_vmread(unsigned int index,void data)
-  1044                                  global asm_vmwrite
-  1045                                  asm_vmwrite:
-  1046 000005D9 0F79CA                  	vmwrite rcx,rdx
-  1047 000005DC C3                      	ret
-  1048                                  global asm_vmxon
-  1049                                  asm_vmxon:
-  1050 000005DD F30FC731                	vmxon [rcx]
-  1051                                  asm_x64_cs_init:
-  1052 000005E1 48                      	db 0x48
-  1053 000005E2 CB                      	retf
-  1054                                  asm_get_cs:
-  1055 000005E3 8CC8                    	mov rax,cs
-  1056 000005E5 C3                      	ret
-  1057                                  ;void asm_sheet_refreshsub32(void* struct SHEET_REFRESH_PACK_32 pack);
-  1058                                  asm_sheet_refreshsub32:
-  1059 000005E6 53                      	push rbx
-  1060 000005E7 56                      	push rsi
-  1061 000005E8 57                      	push rdi
-  1062 000005E9 4154                    	push r12
-  1063 000005EB 4155                    	push r13
-  1064 000005ED 4156                    	push r14
-  1065 000005EF 4157                    	push r15
-  1066 000005F1 488B31                  	mov rsi,[rcx];源变址
-  1067 000005F4 488B7908                	mov rdi,[rcx+8];目的变址
-  1068 000005F8 4C8B4110                	mov r8,[rcx+16];源图层宽度
-  1069 000005FC 4C8B4918                	mov r9,[rcx+24];目的图层宽度
-  1070 00000600 4C8B5120                	mov r10,[rcx+32];刷新窗口宽度
-  1071 00000604 4C8B5928                	mov r11,[rcx+40];刷新窗口高度
-  1072 00000608 4C8B6130                	mov r12,[rcx+48];sid_addr
-  1073 0000060C 4C8B6938                	mov r13,[rcx+56];sid
-  1074 00000610 4489693C                	mov [rcx+56+4],r13d;低端32位sid数据复制到高32位
-  1075 00000614 4C8B6938                	mov r13,[rcx+56];sid
-  1076 00000618 4C896940                	mov [rcx+64],r13;sid
-  1077 0000061C F30F6F6138              	movdqu xmm4,[rcx+56]
-  1078 00000621 4831C0                  	xor rax,rax
-  1079 00000624 4831D2                  	xor rdx,rdx
-  1080                                  	
-  1081                                  .start:	
-  1082 00000627 F30F6F0C86              	movdqu xmm1,[rsi+rax*4]
-  1083 0000062C F30F6F1487              	movdqu xmm2,[rdi+rax*4]
-  1084 00000631 F3410F6F1C84            	movdqu xmm3,[r12+rax*4];sid序列
-  1085 00000637 0FC2DC00                	cmpps xmm3,xmm4,0
-  1086 0000063B 660FDBCB                	pand xmm1,xmm3;清空无效数据
-  1087 0000063F 660FDFDA                	pandn xmm3,xmm2;清空无效数据
-  1088 00000643 660FEBCB                	por xmm1,xmm3;混合
-  1089 00000647 F30F7F0C87              	movdqu [rdi+rax*4],xmm1
-  1090 0000064C 83C004                  	add eax,4
-  1091 0000064F 4C39D0                  	cmp rax,r10
-  1092 00000652 72D3                    	jb .start
-  1093 00000654 7420                    	je .fin;正好相等
-  1094 00000656 83E804                  	sub eax,4
-  1095                                  .continued:
-  1096                                  	;这里说明本行剩下的不足4个像素
-  1097 00000659 8B1C86                  	mov ebx,[rsi+rax*4]
-  1098 0000065C 448B3487                	mov r14d,[rdi+rax*4]
-  1099 00000660 458B3C84                	mov r15d,[r12+rax*4]
-  1100 00000664 4539EF                  	cmp r15d,r13d
-  1101 00000667 490F45DE                	cmovne rbx,r14
-  1102 0000066B 891C87                  	mov [rdi+rax*4],ebx
-  1103 0000066E 48FFC0                  	inc rax
-  1104 00000671 4C39D0                  	cmp rax,r10
-  1105 00000674 75E3                    	jne .continued
-  1106                                  .fin:
-  1107 00000676 31C0                    	xor eax,eax
-  1108 00000678 48FFC2                  	inc rdx
-  1109 0000067B 4A8D3486                	lea rsi,[rsi+r8*4]
-  1110 0000067F 4A8D3C8F                	lea rdi,[rdi+r9*4]
-  1111 00000683 4F8D248C                	lea r12,[r12+r9*4]
-  1112 00000687 4C39DA                  	cmp rdx,r11
-  1113 0000068A 729B                    	jb .start
-  1114 0000068C 415F                    	pop r15
-  1115 0000068E 415E                    	pop r14
-  1116 00000690 415D                    	pop r13
-  1117 00000692 415C                    	pop r12
-  1118 00000694 5F                      	pop rdi
-  1119 00000695 5E                      	pop rsi
-  1120 00000696 5B                      	pop rbx
-  1121 00000697 C3                      	ret
-  1122                                  
-  1123                                  
-  1124                                  ;void asm_sheet_refreshsub32a(void* struct SHEET_REFRESH_PACK_32 pack);
-  1125                                  asm_sheet_refreshsub32a:
-  1126 00000698 53                      	push rbx
-  1127 00000699 56                      	push rsi
-  1128 0000069A 57                      	push rdi
-  1129 0000069B 4154                    	push r12
-  1130 0000069D 4155                    	push r13
-  1131 0000069F 4156                    	push r14
-  1132 000006A1 4157                    	push r15
-  1133 000006A3 488B31                  	mov rsi,[rcx];源变址
-  1134 000006A6 488B7908                	mov rdi,[rcx+8];目的变址
-  1135 000006AA 4C8B4110                	mov r8,[rcx+16];源图层宽度
-  1136 000006AE 4C8B4918                	mov r9,[rcx+24];目的图层宽度
-  1137 000006B2 4C8B5120                	mov r10,[rcx+32];刷新窗口宽度
-  1138 000006B6 4C8B5928                	mov r11,[rcx+40];刷新窗口高度
-  1139 000006BA 4C8B6130                	mov r12,[rcx+48];sid_addr
-  1140 000006BE 4C8B6938                	mov r13,[rcx+56];sid
-  1141 000006C2 660F126138              	movlpd xmm4,[rcx+56]
-  1142 000006C7 660F70E400              	pshufd xmm4,xmm4,0;低端32位sid数据复制扩展到整个xmm
-  1143 000006CC 4831C0                  	xor rax,rax
-  1144 000006CF 4831D2                  	xor rdx,rdx
-  1145                                  	
-  1146                                  .start:	
-  1147 000006D2 660F6F0C86              	movdqa xmm1,[rsi+rax*4]
-  1148 000006D7 660F6F1487              	movdqa xmm2,[rdi+rax*4]
-  1149 000006DC 66410F6F1C84            	movdqa xmm3,[r12+rax*4];sid序列
-  1150 000006E2 0FC2DC00                	cmpps xmm3,xmm4,0
-  1151 000006E6 660FDBCB                	pand xmm1,xmm3;清空无效数据
-  1152 000006EA 660FDFDA                	pandn xmm3,xmm2;清空无效数据
-  1153 000006EE 660FEBCB                	por xmm1,xmm3;混合
-  1154 000006F2 660F7F0C87              	movdqa [rdi+rax*4],xmm1
-  1155 000006F7 83C004                  	add eax,4
-  1156 000006FA 4C39D0                  	cmp rax,r10
-  1157 000006FD 72D3                    	jb .start
-  1158 000006FF 7420                    	je .fin;正好相等
-  1159 00000701 83E804                  	sub eax,4
-  1160                                  .continued:
-  1161                                  	;这里说明本行剩下的不足4个像素
-  1162 00000704 8B1C86                  	mov ebx,[rsi+rax*4]
-  1163 00000707 448B3487                	mov r14d,[rdi+rax*4]
-  1164 0000070B 458B3C84                	mov r15d,[r12+rax*4]
-  1165 0000070F 4539EF                  	cmp r15d,r13d
-  1166 00000712 490F45DE                	cmovne rbx,r14
-  1167 00000716 891C87                  	mov [rdi+rax*4],ebx
-  1168 00000719 48FFC0                  	inc rax
-  1169 0000071C 4C39D0                  	cmp rax,r10
-  1170 0000071F 75E3                    	jne .continued
-  1171                                  .fin:
-  1172 00000721 31C0                    	xor eax,eax
-  1173 00000723 48FFC2                  	inc rdx
-  1174 00000726 4A8D3486                	lea rsi,[rsi+r8*4]
-  1175 0000072A 4A8D3C8F                	lea rdi,[rdi+r9*4]
-  1176 0000072E 4F8D248C                	lea r12,[r12+r9*4]
-  1177 00000732 4C39DA                  	cmp rdx,r11
-  1178 00000735 729B                    	jb .start
-  1179 00000737 415F                    	pop r15
-  1180 00000739 415E                    	pop r14
-  1181 0000073B 415D                    	pop r13
-  1182 0000073D 415C                    	pop r12
-  1183 0000073F 5F                      	pop rdi
-  1184 00000740 5E                      	pop rsi
-  1185 00000741 5B                      	pop rbx
-  1186 00000742 C3                      	ret
+   719                                  	;db 0x0f,0x32 ;rdmsr
+   720 000003D1 0F32                    	rdmsr
+   721 000003D3 498900                  	mov [r8],rax
+   722 000003D6 488912                  	mov [rdx],rdx
+   723 000003D9 C3                      	ret
+   724                                  io_wrmsr: ;void io_wrmsr(int edx,int eax,int ecx)
+   725                                  	;db 0x0f,0x30 ;wrmsr
+   726 000003DA 4C89C0                  	mov rax,r8
+   727 000003DD 0F30                    	wrmsr
+   728 000003DF C3                      	ret
+   729                                  test2: ;void test(int eax,int ebx)
+   730 000003E0 50                      	push rax
+   731 000003E1 53                      	push rbx
+   732 000003E2 8B442418                	mov eax,[rsp+ip_size+gpr_size*2]
+   733 000003E6 8B5C2420                	mov ebx,[rsp+ip_size+gpr_size*3]
+   734 000003EA 0F0B                    	db 0x0f,0x0b ;ud2
+   735                                  .fin:
+   736 000003EC FA                      	cli
+   737 000003ED F4                      	hlt
+   738 000003EE EBFC                    	jmp .fin
+   739 000003F0 5B                      	pop rbx
+   740 000003F1 58                      	pop rax
+   741 000003F2 C3                      	ret
+   742                                  get_lock: ;int get_lock(int* lock,int bit)
+   743 000003F3 F00FAB11                	lock bts dword [rcx],edx
+   744 000003F7 4831C0                  	xor rax,rax
+   745 000003FA 11C0                    	adc eax,eax
+   746 000003FC C3                      	ret
+   747                                  store_gdt: ;void store_gdt(void* addr)
+   748 000003FD 0F0101                  	sgdt [rcx]
+   749 00000400 C3                      	ret
+   750                                  store_idt: ;void store_gdt(void* addr)
+   751 00000401 0F0109                  	sidt [rcx]
+   752 00000404 C3                      	ret
+   753                                  sys_reboot: ;void sys_reboot(void)
+   754 00000405 FA                      	cli
+   755 00000406 0F20C0                  	mov rax,cr0
+   756 00000409 66BA6400                	mov dx,0x64
+   757 0000040D 66B8FE00                	mov ax,0xfe
+   758 00000411 66EF                    	out dx,ax
+   759                                  .fin:
+   760 00000413 F4                      	hlt
+   761 00000414 EBFD                    	jmp .fin
+   762                                  sys_call:
+   763 00000416 0F35                    	db 0x0f,0x35 ;sysexit
+   764                                  test3:
+   765 00000418 F4                      	db 0xf4
+   766                                  .fin:
+   767 00000419 EBFE                    	jmp .fin
+   768                                  support_rand: ;int support_rand()
+   769 0000041B 31C0                    	xor eax,eax
+   770 0000041D FFC0                    	inc eax
+   771 0000041F C3                      	ret
+   772                                  	
+   773 00000420 53                      	push rbx
+   774 00000421 51                      	push rcx
+   775 00000422 52                      	push rdx
+   776 00000423 B801000000              	mov eax,1
+   777 00000428 0FA2                    	db 0x0f,0xa2 ;cpuid
+   778 0000042A 81E100000040            	and ecx,0x40000000
+   779 00000430 0F92C0                  	db 0x0f,0x92,0xc0;setc al
+   780 00000433 5A                      	pop rdx
+   781 00000434 59                      	pop rcx
+   782 00000435 5B                      	pop rbx
+   783 00000436 C3                      	ret
+   784                                  rdrand: ;int rdrand()
+   785 00000437 0FC7F0                  	db 0x0f,0xc7,0xf0 ;rdrand eax
+   786                                  	;rdrand
+   787 0000043A C3                      	ret
+   788                                  _invlpg:
+   789 0000043B C3                      	ret
+   790                                  tpm_init:
+   791                                  	;初始化tpm
+   792 0000043C 50                      	push rax
+   793 0000043D B800F00600                  mov eax, 0x6f000
+   794 00000442 8904250000D4FE              mov dword [tpm_command], eax
+   795          ******************       warning: dword data exceeds bounds
+   796 00000449 E802000000                  call tpm_wait_for_status
+   797 0000044E 58                      	pop rax
+   798 0000044F C3                      	ret
+   799                                  tpm_get_a_key:
+   800                                  	
+   801                                  tpm_wait_for_status:
+   802                                          ;等待tpm状态就绪
+   803 00000450 8B04251400D4FE                  mov eax, dword [tpm_status]
+   804          ******************       warning: dword data exceeds bounds
+   805 00000457 2500008001                      and eax, 0x01800000
+   806 0000045C 3D00008000                      cmp eax, 0x00800000
+   807 00000461 75ED                            jne tpm_wait_for_status
+   808 00000463 C3                      		ret
+   809                                  sys_nop:
+   810 00000464 90                      	nop
+   811 00000465 C3                      	ret
+   812                                  ;unsigned int asm_sse_strcmp(char* str,char* str,unsigned,int longer)
+   813                                  asm_sse_strcmp:
+   814 00000466 55                      	push rbp
+   815 00000467 4889E5                  	mov rbp,rsp
+   816                                  	
+   817 0000046A 4889C8                  	mov rax,rcx
+   818                                  	;mov edx,rdx
+   819 0000046D 4C89C1                  	mov rcx,r8
+   820 00000470 53                      	push rbx
+   821 00000471 56                      	push rsi
+   822 00000472 57                      	push rdi
+   823 00000473 4889C6                  	mov rsi,rax
+   824 00000476 4889D7                  	mov rdi,rdx
+   825 00000479 4889CA                  	mov rdx,rcx
+   826                                  	;清零计数器
+   827 0000047C 4831DB                  	xor rbx,rbx 
+   828 0000047F 0F06                    	clts
+   829 00000481 660FEFD2                	pxor xmm2,xmm2
+   830                                  .lp:
+   831 00000485 0F06                    	clts
+   832                                  	;将字符串剩余长度读入
+   833                                  	;lea eax,[edx-ebx]
+   834 00000487 4889D0                  	mov rax,rdx
+   835 0000048A 4829D8                  	sub rax,rbx
+   836 0000048D 4889C1                  	mov rcx,rax
+   837 00000490 F30F6F041E              	movdqu xmm0, [rsi+rbx]
+   838 00000495 F30F6F0C1F              	movdqu xmm1, [rdi+rbx]
+   839 0000049A 660F3A61C118            	pcmpestri xmm0,xmm1,0x18
+   840                                  	;不是16证明有不一样的部分
+   841 000004A0 4883F910                	cmp rcx,16
+   842 000004A4 752E                    	jne .fin
+   843                                  	
+   844                                  	;检查两个字符串中是否有0 如果有 证明其中一个字符串已经结束
+   845 000004A6 4889CB                  	mov rbx,rcx
+   846 000004A9 660F3A63C204            	pcmpistri xmm0,xmm2,0x04
+   847                                  	;如果不是16 证明有一个字符是空字符 字符串结束
+   848 000004AF 4883F910                	cmp rcx,16
+   849 000004B3 7517                    	jne .fin2
+   850                                  	
+   851 000004B5 660F3A63CA04            	pcmpistri xmm1,xmm2,0x04
+   852                                  	;如果不是16 证明有一个字符是空字符 字符串结束
+   853 000004BB 4883F910                	cmp rcx,16
+   854 000004BF 750B                    	jne .fin2
+   855                                  	
+   856 000004C1 4883C310                	add rbx,16
+   857                                  	;最后 比较是否达到了界限值
+   858 000004C5 4839DA                  	cmp rdx,rbx
+   859 000004C8 7602                    	jbe .fin2
+   860                                  	
+   861 000004CA EBB9                    	jmp .lp
+   862                                  .fin2:
+   863                                  	;没有异常
+   864 000004CC 4831C0                  	xor rax,rax
+   865 000004CF 5F                      	pop rdi
+   866 000004D0 5E                      	pop rsi
+   867 000004D1 5B                      	pop rbx
+   868 000004D2 5D                      	pop rbp
+   869 000004D3 C3                      	ret
+   870                                  .fin:
+   871 000004D4 488D040B                	lea rax,[rbx+rcx]
+   872 000004D8 48FFC0                  	inc rax
+   873                                  	
+   874 000004DB 660F3A63C118            	pcmpistri xmm0,xmm1,0x18
+   875                                  	;最后判断一次是不是遇到了字符串结尾
+   876 000004E1 4883F910                	cmp rcx,16
+   877 000004E5 74E5                    	je .fin2
+   878                                  	
+   879 000004E7 5F                      	pop rdi
+   880 000004E8 5E                      	pop rsi
+   881 000004E9 5B                      	pop rbx
+   882 000004EA 5D                      	pop rbp
+   883 000004EB C3                      	ret
+   884                                  ;asm_sse_strtest(char* str,char test[16])
+   885                                  _asm_sse_strtest:
+   886 000004EC 55                      	push rbp
+   887 000004ED 4889E5                  	mov rbp,rsp
+   888 000004F0 4889C8                  	mov rax,rcx
+   889                                  	;mov rdx,[rbp+gpr_size*3]
+   890 000004F3 53                      	push rbx
+   891 000004F4 56                      	push rsi
+   892 000004F5 57                      	push rdi
+   893 000004F6 67F30F6F0A              	movdqu xmm1,[edx]
+   894                                  	;清零计数器
+   895 000004FB 4831C0                  	xor rax,rax 
+   896 000004FE 0F06                    	clts
+   897 00000500 660FEFD2                	pxor xmm2,xmm2
+   898                                  .lp:
+   899 00000504 0F06                    	clts
+   900 00000506 67F30F6F0406            	movdqu xmm0, [esi+eax]
+   901 0000050C 660F3A63C114            	pcmpistri xmm0,xmm1,0x14
+   902 00000512 4883F910                	cmp rcx,16
+   903                                  	;0
+   904 00000516 7518                    	jne .fin
+   905                                  	
+   906 00000518 4889CB                  	mov rbx,rcx
+   907 0000051B 660F3A63C204            	pcmpistri xmm0,xmm2,0x04
+   908                                  	;如果是16 证明没有任何一个字符是空字符 字符串没有结束
+   909 00000521 4883F910                	cmp rcx,16
+   910 00000525 7506                    	jne .fin2
+   911                                  	
+   912 00000527 4883C010                	add rax,16
+   913 0000052B EBD7                    	jmp .lp
+   914                                  .fin2:
+   915 0000052D 4889D8                  	mov rax,rbx
+   916                                  .fin:
+   917 00000530 4801C8                  	add rax,rcx
+   918 00000533 5F                      	pop rdi
+   919 00000534 5E                      	pop rsi
+   920 00000535 5B                      	pop rbx
+   921 00000536 5D                      	pop rbp
+   922 00000537 C3                      	ret
+   923                                  ;asm_task_switch32(unsigned int *old_esp,unsigned int *new_esp)
+   924                                  asm_task_switch32:
+   925 00000538 55                      	push rbp
+   926                                  	;mov ecx,[rbp+8]
+   927                                  	;mov edx,[rbp+12]
+   928 00000539 E802000000              	call .start
+   929                                  	;恢复环境的代码
+   930 0000053E 5D                      	pop rbp
+   931 0000053F C3                      	ret
+   932                                  .start:
+   933                                  	;保存环境的代码
+   934 00000540 53                      	push rbx
+   935 00000541 56                      	push rsi
+   936 00000542 57                      	push rdi
+   937 00000543 55                      	push rbp
+   938                                  	;cr3
+   939 00000544 0F20D8                  	mov rax,cr3
+   940 00000547 50                      	push rax
+   941 00000548 4831C0                  	xor rax,rax
+   942                                  	;flags
+   943 0000054B 9C                      	pushfq
+   944                                  	;tr
+   945 0000054C 50                      	push rax
+   946 0000054D 0F000C24                	str [rsp]
+   947                                  	;ldtr
+   948 00000551 50                      	push rax
+   949 00000552 0F000424                	sldt [rsp]
+   950                                  	;64位被调用者寄存器
+   951 00000556 4154                    	push r12
+   952 00000558 4155                    	push r13
+   953 0000055A 4156                    	push r14
+   954 0000055C 4157                    	push r15
+   955 0000055E 488921                  	mov [rcx],rsp
+   956                                  	;加载环境的代码
+   957 00000561 488B22                  	mov rsp,[rdx]
+   958 00000564 415F                    	pop r15
+   959 00000566 415E                    	pop r14
+   960 00000568 415D                    	pop r13
+   961 0000056A 415C                    	pop r12
+   962                                  	;ldtr
+   963 0000056C 0F001424                	lldt [rsp]
+   964 00000570 58                      	pop rax
+   965                                  	;tr
+   966                                  	;ltr [esp]
+   967 00000571 58                      	pop rax
+   968                                  	;flags
+   969 00000572 9D                      	popfq
+   970                                  	;cr3
+   971 00000573 58                      	pop rax
+   972 00000574 0F22D8                  	mov cr3,rax
+   973 00000577 5D                      	pop rbp
+   974 00000578 5F                      	pop rdi
+   975 00000579 5E                      	pop rsi
+   976 0000057A 5B                      	pop rbx
+   977 0000057B C3                      	ret
+   978                                  bits 32
+   979                                  ;asm_task_switch32_2(unsigned int *old_esp,tss32 *new_esp)
+   980                                  asm_task_switch32_2:
+   981 0000057C 55                      	push ebp
+   982 0000057D 89E5                    	mov ebp,esp
+   983 0000057F 8B4D08                  	mov ecx,[ebp+8]
+   984 00000582 8B550C                  	mov edx,[ebp+12]
+   985 00000585 E802000000              	call .start
+   986                                  	;恢复环境的代码
+   987 0000058A 5D                      	pop ebp
+   988 0000058B C3                      	ret
+   989                                  .start:
+   990                                  	;保存环境的代码
+   991 0000058C 53                      	push ebx
+   992 0000058D 56                      	push esi
+   993 0000058E 57                      	push edi
+   994 0000058F 55                      	push ebp
+   995 00000590 0F20D8                  	mov eax,cr3
+   996 00000593 50                      	push eax
+   997 00000594 9C                      	pushfd
+   998 00000595 50                      	push eax
+   999 00000596 8921                    	mov [ecx],esp
+  1000                                  	;加载环境的代码
+  1001 00000598 8B02                    	mov eax,[edx]
+  1002 0000059A 8B503C                  	mov edx,[eax+15*4]
+  1003 0000059D 89D5                    	mov ebp,edx
+  1004 0000059F 8B5040                  	mov edx,[eax+16*4]
+  1005 000005A2 89D6                    	mov esi,edx
+  1006 000005A4 8B5044                  	mov edx,[eax+17*4]
+  1007 000005A7 89D7                    	mov edi,edx
+  1008 000005A9 8B5048                  	mov edx,[eax+18*4]
+  1009 000005AC 8EC2                    	mov es,edx
+  1010 000005AE 8B5058                  	mov edx,[eax+22*4]
+  1011 000005B1 8EE2                    	mov fs,edx
+  1012 000005B3 8B505C                  	mov edx,[eax+23*4]
+  1013 000005B6 8EEA                    	mov gs,edx
+  1014 000005B8 89C4                    	mov esp,eax
+  1015 000005BA 61                      	popad
+  1016 000005BB CB                      	retf
+  1017 000005BC C3                      	ret
+  1018                                  bits 64
+  1019                                  ;void asm_vmptrld(unsigned int vmcs_point)
+  1020                                  global asm_vmptrld
+  1021                                  asm_vmptrld:
+  1022 000005BD 0FC731                  	vmptrld [rcx]
+  1023 000005C0 C3                      	ret
+  1024                                  ;void asm_vmptrst(unsigned int* vmcs_point)
+  1025                                  global asm_vmptrst
+  1026                                  asm_vmptrst:
+  1027 000005C1 0FC739                  	vmptrst [rcx]
+  1028 000005C4 C3                      	ret
+  1029                                  ;void asm_vmclear(unsigned int vmcs_point)
+  1030                                  global asm_vmclear
+  1031                                  asm_vmclear:
+  1032 000005C5 660FC731                	vmclear [rcx]
+  1033 000005C9 C3                      	ret
+  1034                                  ;unsigned long long asm_vmread(unsigned int index)
+  1035                                  global asm_vmread
+  1036                                  asm_vmread:
+  1037 000005CA 0F78C8                  	vmread rax,rcx
+  1038 000005CD C3                      	ret
+  1039                                  ;void asm_vmread(unsigned int index,void data)
+  1040                                  global asm_vmwrite
+  1041                                  asm_vmwrite:
+  1042 000005CE 0F79CA                  	vmwrite rcx,rdx
+  1043 000005D1 C3                      	ret
+  1044                                  global asm_vmxon
+  1045                                  asm_vmxon:
+  1046 000005D2 F30FC731                	vmxon [rcx]
+  1047                                  asm_x64_cs_init:
+  1048 000005D6 48                      	db 0x48
+  1049 000005D7 CB                      	retf
+  1050                                  asm_get_cs:
+  1051 000005D8 8CC8                    	mov rax,cs
+  1052 000005DA C3                      	ret
+  1053                                  ;void asm_sheet_refreshsub32(void* struct SHEET_REFRESH_PACK_32 pack);
+  1054                                  asm_sheet_refreshsub32:
+  1055 000005DB 53                      	push rbx
+  1056 000005DC 56                      	push rsi
+  1057 000005DD 57                      	push rdi
+  1058 000005DE 4154                    	push r12
+  1059 000005E0 4155                    	push r13
+  1060 000005E2 4156                    	push r14
+  1061 000005E4 4157                    	push r15
+  1062 000005E6 488B31                  	mov rsi,[rcx];源变址
+  1063 000005E9 488B7908                	mov rdi,[rcx+8];目的变址
+  1064 000005ED 4C8B4110                	mov r8,[rcx+16];源图层宽度
+  1065 000005F1 4C8B4918                	mov r9,[rcx+24];目的图层宽度
+  1066 000005F5 4C8B5120                	mov r10,[rcx+32];刷新窗口宽度
+  1067 000005F9 4C8B5928                	mov r11,[rcx+40];刷新窗口高度
+  1068 000005FD 4C8B6130                	mov r12,[rcx+48];sid_addr
+  1069 00000601 4C8B6938                	mov r13,[rcx+56];sid
+  1070 00000605 4489693C                	mov [rcx+56+4],r13d;低端32位sid数据复制到高32位
+  1071 00000609 4C8B6938                	mov r13,[rcx+56];sid
+  1072 0000060D 4C896940                	mov [rcx+64],r13;sid
+  1073 00000611 F30F6F6138              	movdqu xmm4,[rcx+56]
+  1074 00000616 4831C0                  	xor rax,rax
+  1075 00000619 4831D2                  	xor rdx,rdx
+  1076                                  	
+  1077                                  .start:	
+  1078 0000061C F30F6F0C86              	movdqu xmm1,[rsi+rax*4]
+  1079 00000621 F30F6F1487              	movdqu xmm2,[rdi+rax*4]
+  1080 00000626 F3410F6F1C84            	movdqu xmm3,[r12+rax*4];sid序列
+  1081 0000062C 0FC2DC00                	cmpps xmm3,xmm4,0
+  1082 00000630 660FDBCB                	pand xmm1,xmm3;清空无效数据
+  1083 00000634 660FDFDA                	pandn xmm3,xmm2;清空无效数据
+  1084 00000638 660FEBCB                	por xmm1,xmm3;混合
+  1085 0000063C F30F7F0C87              	movdqu [rdi+rax*4],xmm1
+  1086 00000641 83C004                  	add eax,4
+  1087 00000644 4C39D0                  	cmp rax,r10
+  1088 00000647 72D3                    	jb .start
+  1089 00000649 7420                    	je .fin;正好相等
+  1090 0000064B 83E804                  	sub eax,4
+  1091                                  .continued:
+  1092                                  	;这里说明本行剩下的不足4个像素
+  1093 0000064E 8B1C86                  	mov ebx,[rsi+rax*4]
+  1094 00000651 448B3487                	mov r14d,[rdi+rax*4]
+  1095 00000655 458B3C84                	mov r15d,[r12+rax*4]
+  1096 00000659 4539EF                  	cmp r15d,r13d
+  1097 0000065C 490F45DE                	cmovne rbx,r14
+  1098 00000660 891C87                  	mov [rdi+rax*4],ebx
+  1099 00000663 48FFC0                  	inc rax
+  1100 00000666 4C39D0                  	cmp rax,r10
+  1101 00000669 75E3                    	jne .continued
+  1102                                  .fin:
+  1103 0000066B 31C0                    	xor eax,eax
+  1104 0000066D 48FFC2                  	inc rdx
+  1105 00000670 4A8D3486                	lea rsi,[rsi+r8*4]
+  1106 00000674 4A8D3C8F                	lea rdi,[rdi+r9*4]
+  1107 00000678 4F8D248C                	lea r12,[r12+r9*4]
+  1108 0000067C 4C39DA                  	cmp rdx,r11
+  1109 0000067F 729B                    	jb .start
+  1110 00000681 415F                    	pop r15
+  1111 00000683 415E                    	pop r14
+  1112 00000685 415D                    	pop r13
+  1113 00000687 415C                    	pop r12
+  1114 00000689 5F                      	pop rdi
+  1115 0000068A 5E                      	pop rsi
+  1116 0000068B 5B                      	pop rbx
+  1117 0000068C C3                      	ret
+  1118                                  
+  1119                                  
+  1120                                  ;void asm_sheet_refreshsub32a(void* struct SHEET_REFRESH_PACK_32 pack);
+  1121                                  asm_sheet_refreshsub32a:
+  1122 0000068D 53                      	push rbx
+  1123 0000068E 56                      	push rsi
+  1124 0000068F 57                      	push rdi
+  1125 00000690 4154                    	push r12
+  1126 00000692 4155                    	push r13
+  1127 00000694 4156                    	push r14
+  1128 00000696 4157                    	push r15
+  1129 00000698 488B31                  	mov rsi,[rcx];源变址
+  1130 0000069B 488B7908                	mov rdi,[rcx+8];目的变址
+  1131 0000069F 4C8B4110                	mov r8,[rcx+16];源图层宽度
+  1132 000006A3 4C8B4918                	mov r9,[rcx+24];目的图层宽度
+  1133 000006A7 4C8B5120                	mov r10,[rcx+32];刷新窗口宽度
+  1134 000006AB 4C8B5928                	mov r11,[rcx+40];刷新窗口高度
+  1135 000006AF 4C8B6130                	mov r12,[rcx+48];sid_addr
+  1136 000006B3 4C8B6938                	mov r13,[rcx+56];sid
+  1137 000006B7 660F126138              	movlpd xmm4,[rcx+56]
+  1138 000006BC 660F70E400              	pshufd xmm4,xmm4,0;低端32位sid数据复制扩展到整个xmm
+  1139 000006C1 4831C0                  	xor rax,rax
+  1140 000006C4 4831D2                  	xor rdx,rdx
+  1141                                  	
+  1142                                  .start:	
+  1143 000006C7 660F6F0C86              	movdqa xmm1,[rsi+rax*4]
+  1144 000006CC 660F6F1487              	movdqa xmm2,[rdi+rax*4]
+  1145 000006D1 66410F6F1C84            	movdqa xmm3,[r12+rax*4];sid序列
+  1146 000006D7 0FC2DC00                	cmpps xmm3,xmm4,0
+  1147 000006DB 660FDBCB                	pand xmm1,xmm3;清空无效数据
+  1148 000006DF 660FDFDA                	pandn xmm3,xmm2;清空无效数据
+  1149 000006E3 660FEBCB                	por xmm1,xmm3;混合
+  1150 000006E7 660F7F0C87              	movdqa [rdi+rax*4],xmm1
+  1151 000006EC 83C004                  	add eax,4
+  1152 000006EF 4C39D0                  	cmp rax,r10
+  1153 000006F2 72D3                    	jb .start
+  1154 000006F4 7420                    	je .fin;正好相等
+  1155 000006F6 83E804                  	sub eax,4
+  1156                                  .continued:
+  1157                                  	;这里说明本行剩下的不足4个像素
+  1158 000006F9 8B1C86                  	mov ebx,[rsi+rax*4]
+  1159 000006FC 448B3487                	mov r14d,[rdi+rax*4]
+  1160 00000700 458B3C84                	mov r15d,[r12+rax*4]
+  1161 00000704 4539EF                  	cmp r15d,r13d
+  1162 00000707 490F45DE                	cmovne rbx,r14
+  1163 0000070B 891C87                  	mov [rdi+rax*4],ebx
+  1164 0000070E 48FFC0                  	inc rax
+  1165 00000711 4C39D0                  	cmp rax,r10
+  1166 00000714 75E3                    	jne .continued
+  1167                                  .fin:
+  1168 00000716 31C0                    	xor eax,eax
+  1169 00000718 48FFC2                  	inc rdx
+  1170 0000071B 4A8D3486                	lea rsi,[rsi+r8*4]
+  1171 0000071F 4A8D3C8F                	lea rdi,[rdi+r9*4]
+  1172 00000723 4F8D248C                	lea r12,[r12+r9*4]
+  1173 00000727 4C39DA                  	cmp rdx,r11
+  1174 0000072A 729B                    	jb .start
+  1175 0000072C 415F                    	pop r15
+  1176 0000072E 415E                    	pop r14
+  1177 00000730 415D                    	pop r13
+  1178 00000732 415C                    	pop r12
+  1179 00000734 5F                      	pop rdi
+  1180 00000735 5E                      	pop rsi
+  1181 00000736 5B                      	pop rbx
+  1182 00000737 C3                      	ret
+  1183                                  extern console_task
+  1184                                  global asm_console_task_start_64
+  1185                                  ;这个函数的目的是因为x64架构下无法使用栈传递第一个和第二个参数 但是为了任务切换效率无法切换调用者保存寄存器 因此使用这个函数中转
+  1186                                  asm_console_task_start_64:
+  1187 00000738 488B4C2408              	mov rcx,[rsp+8]
+  1188 0000073D 488B542410              	mov rdx,[rsp+16]
+  1189 00000742 E9(00000000)            	jmp console_task

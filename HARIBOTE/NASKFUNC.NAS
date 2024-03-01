@@ -716,18 +716,14 @@ support_apic: ;int support_apic(void):
 	pop rdx
 	ret
 io_rdmsr: ;void io_rdmsr(int* edx,int* eax,int ecx)
-	mov r15,rcx
-	mov rcx,r8
 	;db 0x0f,0x32 ;rdmsr
 	rdmsr
-	mov [r15],edx
-	mov [rdx],eax
+	mov [r8],rax
+	mov [rdx],rdx
 	ret
 io_wrmsr: ;void io_wrmsr(int edx,int eax,int ecx)
-	mov rax,rdx
-	mov rdx,rcx
-	mov rcx,r8
 	;db 0x0f,0x30 ;wrmsr
+	mov rax,r8
 	wrmsr
 	ret
 test2: ;void test(int eax,int ebx)
@@ -1182,3 +1178,10 @@ asm_sheet_refreshsub32a:
 	pop rsi
 	pop rbx
 	ret
+extern console_task
+global asm_console_task_start_64
+;这个函数的目的是因为x64架构下无法使用栈传递第一个和第二个参数 但是为了任务切换效率无法切换调用者保存寄存器 因此使用这个函数中转
+asm_console_task_start_64:
+	mov rcx,[rsp+8]
+	mov rdx,[rsp+16]
+	jmp console_task

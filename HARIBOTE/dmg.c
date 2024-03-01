@@ -131,10 +131,8 @@ void task_disk(){
 			int i = fifo32_get(&task->fifo);
 			io_sti();
 		}
-		if(i=='\d' || i=='\a'){
-			if(asm_sse_strcmp(command,'satainfo',8)==0){
-				
-			}
+		if(i=='q' || i=='Q'){
+			cons_putstr0(task->cons,"dmg task exit\n");
 		}else{
 			command[command_point++]=i;
 		}

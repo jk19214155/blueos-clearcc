@@ -130,7 +130,7 @@ int io_in8(int port);
 int io_out8(int port, int data);
 int io_in16(int port);
 int io_out16(int port, int data);
-int io_load_eflags(void);
+unsigned long long io_load_eflags(void);
 int io_store_eflags(unsigned long long eflags);
 int load_gdtr(unsigned long long limit, unsigned long long addr);
 int load_idtr(unsigned long long limit, unsigned long long addr);
@@ -153,8 +153,8 @@ void asm_hrb_api(void);
 void start_app(unsigned long long eip, unsigned long long cs, unsigned long long esp, unsigned long long ds, unsigned long long *tss_esp0);
 void asm_end_app(void);
 int support_apic(void);
-void io_wrmsr(unsigned long long edx,unsigned long long eax,unsigned long long ecx);
-void io_rdmsr(unsigned long long* edx,unsigned long long* eax,unsigned long long ecx);
+void io_wrmsr(unsigned long long ecx,unsigned long long edx,unsigned long long eax);
+void io_rdmsr(unsigned long long ecx,unsigned long long* edx,unsigned long long* eax);
 void test2(int eax,int ebx);
 void store_gdt(void* addr);
 void store_idt(void* addr);
@@ -163,7 +163,10 @@ void sys_call(void);
 int rdrand();
 unsigned int  asm_sse_strcmp(char* s,char* t,unsigned int longer);
 void asm_task_switch32(unsigned int *esp_s,unsigned int* esp_t);
+void asm_console_task_start_64();
 unsigned long long asm_get_cs();
+unsigned long long store_cr4();
+int load_cr4(unsigned long long cr4);
 //void memset(char* s,int num,int longer);
 //void strcpy(char* s,char* t,int longer);
 //int strcmp(char* s,char* t,int longer);
@@ -688,7 +691,7 @@ typedef struct _SYSTEMTABLE{
 	struct _SYSTEMTABLE_FILE *file;
 }SYSTEMTABLE;
 void console_init(struct CONSOLE* cons,struct SHTCTL* shtctl,unsigned int cons_x,unsigned int cons_y);
-void console_task(struct SHEET *sheet, int memtotal);
+void __cdecl console_task(struct SHEET *sheet, int memtotal);
 void cons_putchar(struct CONSOLE *cons, int chr, char move);
 void cons_newline(struct CONSOLE *cons);
 void cons_putstr0(struct CONSOLE *cons, char *s);
@@ -905,6 +908,7 @@ typedef struct ahci_abi_regs {
   unsigned int HBA_RPxIS; //HBA_RPxIS
   unsigned int HBA_RPxIE;
   unsigned int HBA_RPxCMD;
+  unsigned int res;
   unsigned int HBA_RPxTFD;
   unsigned int HBA_RPxSIG;
   unsigned int HBA_RPxSSTS;
@@ -956,6 +960,15 @@ typedef struct pci_device{//设备信息编号
 	int class_code;
 	int subclass_code;
 }PCI_DEV;
+#pragma pack(1)
+typedef struct ahci_device{
+	PCI_DEV pci_dev;
+	unsigned long long fis_base[32];
+	unsigned long long fis_page_base[2];
+	unsigned  long long clb_base[32];
+	unsigned  long long clb_page_base[8];
+	void* dev_info;
+}AHCI_DEV;
 #define ahci_command_header$flags$a (1<<5)
 #define ahci_command_header$flags$w (1<<6)
 #define ahci_command_header$flags$p (1<<7)
@@ -983,9 +996,10 @@ typedef struct _ahci_cfis_0x27{
 	char device;
 	short lba39_24;
 	char lba47_40;
-	char control;
-	short auxiliary;
+	char features2;
+	short count;
 	short reserved;
+	unsigned int aux;
 }AHCI_CFIS_0X27;
 #pragma pack(1)
 typedef struct _ahci_prdt{//数据块描述结构 描述设备和系统传输数据的地址
@@ -1001,7 +1015,7 @@ typedef struct _ahci_sata_fis{//SATA FIS的结构
 		char space[0x40];
 	}cfis;
 	union{//ACMD结构
-		char space[0x10];
+		char space[0x40];
 	}acmd;
 	AHCI_PRDT prdt[0];//动态大小 
 }AHCI_SATA_FIS;
@@ -1019,6 +1033,9 @@ typedef struct _ahci_sata_fis{//SATA FIS的结构
 unsigned int pcie_read_config(PCI_DEV* dev,int reg_offset); 
 void pcie_write_config(PCI_DEV* dev,int reg_offset,unsigned int config);
 unsigned pcie_get_rcba();
+typedef struct block_dev_function{
+	EFI_STATUS (*data_move)(void* id,void* buff,unsigned long long lba,unsigned long long size,unsigned long long flags);
+}BLOCK_DEV_FUNCTION;
 //unsigned int read_pci_config8(struct pci_device pci_device, unsigned char reg_offset);
 //unsigned int read_pci_config32(struct pci_device pci_device, unsigned char reg_offset);
 /*bmp.c*/

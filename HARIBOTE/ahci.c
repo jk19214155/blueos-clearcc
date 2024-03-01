@@ -23,12 +23,12 @@
 #define HBA_RPxSNTF 15
 #define HBA_RPxFBS 16
 */
-#define AHCI_CLASS_ID 0x010601
+#define AHCI_CLASS_ID 0x0106
 
-static unsigned int fis_base[32];
-static unsigned int fis_page_base[2];
-static unsigned int clb_base[32];
-static unsigned int clb_page_base[8];
+//unsigned long long fis_base[32];
+//unsigned long long fis_page_base[2];
+// unsigned  long long clb_base[32];
+// unsigned  long long clb_page_base[8];
 int ahci_find_device_in_pcie(PCI_DEV* pci_dev){
 	int recode=pcie_find_dev_by_class(pci_dev,AHCI_CLASS_ID);
 	if(recode == 0){
@@ -54,146 +54,304 @@ int ahci_find_device_in_pcie(PCI_DEV* pci_dev){
 static unsigned int ahci_regs_header_cap;
 static unsigned int ahci_regs_header_pi;
 static AHCI_REGS* ahci_base_address;
+extern char buff[1024];
 #pragma pack(push,16)
 	static char ahci_buff[4096];
 #pragma pack(pop)
-PCI_DEV ahci_dev;
-int ahci_init(){
+typedef struct _AHCI_TABLE{
+	AHCI_DEV ahci_dev[8];
+	int number;
+}AHCI_TABLE;
+typedef struct _ahci_command{
+	unsigned long long id;
+	unsigned long long lba;
+	void* buff;
+	unsigned long long block_count;
+	void (func)(struct _ahci_command* cmd);//回调函数
+}AHCI_COMMAND;
+typedef struct _ahci_command_list{
+	AHCI_COMMAND* list[128];
+}AHCI_COMMAND_LIST;
+EFI_STATUS ahci_init(AHCI_DEV* ahci_dev);
+AHCI_TABLE* ahci_table;
+AHCI_TABLE* ahci_init_all(){
 	struct PAGEMAN32* pageman=*((void** )ADR_PAGEMAN);
 	struct MEMMAN* memman=task_now()->memman;
-	ahci_find_device_in_pcie(&ahci_dev);
+	struct TASK* task=task_now();
+	struct CONSOLE* cons=task->cons;
+	int i;
+	AHCI_TABLE* ahci_table0=memman_alloc_page_32(pageman);
+	//清空区域
+	for(i=0;i<4096/8;i++){
+		*((unsigned long long*)ahci_table0+i)=0;
+	}
+	for(int i=0;i<8;i++){
+		EFI_STATUS status=ahci_init(&ahci_table0->ahci_dev[i]);
+		if(EFI_ERROR(status)){
+			break;
+		}
+		ahci_table0->ahci_dev[i].dev_info=memman_alloc_page_32(pageman);
+	}
+	ahci_table0->number=i;
+	ahci_table=ahci_table0;
+	return ahci_table0;
+}
+EFI_STATUS ahci_software_reset(AHCI_ABI_REGS* port){
+	AHCI_SATA_FIS* fis1=memman_alloc_page_32(pageman);
+	AHCI_SATA_FIS* fis2=memman_alloc_page_32(pageman);
+	fis1=memman_alloc_page_32(pageman);
+	fis2=memman_alloc_page_32(pageman);
+	ahci_make_fis(AHCI_SATA_FIS* fis,,void* buff,unsigned long long lba,unsigned long long count,unsigned long long command,unsigned long long flag)
+	ahci_make_fis(AHCI_SATA_FIS* fis,,void* buff,unsigned long long lba,unsigned long long count,unsigned long long command,unsigned long long flag)
+}
+EFI_STATUS ahci_init(AHCI_DEV* ahci_dev){
+	struct PAGEMAN32* pageman=*((void** )ADR_PAGEMAN);
+	struct MEMMAN* memman=task_now()->memman;
+	struct TASK* task=task_now();
+	struct CONSOLE* cons=task->cons;
+	EFI_STATUS status=ahci_find_device_in_pcie(ahci_dev);
+	if(EFI_ERROR(status)){
+		return -1;
+	}
+	if(cons!=0){
+		sprintf(buff,"ahci_init:bus is %d\n",((PCI_DEV*)ahci_dev)->bus);
+		cons_putstr0(cons, buff);
+		sprintf(buff,"ahci_init:dev is %d\n",((PCI_DEV*)ahci_dev)->device);
+		cons_putstr0(cons, buff);
+		sprintf(buff,"ahci_init:func is %d\n",((PCI_DEV*)ahci_dev)->function);
+		cons_putstr0(cons, buff);
+	}
 	unsigned int ahci_bar_6;
 	/*读取6号bar的数值*/
-	pcie_get_bar_from_device(&ahci_dev,6,&ahci_bar_6);
+	pcie_get_bar_from_device(ahci_dev,5,&ahci_bar_6);
+	if(cons!=0){
+		sprintf(buff,"ahci_init:ahci_bar_6 is %x\n",ahci_bar_6);
+		cons_putstr0(cons, buff);
+	}
 	unsigned int ahci_bar_6_size;
 	/*读取6号bar的大小*/
-	pcie_get_size_from_bar(&ahci_dev,6,&ahci_bar_6_size);
+	//pcie_get_size_from_bar(&ahci_dev,6,&ahci_bar_6_size);
+	if(cons!=0){
+		sprintf(buff,"ahci_init:ahci_bar_6_size is %x\n",ahci_bar_6_size);
+		cons_putstr0(cons, buff);
+	}
 	/*映射空间*/
-	AHCI_REGS* ahci_bar_6_base=memman_alloc_4k(memman,ahci_bar_6_size);
-	pageman_link_page_32_m(pageman,ahci_bar_6_base,ahci_bar_6|0x07,(ahci_bar_6_size+0xfff)>>12,1);
+	//AHCI_REGS* ahci_bar_6_base=memman_alloc_4k(memman,ahci_bar_6_size);
+	//pageman_link_page_32_m(pageman,ahci_bar_6_base,ahci_bar_6|0x07,(ahci_bar_6_size+0xfff)>>12,1);
+	//64位模式不进行映射
+	AHCI_REGS* ahci_bar_6_base=ahci_bar_6;
 	ahci_base_address=ahci_bar_6_base;
+	//return ahci_dev;
 	/*配置控制寄存器*/
-	unsigned int pcie_command=pcie_read_config(&ahci_dev,0x04);
+	unsigned int pcie_command=pcie_read_config(ahci_dev,0x04);
 	pcie_command|=PCI_RCMD_MM_ACCESS|PCI_RCMD_DISABLE_INTR|PCI_RCMD_BUS_MASTER;
-	pcie_write_config(&ahci_dev,0x04,pcie_command);
+	pcie_write_config(ahci_dev,0x04,pcie_command);
 	/*启用AHCI*/
-	(ahci_bar_6_base->header).i.ghc|=0x01;//激活AHCI模式
-	(ahci_bar_6_base->header).i.ghc|=(1<<32);
+	(ahci_bar_6_base->header).i.ghc|=(1<<31);//激活AHCI模式
+	(ahci_bar_6_base->header).i.ghc|=(1<<1);//激活中断
+	
 	ahci_regs_header_cap=(ahci_bar_6_base->header).i.cap;
 	ahci_regs_header_pi=(ahci_bar_6_base->header).i.pi;//所有已经开启的端口
-	
+	if(cons!=0){
+		sprintf(buff,"ahci_init:ahci.header.cap is %x\n",ahci_regs_header_cap);
+		cons_putstr0(cons, buff);
+	}
+	/*首先分配clb的空间*/
+	for(int i=0;i<8;i++){
+		ahci_dev->clb_page_base[i]=memman_alloc_page_32(pageman);
+		/*同一个页分配4个clb*/
+		for(int j=0;j<4;j++){
+			ahci_dev->clb_base[i*4+j]=ahci_dev->clb_page_base[i]+(1024*j);
+		}
+	}
+	/*分配fis的空间*/
+	for(int i=0;i<2;i++){
+		ahci_dev->fis_page_base[i]=memman_alloc_page_32(pageman);
+		/*同一个页分配16个fis*/
+		for(int j=0;j<16;j++){
+			ahci_dev->fis_base[i*16+j]=ahci_dev->fis_page_base[i]+(256*j);
+		}
+	}
 	/*端口重置*/
-	for(int i =0;0&(i<32);i++){//禁用重置
-		if(((ahci_bar_6_base->header).i.pi)&(1<<i)==0){//端口未开启
+	for(int i=0;i<32;i++){
+		if(cons!=0){
+			sprintf(buff,"ahci_init:HBA_RPxSIG is %x\n",(ahci_base_address->port)[i].i.HBA_RPxSIG);
+			cons_putstr0(cons, buff);
+		}
+		//检测端口是否开启
+		if((((ahci_bar_6_base->header).i.pi)&(1<<i))==0){//端口未开启
+			continue;
+		}
+		if((ahci_base_address->port)[i].i.HBA_RPxSIG==0xffffffff){
+			continue;
+		}
+		//关闭ST
+		(ahci_base_address->port)[i].i.HBA_RPxCMD&=~(0x01);
+		//关闭FRE
+		(ahci_base_address->port)[i].i.HBA_RPxCMD&=~(0x10);
+		//关闭端口
+		while(1){
+			//FR
+			if((ahci_base_address->port)[i].i.HBA_RPxCMD&0x4000){
+				continue;
+			}
+			//CR
+			if((ahci_base_address->port)[i].i.HBA_RPxCMD&0x8000){
+				continue;
+			}
+			break;
+		}
+		//分配操作空间
+		(ahci_base_address->port)[i].i.fb=ahci_dev->fis_base[i];
+		(ahci_base_address->port)[i].i.fbu=0;
+		(ahci_base_address->port)[i].i.clb=ahci_dev->clb_base[i];
+		(ahci_base_address->port)[i].i.clbu=0;
+		(ahci_bar_6_base->port)[i].i.HBA_RPxCI=0;
+		(ahci_bar_6_base->port)[i].i.HBA_RPxSERR=-1;
+		//开启端口
+		while((ahci_base_address->port)[i].i.HBA_RPxCMD&0x8000);
+		(ahci_base_address->port)[i].i.HBA_RPxCMD|=(0x10);
+		(ahci_base_address->port)[i].i.HBA_RPxCMD|=(0x01);
+		
+	}
+	/*
+	//端口重置
+	
+	for(int i =0;i<1;i++){//禁用重置
+		if(cons!=0){
+			sprintf(buff,"reg rsset %x\n",i);
+			cons_putstr0(cons, buff);
+		}
+		if((((ahci_bar_6_base->header).i.pi)&(1<<i))==0){//端口未开启
 			continue;
 		}
 		(ahci_bar_6_base->port)[i].i.HBA_RPxCMD&=~(0x01);
 		(ahci_bar_6_base->port)[i].i.HBA_RPxCMD&=~(1<<4);
-		for(int j=0;j<1000*1000*500;j++){
+		for(int j=0;j<1000*1000;j++){
 			sys_nop();
 		}
 		if((ahci_bar_6_base->port)[i].i.HBA_RPxCMD&HBA_PxCMD_CR){
+			if(cons!=0){
+				cons_putstr0(cons, "port CR set\n");
+			}
 			continue;
 		}
-		(ahci_bar_6_base->port)[i].i.HBA_RPxSCTL =((ahci_bar_6_base->port)[i].i.HBA_RPxSCTL)& ~0x0f |1;
+		else{
+			if(cons!=0){
+				cons_putstr0(cons, "port CR not set\n");
+			}
+		}
+		(ahci_bar_6_base->port)[i].i.HBA_RPxSCTL =(((ahci_bar_6_base->port)[i].i.HBA_RPxSCTL)& ~0x0f) |1;
 		for(int j=0;j<1000*1000;j++){
 			sys_nop();
 		}
 		(ahci_bar_6_base->port)[i].i.HBA_RPxSCTL =((ahci_bar_6_base->port)[i].i.HBA_RPxSCTL)& ~0x0f;
 	}
-	
+	*/
 	/*分配操作空间*/
 	/*clb size: 1024b=1/4 page *32=8 page*/
 	/*fis size: 256b=1/16 page *32=2 page*/
-	/*首先分配clb的空间*/
-	for(int i=0;i<8;i++){
-		unsigned int p=memman_alloc_4k(memman,4096);
-		clb_page_base[i]=pageman_link_page_32(pageman,p,0x07,0);
-		/*同一个页分配4个clb*/
-		for(int j=0;j<4;j++){
-			(ahci_bar_6_base->port)[i*16+j].i.clb=clb_page_base[i]+(1024*j);
-			(ahci_bar_6_base->port)[i*16+j].i.clbu=0;
-			clb_base[i*4+j]=clb_page_base[i]+(1024*j);
-		}
-	}
-	/*分配fis的空间*/
-	for(int i=0;i<2;i++){
-		unsigned int p=memman_alloc_4k(memman,4096);
-		fis_page_base[i]=pageman_link_page_32(pageman,ahci_bar_6_base,ahci_bar_6|0x07,0);
-		/*同一个页分配4个clb*/
-		for(int j=0;j<16;j++){
-			(ahci_bar_6_base->port)[i*16+j].i.fb=clb_page_base[i]+(256*j);
-			(ahci_bar_6_base->port)[i*16+j].i.fbu=0;
-			fis_base[i*16+j]=clb_page_base[i]+(256*j);
-		}
-	}
-	/*清空CI寄存器,清空PxSERR*/
-	for(int i=0;i<32;i++){
-		(ahci_bar_6_base->port)[i].i.HBA_RPxCI=0;
-		(ahci_bar_6_base->port)[i].i.HBA_RPxSERR=-1;
-		
-	}
-	unsigned int msi_index = pcie_find_capbility_by_id(&ahci_dev,0x05);//寻找MSI中断扩展配置 MSI-X的编码为0x11
-	unsigned a=pcie_read_config(&ahci_dev,msi_index*4);
+	
+	unsigned int msi_index = pcie_find_capbility_by_id(ahci_dev,0x05);//寻找MSI中断扩展配置 MSI-X的编码为0x11
+	unsigned a=pcie_read_config(ahci_dev,msi_index*4);
 	unsigned int msg_ctl=a>>16;
 	int offset= (!!(msg_ctl&0x80))*4;//这里判断MSI结构格式是否有另外的4个字节偏移 64位系统有4个字节的高地址 32位系统没有
-	pcie_write_config(&ahci_dev,msi_index*4+8+offset,0x80);//0x80是硬盘中断号 可自定义
+	pcie_write_config(ahci_dev,msi_index*4+8+offset,0x80);//0x80是硬盘中断号 可自定义
 	if(msg_ctl&0x100){//如果支持中断MASK
-		pcie_write_config(&ahci_dev,msi_index*4+0x0c+offset,0);
+		pcie_write_config(ahci_dev,msi_index*4+0x0c+offset,0);
 	}
 	a=(a&0xff8fffff)|0x10000;
-	pcie_write_config(&ahci_dev,msi_index*4,a);
-	return &ahci_dev;
+	pcie_write_config(ahci_dev,msi_index*4,a);
+	return 0;
 }
-unsigned int ahci_get_info(PCI_DEV* dev,unsigned int ahci_abi_regs_index,void* buff){
-	struct MEMMAN* memman=task_now()->memman;
+AHCI_SATA_FIS* ahci_make_fis(AHCI_SATA_FIS* fis,,void* buff,unsigned long long lba,unsigned long long count,unsigned long long command,unsigned long long flag){
+	if(fis==0){
+		fis=memman_alloc_page_32(pageman);
+	}
+	(fis->cfis).ahci_cfis_0x27.type=0x27;
+	(fis->cfis).ahci_cfis_0x27.command=command;//读取DMA EXT
+	(fis->cfis).ahci_cfis_0x27.device=0xe0;
+	(fis->cfis).ahci_cfis_0x27.flag=(1<<7);
+	(fis->cfis).ahci_cfis_0x27.lba15_0=lba&0xffff;
+	(fis->cfis).ahci_cfis_0x27.lba23_16=(lba>>16)&0xff;
+	(fis->cfis).ahci_cfis_0x27.lba39_24=(lba>>24)&0xffff;
+	(fis->cfis).ahci_cfis_0x27.lba47_40=(lba>>40)&0xff;
+	(fis->cfis).ahci_cfis_0x27.count=count;
+	(fis->cfis).ahci_cfis_0x27.aux=0;
+	(fis->cfis).ahci_cfis_0x27.reserved=0;
+	(fis->cfis).ahci_cfis_0x27.features2=0;
+	(fis->cfis).ahci_cfis_0x27.features=0;
+	fis->prdt[0].dba=data_base;
+	fis->prdt[0].dbau=0;
+	fis->prdt[0].dbc=4096-1;//设备信息有512字节大小
+	return fis;
+}
+AHCI_SATA_FIS* ahci_data_move(AHCI_DEV* dev,unsigned int ahci_abi_regs_index,AHCI_SATA_FIS* fis,unsigned long long prdtl){
+	struct MEMMAN* memman=task_now()->memman; 
 	struct PAGEMAN32* pageman=*((void** )ADR_PAGEMAN);
+	struct TASK* task=task_now();
+	struct CONSOLE* cons=task->cons;
+	AHCI_COMMAND_HEADER* clb=(AHCI_COMMAND_HEADER*)(dev->clb_base)[ahci_abi_regs_index];//命令区块地址 
+	//AHCI_COMMAND_HEADER* clb=(void*)0x61108000;
 	/*寻找空闲的命令队列*/
-	unsigned int HBA_RPxCI=(ahci_base_address->port)[ahci_abi_regs_index].i.HBA_RPxCI;
+	unsigned int HBA_RPxCI=( ahci_base_address->port)[ahci_abi_regs_index].i.HBA_RPxCI;
 	unsigned int HBA_RPxSACT=(ahci_base_address->port)[ahci_abi_regs_index].i.HBA_RPxSACT;
 	int i;
 	for(i=0;i<32;i++){
-		if(HBA_RPxCI&(1<<i)==1){//被占用则测试下一个
+		if((HBA_RPxCI&(1<<i))==1){//被占用则测试下一个
 			continue;
 		}
-		if(HBA_RPxSACT&(1<<i)==1){//被占用则测试下一个
+		if((HBA_RPxSACT&(1<<i))==1){//被占用则测试下一个
 			continue;
 		}
 		//找到一个没有被占用的命令槽位
-		AHCI_COMMAND_HEADER* clb=(AHCI_COMMAND_HEADER*)(ahci_base_address->port)[ahci_abi_regs_index].i.clb;//命令区块地址
 		//判断是哪一种设备
 		unsigned int HBA_RPxSIG=(ahci_base_address->port)[ahci_abi_regs_index].i.HBA_RPxSIG;
 		if(HBA_RPxSIG==0x00000101){//ATA设备
-			AHCI_SATA_FIS* fis=memman_alloc_4k(memman,4096);
-			pageman_link_page_32(pageman,fis,0x07,0);
-			(fis->cfis).ahci_cfis_0x27.type=0x27;
-			(fis->cfis).ahci_cfis_0x27.command=ATA_IDENTIFY_DEVICE;
-			
-			unsigned int data_base=get_physical_by_linear_32((unsigned int)buff);//获取物理地址
-			fis->prdt[0].dba=data_base;
-			fis->prdt[0].dbau=0;
-			fis->prdt[0].dbc=511|(1<<31);//设备信息有512字节大小
-			
-			clb[i].flags=(64/4)|ahci_command_header$flags$c;
-			clb[i].prdtl=16;
-			clb[i].command_table_address_32=fis;//挂载
-			HBA_RPxCI&=(1<<i);//执行
-			
-			task_sleep(task_now());
+			if(cons!=0){
+				sprintf(buff,"AHCI ATA HBA_RPxSIG is %x\n",HBA_RPxSIG);
+				cons_putstr0(cons,buff);
+			}
+			if(cons!=0){
+				sprintf(buff,"AHCI ATA i is %x\n",i);
+				cons_putstr0(cons,buff);
+			}
+			if(cons!=0)
+				cons_putstr0(cons,"AHCI ATA device 00\n");
+
+			clb[i].flags=(0x05)|ahci_command_header$flags$c;
+			clb[i].prdtl=1;
+			clb[i].command_table_address_32=((unsigned long long)fis)&0xffffffff;//挂载
+			clb[i].command_table_address_64=((unsigned long long)(fis>>32))&0xffffffff;
+			//HBA_RPxSACT|=(1<<i);//执行
+			//(ahci_base_address->port)[ahci_abi_regs_index].i.HBA_RPxSACT=HBA_RPxSACT;
+			//HBA_RPxSACT|=(1<<i);//执行
+			//(ahci_base_address->port)[ahci_abi_regs_index].i.HBA_RPxSACT=HBA_RPxSACT;
+			HBA_RPxCI|=(1<<i);//执行
+			(ahci_base_address->port)[ahci_abi_regs_index].i.HBA_RPxCI=HBA_RPxCI;
+			return fis;
 			//释放内存
-			pageman_unlink_page_32(pageman,fis,1);
-			memman_free_4k(memman,fis,4096);
+			//pageman_unlink_page_32(pageman,fis,1);
+			//memman_free_4k(memman,fis,4096);
 		}
-		else if(HBA_RPxSIG==0xeb140101){//ATAPI设备
-			
+		else if(HBA_RPxSIG==0xeb140101){//ATAPI设备;
+			if(cons!=0)
+				cons_putstr0(cons, "AHCI ATAPI device");
+			break;
 		}
 		else if(HBA_RPxSIG==0xc33c0101){//SATA 保留类型
+			if(cons!=0)
+				cons_putstr0(cons, "AHCI SATA RES01 device");
 			return -1;
 		}
 		else if(HBA_RPxSIG==0x96690101){//SATA 保留类型
+			if(cons!=0)
+				cons_putstr0(cons, "AHCI SATA RES02 device");
 			return -1;
 		}
 		else if(HBA_RPxSIG==0xaace0000){//未知设备,HBA_RPxSIG值为0xaacexxxx(x是N/A)
+			if(cons!=0)
+				cons_putstr0(cons, "AHCI SATA unknow device");
 			return -1;
 		}
 	}
