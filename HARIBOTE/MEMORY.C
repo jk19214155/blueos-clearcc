@@ -487,7 +487,10 @@ unsigned int memman_alloc_page_32(struct PAGEMAN32 *man){
 	return -1;//没有找到可用的物理内存
 }
 
-unsigned long long memman_alloc_page_64(struct PAGEMAN32 *man){
+
+#define memman_alloc_page_64 memman_alloc_page_64_4k
+
+unsigned long long memman_alloc_page_64_4k(struct PAGEMAN32 *man){
 	unsigned long long i;
 	for(i=0;i<0x100000;i++){
 		if(man->mem_map_base[i]==0){
@@ -495,6 +498,33 @@ unsigned long long memman_alloc_page_64(struct PAGEMAN32 *man){
 			man->free_page_num--;
 			if(task_now()!=0){//记录内存使用情况
 				task_now()->mem_use++;
+			}
+			return i*4096;//返回物理地址
+		}
+	}
+	*(int*)0x0026f010=man->free_page_num;//记录最后一次内存请求失败的时候的free值
+	for(;;){
+		io_cli();
+		io_hlt();
+	}
+	return -1;//没有找到可用的物理内存
+}
+
+unsigned long long memman_alloc_page_64_4m(struct PAGEMAN32 *man){
+	unsigned long long i,j;
+	for(i=0;i<0x100000;i+=1024){
+		for(j=0;j<1024;j++){
+			if(man->mem_map_base[i+j]!=0){
+				break;
+			}
+		}
+		if(j==1024){
+			for(j=0;j<1024;j++){
+				man->mem_map_base[i+j]==1;
+			}
+			man->free_page_num-=1024;
+			if(task_now()!=0){//记录内存使用情况
+				task_now()->mem_use+=1024;
 			}
 			return i*4096;//返回物理地址
 		}
@@ -612,6 +642,33 @@ unsigned long long memman_link_page_64(struct PAGEMAN32* pageman,unsigned long l
 	return *(unsigned long long*)addr;
 }
 
+unsigned long long memman_link_page_64_4m(struct PAGEMAN32* pageman,unsigned long long cr3_address,unsigned long long linear_address,unsigned long long physical_address,unsigned int mode){
+	unsigned long long index,addr;
+	unsigned long long mask=0xff8;
+	unsigned long long mask2=0xfff;
+	index=(linear_address>>36)&mask;
+	addr=index+(cr3_address&0xfffffffffffff000);
+	if(((*(unsigned long long*)addr)&1)==0){//要链接的目标页面不存在
+		*(unsigned long long*)addr=memman_alloc_page_64(pageman)|3;
+	}
+	addr=(*(unsigned long long*)addr)&0xfffffffffffff000;//获取页表的地址
+	index=((linear_address>>27)&mask);//保留中间10位索引
+	addr=addr+index;
+	if(((*(unsigned long long*)addr)&1)==0){//要链接的目标页面不存在
+		*(unsigned long long*)addr=memman_alloc_page_64(pageman)|3;
+	}
+	addr=(*(unsigned long long*)addr)&0xfffffffffffff000;//获取页表的地址
+	index=((linear_address>>18)&mask);//保留中间10位索引
+	addr=addr+index;
+	if(mode==0){//没有想要链接的地址
+		physical_address=(physical_address&mask2)|(memman_alloc_page_64_4m(pageman));
+		*(unsigned long long*)addr=physical_address;
+		return physical_address;
+	}
+	*(unsigned long long*)addr=physical_address;
+	return *(unsigned long long*)addr;
+}
+
 unsigned int memman_link_page_64_m(struct PAGEMAN32 *man,unsigned long long cr3_address,unsigned long long linear_address,unsigned long long physical_address,int page_num,int mode){
 	io_cli();
 	unsigned long long i;
@@ -630,5 +687,25 @@ unsigned int memman_link_page_64_m(struct PAGEMAN32 *man,unsigned long long cr3_
 	store_cr3(i);
 	io_sti();
 	return physical_address;
+}
+unsigned long long pageman_get_physical_address(unsigned long long cr3_address,unsigned long long linear_address){
+	unsigned long long index,addr;
+	unsigned long long mask=0xff8;
+	unsigned long long mask2=0xfff;
+	index=(linear_address>>36)&mask;
+	addr=index+(cr3_address&0xfffffffffffff000);
+	if(((*(unsigned long long*)addr)&1)==0){//要链接的目标页面不存在
+		return -1;
+	}
+	addr=(*(unsigned long long*)addr)&0xfffffffffffff000;//获取页表的地址
+	index=((linear_address>>27)&mask);//保留中间10位索引
+	addr=addr+index;
+	if(((*(unsigned long long*)addr)&1)==0){//要链接的目标页面不存在
+		return -1;
+	}
+	addr=(*(unsigned long long*)addr)&0xfffffffffffff000;//获取页表的地址
+	index=((linear_address>>18)&mask);//保留中间10位索引
+	addr=addr+index;
+	return *(unsigned long long*)addr;
 }
 

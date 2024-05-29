@@ -21,11 +21,16 @@ void pcie_write_config(PCI_DEV* dev,int reg_offset,unsigned int config){
 	io_out32(PCI_DATA_PORT,config);
 	return;
 }
-int  pcie_find_dev_by_class(PCI_DEV *pci_dev, int class_id){
-	for(int bus = pci_dev->bus; bus < 256; bus++){
+EFI_STATUS  pcie_find_dev_by_class(PCI_DEV *pci_dev, int class_id){
+	int bus= pci_dev->bus;
+	int dev=pci_dev->device;
+	int func=pci_dev->function;
+	goto start;
+	for(bus=0; bus < 256; bus++){
         // 枚举每一总线上的所有设备
-        for(int dev = pci_dev->device; dev < 32; dev++){
-			for(int func=pci_dev->function;func<8;func++){
+        for(dev=0; dev < 32; dev++){
+			for(func=0;func<8;func++){
+				start:
 				unsigned int id = (bus<<16) | (dev<<11) | (1<<31) | (func<<8);
 				io_out32(PCI_CONFIG_PORT,id); 
 				unsigned int u = io_in32(PCI_DATA_PORT);
@@ -65,7 +70,7 @@ int  pcie_find_dev_by_class(PCI_DEV *pci_dev, int class_id){
 		}
 	}
 	/*找不到特定设备*/
-	return -1;
+	return 0xffffffff;
 }
 
 int pcie_get_id_by_dev(PCI_DEV* pci_dev,unsigned int id){

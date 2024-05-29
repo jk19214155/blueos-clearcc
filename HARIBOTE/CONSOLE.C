@@ -302,6 +302,9 @@ void console_task(struct SHEET *sheet, int memtotal)
 
 void cons_putchar(struct CONSOLE *cons, int chr, char move)
 {
+	if(cons==0){
+		return;
+	}
 	char s[2];
 	s[0] = chr;
 	s[1] = 0;
@@ -370,6 +373,9 @@ void cons_newline(struct CONSOLE *cons)
 
 void cons_putstr0(struct CONSOLE *cons, char *s)
 {
+	if(cons==0){
+		return;
+	}
 	for (; *s != 0; s++) {
 		cons_putchar(cons, *s, 1);
 	}
@@ -378,6 +384,9 @@ void cons_putstr0(struct CONSOLE *cons, char *s)
 
 void cons_putstr1(struct CONSOLE *cons, char *s, int l)
 {
+	if(cons==0){
+		return;
+	}
 	int i;
 	for (i = 0; i < l; i++) {
 		cons_putchar(cons, s[i], 1);
@@ -385,7 +394,7 @@ void cons_putstr1(struct CONSOLE *cons, char *s, int l)
 	return;
 }
 void cmd_cd(struct CONSOLE *cons,char* cmdline);
-
+extern AHCI_TABLE* ahci_table_addr;
 void cons_runcmd(char *cmdline, struct CONSOLE *cons, int *fat, int memtotal)
 {
 	if (strcmp(cmdline, "mem") == 0 && cons->sht != 0) {
@@ -431,11 +440,31 @@ void cons_runcmd(char *cmdline, struct CONSOLE *cons, int *fat, int memtotal)
 	else if (asm_sse_strcmp(cmdline,"dmgtask",7) == 0){//开启命令行虚拟机环境
 		task_disk();
 	}
-	else if (asm_sse_strcmp(cmdline,"ahciinit",8) == 0){
-		sprintf(buff,"buff address is %x\n",buff);
+	else if (asm_sse_strcmp(cmdline,"ahcilist",8) == 0){
+		sprintf(buff,"ahci_table_addr: %d\n",ahci_table_addr);
 		cons_putstr0(cons, buff);
-		PCI_DEV* ahci_dev=ahci_init();
-		ahci_get_info(ahci_dev,0,buff);
+		sprintf(buff,"ahci number: %d\n",ahci_table_addr->number);
+		cons_putstr0(cons, buff);
+		for(int i=0;i<8;i++){
+			for(int j=0,k=0;j<=32;j++){
+				if(j==32){
+					sprintf(buff,"port number: %d\n",k);
+					cons_putstr0(cons, buff);
+					break;
+				}
+				if(ahci_table_addr->ahci_dev[i].dev_info[j]!=NULL){
+					//cons_putstr0(cons, ahci_table_addr->ahci_dev[i].dev_info[j]->ModelNumber);
+					sprintf(buff,"clb base: %x\n",ahci_table_addr->ahci_dev[i].clb_base[j]);
+					cons_putstr0(cons, buff);
+					k++;
+				}
+			}
+		}
+		//PCI_DEV* ahci_dev=ahci_init();
+		//ahci_get_info(ahci_dev,0,buff);
+		//for(int i=0;i<ahci_table->number;i++){
+		//	cons_putstr0(cons, "ahci_device!\n");
+		//}
 		cons_putstr0(cons, "ok!");
 		
 	}

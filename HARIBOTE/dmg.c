@@ -119,9 +119,9 @@ void task_disk(){
 		info[i].status=0;
 	}*/
 	/*运行AHCI初始化函数*/
-	PCI_DEV* ahci=ahci_init();
+	//PCI_DEV* ahci=ahci_init();
 	*(unsigned int*)0x0026f044=&ahci_buff;
-	ahci_get_info(ahci,0,ahci_buff);
+	//ahci_get_info(ahci,0,ahci_buff);
 	for(;;){
 		io_cli();
 		if (fifo32_status(&task->fifo) == 0) {

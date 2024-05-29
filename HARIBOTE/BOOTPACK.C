@@ -15,6 +15,7 @@ void* active_sheet_ctl;
 static unsigned long long cr3_address;
 static struct MOUSE_DEC mdec;
 void* gThis;
+AHCI_TABLE* ahci_table_addr;
 void WinMain(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable){
 	Systemtable->ConOut->OutputString(Systemtable->ConOut,L"hello Winmain\r\n");
 	for(;;){
@@ -218,6 +219,10 @@ void HariMain(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable)
 	fifo32_put(&keycmd, key_leds);
 	*(unsigned int*)0x0026f03c =&sht_back;
 	init_apic((void*)0xfee00000);
+	
+	/*初始化AHCI控制器*/
+	ahci_table_addr=ahci_init_all();
+	
 goto st_next;
 	/* nihongo.fntの読み込み */
 	//fat = (int *) memman_alloc_4k(memman, 4 * 2880);//内存分配!!!

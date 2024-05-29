@@ -344,6 +344,7 @@ unsigned long long memman_link_page_64(struct PAGEMAN32* pageman,unsigned long l
 unsigned int memman_link_page_64_m(struct PAGEMAN32 *man,unsigned long long cr3_address,unsigned long long linear_address,unsigned long long physical_address,int page_num,int mode);
 int inthandler0e(int cr2,int* esp);
 unsigned int get_physical_by_linear_32(unsigned int linear_address);
+unsigned long long pageman_get_physical_address(unsigned long long cr3_address,unsigned long long linear_address);
 /* sheet.c */
 #define MAX_SHEETS		256
 #define SHEET_MOUSE_ENABLE 0x80000000
@@ -520,7 +521,7 @@ void inthandler20(int *esp);
 void inthandler34(int *esp);
 int timer_cancel(unsigned int index,struct TIMER *timer);
 void timer_cancelall(unsigned int index,struct FIFO32 *fifo);
-
+EFI_STATUS timer_wait(unsigned int time_of_ms,unsigned int data);
 /*taskmsg.c*/
 #pragma pack(1)
 typedef struct _TASK_MSG{
@@ -918,8 +919,7 @@ typedef struct ahci_abi_regs {
   unsigned int HBA_RPxCI;
   unsigned int HBA_RPxSNTF;
   unsigned int HBA_RPxFBS;
-  
-  unsigned int vendor[24];  
+
 } AHCI_ABI_REGS;
 /*
 #define HBA_RPBASE (0x40)
@@ -960,6 +960,58 @@ typedef struct pci_device{//设备信息编号
 	int class_code;
 	int subclass_code;
 }PCI_DEV;
+
+typedef struct {
+    unsigned short GeneralConfiguration;            // 0
+    unsigned short NumberOfCylinders;               // 1
+    unsigned short Reserved1;                       // 2
+    unsigned short NumberOfHeads;                   // 3
+    unsigned short UnformattedBytesPerTrack;        // 4
+    unsigned short UnformattedBytesPerSector;       // 5
+    unsigned short SectorsPerTrack;                 // 6
+    unsigned short VendorUnique1[3];                // 7-9
+    char  SerialNumber[20];                // 10-19
+    unsigned short BufferType;                      // 20
+    unsigned short BufferSectorSize;                // 21
+    unsigned short NumberOfECCBytes;                // 22
+    char  FirmwareRevision[8];             // 23-26
+    char  ModelNumber[40];                 // 27-46
+    unsigned short MaximumSectorsPerInterrupt;      // 47
+    unsigned short Reserved2;                       // 48
+    unsigned short Capabilities1;                   // 49
+    unsigned short Capabilities2;                   // 50
+    unsigned short PIODataTransferCycleTiming;      // 51
+    unsigned short Reserved3;                       // 52
+    unsigned short FieldValidity;                   // 53
+    unsigned short CurrentNumberOfCylinders;        // 54
+    unsigned short CurrentNumberOfHeads;            // 55
+    unsigned short CurrentSectorsPerTrack;          // 56
+    unsigned int CurrentSectorCapacity;           // 57-58
+    unsigned short MultipleSectorSetting;           // 59
+    unsigned int TotalAddressableSectors;         // 60-61
+    unsigned short SingleWordDMA;                   // 62
+    unsigned short MultiWordDMA;                    // 63
+    unsigned short AdvancedPIOModes;                // 64
+    unsigned short MinimumMWXferCycleTime;          // 65
+    unsigned short RecommendedMWXferCycleTime;      // 66
+    unsigned short MinimumPIOCycleTimeNoFlow;       // 67
+    unsigned short MinimumPIOCycleTimeIORDY;        // 68
+    unsigned short Reserved4[2];                    // 69-70
+    unsigned short Reserved5[4];                    // 71-74
+    unsigned short QueueDepth;                      // 75
+    unsigned short Reserved6[4];                    // 76-79
+    unsigned short MajorVersionNumber;              // 80
+    unsigned short MinorVersionNumber;              // 81
+    unsigned short CommandSetSupported1;            // 82
+    unsigned short CommandSetSupported2;            // 83
+    unsigned short CommandSetSupported3;            // 84
+    unsigned short CommandSetEnabled1;              // 85
+    unsigned short CommandSetEnabled2;              // 86
+    unsigned short CommandSetDefault;               // 87
+    unsigned short UltraDMAModes;                   // 88
+    unsigned short Reserved7[167];                  // 89-255
+} IDENTIFY_DEVICE_DATA;
+
 #pragma pack(1)
 typedef struct ahci_device{
 	PCI_DEV pci_dev;
@@ -967,7 +1019,8 @@ typedef struct ahci_device{
 	unsigned long long fis_page_base[2];
 	unsigned  long long clb_base[32];
 	unsigned  long long clb_page_base[8];
-	void* dev_info;
+	AHCI_REGS* ahci_config_space_address;
+	IDENTIFY_DEVICE_DATA* dev_info[32];
 }AHCI_DEV;
 #define ahci_command_header$flags$a (1<<5)
 #define ahci_command_header$flags$w (1<<6)
@@ -1019,6 +1072,8 @@ typedef struct _ahci_sata_fis{//SATA FIS的结构
 	}acmd;
 	AHCI_PRDT prdt[0];//动态大小 
 }AHCI_SATA_FIS;
+
+
 #define ATA_IDENTIFY_DEVICE 0xec
 #define ATA_READ_DMA 0xc8
 #define ATA_READ_DMA_EX 0x25
@@ -1143,6 +1198,28 @@ typedef struct _AHCI_BAR6_TABLE{
 	unsigned int bohc;
 	unsigned int UnUse[5];
 }AHCI_BAR6_TABLE;
+
+typedef struct _AHCI_TABLE{
+	AHCI_DEV ahci_dev[8];
+	int number;
+}AHCI_TABLE;
+typedef struct _ahci_command{
+	unsigned long long id;
+	unsigned long long lba;
+	void* buff;
+	unsigned long long block_count;
+	void (*func)(struct _ahci_command* cmd);//回调函数
+}AHCI_COMMAND;
+typedef struct _ahci_command_list{
+	AHCI_COMMAND* list[128];
+}AHCI_COMMAND_LIST;
+AHCI_TABLE* ahci_init_all();
+EFI_STATUS ahci_init(AHCI_DEV* ahci_dev);
+AHCI_SATA_FIS* ahci_make_fis(AHCI_SATA_FIS* fis,void* buff,unsigned long long lba,unsigned long long count,unsigned long long command,unsigned long long flag);
+void ahci_fis_write_prdt(AHCI_SATA_FIS* fis,unsigned int index,unsigned long long address,unsigned long long count);
+AHCI_SATA_FIS* ahci_fis_send(AHCI_DEV* dev,unsigned int ahci_abi_regs_index,AHCI_SATA_FIS* fis,unsigned long long prdtl);
+
+
 /* com.c */
 void com_out_string(unsigned int port,char* str);
 /*sse.c*/

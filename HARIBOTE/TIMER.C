@@ -88,7 +88,7 @@ void timer_init(struct TIMER *timer, struct FIFO32 *fifo, int data)
 
 void timer_settime(unsigned int index,struct TIMER *timer, unsigned int timeout,unsigned int timeout64)
 {
-	int e;
+	unsigned long long e;
 	struct TIMER *t, *s;
 	timer->timeout = timeout + timerctl[index].count;
 	timer->timeout64 = timeout64 + timerctl[index].count64;
@@ -249,4 +249,14 @@ void timer_cancelall(unsigned int index,struct FIFO32 *fifo)
 	}
 	io_store_eflags(e);
 	return;
+}
+
+EFI_STATUS timer_wait(unsigned int time_of_ms,unsigned int data){
+	struct TASK* task=task_now();
+	struct TIMER* timer=timer_alloc(0);
+	unsigned int fps=timer_get_fps(0);
+	unsigned long long count=(time_of_ms*fps)/1000;
+	timer_init(timer, &(task->fifo),data);
+	timer_settime(0,timer,count&0xffffffff,(count>>32)&0xffffffff);
+	return EFI_SUCCESS;
 }
