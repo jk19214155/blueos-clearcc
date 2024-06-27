@@ -1,9 +1,14 @@
 /* ファイル関係 */
 
 #include "bootpack.h"
-
+extern AHCI_TABLE* ahci_table_addr;
 int _file_dmg_read2(char* buff,int lba28,unsigned char block_number,int size){
 	struct TASK* task=task_now();
+	
+	AHCI_SATA_FIS* fis=ahci_make_fis(0,ahci_table_addr->ahci_dev[0].dev_info,lba28,block_number,0x25,0);
+	ahci_fis_write_prdt(fis,0,buff,4095);
+	ahci_fis_send(buff,0,fis,1,0x05);
+	return;
 	//char s[30];
 	int i,j;
 	//sprintf(s,"addr is%x\n",buff);

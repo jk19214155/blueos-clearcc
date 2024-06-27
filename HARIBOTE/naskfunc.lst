@@ -1180,10 +1180,17 @@
   1180 00000735 5E                      	pop rsi
   1181 00000736 5B                      	pop rbx
   1182 00000737 C3                      	ret
-  1183                                  extern console_task
-  1184                                  global asm_console_task_start_64
-  1185                                  ;这个函数的目的是因为x64架构下无法使用栈传递第一个和第二个参数 但是为了任务切换效率无法切换调用者保存寄存器 因此使用这个函数中转
-  1186                                  asm_console_task_start_64:
-  1187 00000738 488B4C2408              	mov rcx,[rsp+8]
-  1188 0000073D 488B542410              	mov rdx,[rsp+16]
-  1189 00000742 E9(00000000)            	jmp console_task
+  1183                                  global asm_memcpy
+  1184                                  asm_memcpy:
+  1185 00000738 4889CF                  	mov rdi,rcx
+  1186 0000073B 4889D6                  	mov rsi,rdx
+  1187 0000073E 4C89C1                  	mov rcx,r8
+  1188 00000741 F3A4                    	rep movsb
+  1189 00000743 C3                      	ret
+  1190                                  extern console_task
+  1191                                  global asm_console_task_start_64
+  1192                                  ;这个函数的目的是因为x64架构下无法使用栈传递第一个和第二个参数 但是为了任务切换效率无法切换调用者保存寄存器 因此使用这个函数中转
+  1193                                  asm_console_task_start_64:
+  1194 00000744 488B4C2408              	mov rcx,[rsp+8]
+  1195 00000749 488B542410              	mov rdx,[rsp+16]
+  1196 0000074E E9(00000000)            	jmp console_task

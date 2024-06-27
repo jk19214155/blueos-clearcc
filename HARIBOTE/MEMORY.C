@@ -144,6 +144,18 @@ int memman_free(struct MEMMAN *man, unsigned long long addr, unsigned long long 
 	return -1; /* 失敗終了 */
 }
 
+struct FREEINFO memman_get_item(struct MEMMAN* man){
+	if(man->frees>0){
+		return man->free[0];
+	}
+	else{
+		struct FREEINFO info;
+		info.size=0;
+		info.addr=0;
+		return info;
+	}
+}
+
 unsigned long long memman_alloc_4k(struct MEMMAN *man, unsigned long long size)
 {
 	unsigned long long a;
@@ -491,6 +503,9 @@ unsigned int memman_alloc_page_32(struct PAGEMAN32 *man){
 #define memman_alloc_page_64 memman_alloc_page_64_4k
 
 unsigned long long memman_alloc_page_64_4k(struct PAGEMAN32 *man){
+	if(man==0){
+		man=pageman_get();
+	}
 	unsigned long long i;
 	for(i=0;i<0x100000;i++){
 		if(man->mem_map_base[i]==0){
@@ -510,7 +525,20 @@ unsigned long long memman_alloc_page_64_4k(struct PAGEMAN32 *man){
 	return -1;//没有找到可用的物理内存
 }
 
+void memman_free_page_64_4k(struct PAGEMAN32 *man,unsigned long long addr){
+	if(man==0){
+		man=pageman_get();
+	}
+	man->mem_map_base[addr/4096]==0;
+	task_now()->mem_use--;
+	man->free_page_num++;
+	return 0;
+}
+
 unsigned long long memman_alloc_page_64_4m(struct PAGEMAN32 *man){
+	if(man==0){
+		man=pageman_get();
+	}
 	unsigned long long i,j;
 	for(i=0;i<0x100000;i+=1024){
 		for(j=0;j<1024;j++){
@@ -537,7 +565,24 @@ unsigned long long memman_alloc_page_64_4m(struct PAGEMAN32 *man){
 	return -1;//没有找到可用的物理内存
 }
 
+void memman_free_page_64_4m(struct PAGEMAN32 *man,unsigned long long addr){
+	if(man==0){
+		man=pageman_get();
+	}
+	unsigned long long i,j;
+	for(i=(addr/4096);i<1024;i+=1024){
+		man->mem_map_base[i]=0;
+	}
+	man->free_page_num+=1024;
+	task_now()->mem_use-=1024;
+	*(int*)0x0026f010=man->free_page_num;//记录最后一次内存请求失败的时候的free值
+	return 0;
+}
+
 unsigned int memman_free_page_32_m(struct PAGEMAN32 *man,unsigned int physical_address,int page_num){
+	if(man==0){
+		man=pageman_get();
+	}
 	int index=physical_address>>12;//得到?的索引
 	int i;
 	for(i=0;i<page_num;i++){
@@ -552,6 +597,9 @@ unsigned int memman_free_page_32_m(struct PAGEMAN32 *man,unsigned int physical_a
 	return 0;
 }
 unsigned int memman_free_page_32(struct PAGEMAN32 *man,unsigned int physical_address){
+	if(man==0){
+		man=pageman_get();
+	}
 	int index=physical_address>>12;//得到?的索引
 	if(man->mem_map_base[index]==1){//正在使用
 		man->free_page_num++;
@@ -567,6 +615,9 @@ unsigned int memman_free_page_32(struct PAGEMAN32 *man,unsigned int physical_add
 void memman_copy_page_32_m(struct PAGEMAN32 *man,unsigned int cr3_address_s,int cr3_address_d,unsigned int linear_address_s,unsigned int linear_address_d,int num){
 	int addr_s,addr_d;
 	int i;
+	if(man==0){
+		man=pageman_get();
+	}
 	for(i=0;i<num;i++){
 		int index,addr;
 		index=((linear_address_s+i<<12)>>20)&0xffc;
@@ -615,6 +666,9 @@ unsigned long long memman_link_page_64(struct PAGEMAN32* pageman,unsigned long l
 	unsigned long long mask2=0xfff;
 	index=(linear_address>>36)&mask;
 	addr=index+(cr3_address&0xfffffffffffff000);
+	if(pageman==0){
+		pageman=pageman_get();
+	}
 	if(((*(unsigned long long*)addr)&1)==0){//要链接的目标页面不存在
 		*(unsigned long long*)addr=memman_alloc_page_64(pageman)|3;
 	}
@@ -648,6 +702,9 @@ unsigned long long memman_link_page_64_4m(struct PAGEMAN32* pageman,unsigned lon
 	unsigned long long mask2=0xfff;
 	index=(linear_address>>36)&mask;
 	addr=index+(cr3_address&0xfffffffffffff000);
+	if(pageman==0){
+		pageman=pageman_get();
+	}
 	if(((*(unsigned long long*)addr)&1)==0){//要链接的目标页面不存在
 		*(unsigned long long*)addr=memman_alloc_page_64(pageman)|3;
 	}
@@ -672,6 +729,12 @@ unsigned long long memman_link_page_64_4m(struct PAGEMAN32* pageman,unsigned lon
 unsigned int memman_link_page_64_m(struct PAGEMAN32 *man,unsigned long long cr3_address,unsigned long long linear_address,unsigned long long physical_address,int page_num,int mode){
 	io_cli();
 	unsigned long long i;
+	if(man==0){
+		man=pageman_get();
+	}
+	if(cr3_address==NULL){
+		cr3_address=load_cr3();
+	}
 	if(mode==0){//没有要链接的页面
 		for(i=0;i<page_num;i++){
 			memman_link_page_64(man,cr3_address,linear_address+i*0x1000,physical_address,mode);
@@ -708,4 +771,10 @@ unsigned long long pageman_get_physical_address(unsigned long long cr3_address,u
 	addr=addr+index;
 	return *(unsigned long long*)addr;
 }
-
+struct PAGEMAN32* global_pageman_point;
+void pageman_set(struct PAGEMAN32* pageman){
+	global_pageman_point=pageman;
+}
+void* pageman_get(){
+	return global_pageman_point;
+}

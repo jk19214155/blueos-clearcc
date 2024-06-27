@@ -84,11 +84,11 @@ typedef char *  va_list;
  
  #define NULL 0
 
- int _div(long* n,unsigned base)
+ long long _div(long long* n,unsigned base)
  {
-     int __res; 
-         __res = ((unsigned long) *n) % (unsigned) base; 
-         *n = ((unsigned long) *n) / (unsigned) base; 
+     long long __res; 
+         __res = ((unsigned long long) *n) % (unsigned) base; 
+         *n = ((unsigned long long) *n) / (unsigned) base; 
          return __res;
  }
 
@@ -108,9 +108,9 @@ typedef char *  va_list;
 
 
 
- static int skip_atoi(const char **s)
+ static long long skip_atoi(const char **s)
  {
-    int i = 0;
+    long long i = 0;
 
     while (isdigit(**s))
         i = i * 10 + *((*s)++) - '0';
@@ -119,7 +119,7 @@ typedef char *  va_list;
 
 
 
- static char *Test_number(char *str, long num, int base, int size, int precision,
+ static char *Test_number(char *str, long long num, long long base, long long size, int precision,
     int type)
  {
     char c, sign, tmp[66];
@@ -200,7 +200,7 @@ typedef char *  va_list;
  int Test_vsprintf(char *buf, const char *fmt, va_list args)
  {
     int len;
-    unsigned long num;
+    unsigned long long num;
     int i, base;
     char *str;
     const char *s;
@@ -308,13 +308,13 @@ typedef char *  va_list;
                 flags |= ZEROPAD;
             }
             str = Test_number(str,
-                     (unsigned long)Test_va_arg(args, void *), 16,
+                     (unsigned long long)Test_va_arg(args, void *), 16,
                      field_width, precision, flags);
             continue;
 
         case 'n':
             if (qualifier == 'l') {
-                long *ip = Test_va_arg(args, long *);
+                long long *ip = Test_va_arg(args, long long *);
                 *ip = (str - buf);
             } else {
                 int *ip = Test_va_arg(args, int *);
@@ -352,7 +352,7 @@ typedef char *  va_list;
             continue;
         }
         if (qualifier == 'l')
-            num = Test_va_arg(args, unsigned long);
+            num = Test_va_arg(args, unsigned long long);
         else if (qualifier == 'h') {
             num = (unsigned short)Test_va_arg(args, int);
             if (flags & SIGN)

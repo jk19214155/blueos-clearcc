@@ -1178,6 +1178,13 @@ asm_sheet_refreshsub32a:
 	pop rsi
 	pop rbx
 	ret
+global asm_memcpy
+asm_memcpy:
+	mov rdi,rcx
+	mov rsi,rdx
+	mov rcx,r8
+	rep movsb
+	ret
 extern console_task
 global asm_console_task_start_64
 ;这个函数的目的是因为x64架构下无法使用栈传递第一个和第二个参数 但是为了任务切换效率无法切换调用者保存寄存器 因此使用这个函数中转

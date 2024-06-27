@@ -1,6 +1,11 @@
 //Thanks to ChatGPT 3.5 from OpenAI for the help
 //Thanks to Claude from Slack for the help
 #include<Uefi.h>
+
+#define uint8_t unsigned char
+#define uint16_t unsigned short
+#define uint32_t unsigned int
+#define uint64_t unsigned long long
 int dmg_write(void* buff,int lba28,int block_number,int divice);
 EFI_SYSTEM_TABLE* get_sys_table_addr();
 EFI_GUID* get_var_guid();
@@ -10,6 +15,7 @@ void test3();
 //数据分区的代码
 #define gUidPartTypeBaseData {0xEBD0A0A2,0xB9E5,0x4433,{0x87, 0xC0, 0x68, 0xB6, 0xB7, 0x26, 0x99, 0xC7}}
 //EFI分区表的表项
+#pragma pack(1)
 typedef struct{
 	EFI_GUID type;//分区的类型id
 	EFI_GUID guid;//分区自身的唯一id
@@ -167,6 +173,7 @@ void asm_console_task_start_64();
 unsigned long long asm_get_cs();
 unsigned long long store_cr4();
 int load_cr4(unsigned long long cr4);
+void asm_memcpy(unsigned long long rdi,unsigned long long rsi,unsigned long long rcx);
 //void memset(char* s,int num,int longer);
 //void strcpy(char* s,char* t,int longer);
 //int strcmp(char* s,char* t,int longer);
@@ -345,6 +352,12 @@ unsigned int memman_link_page_64_m(struct PAGEMAN32 *man,unsigned long long cr3_
 int inthandler0e(int cr2,int* esp);
 unsigned int get_physical_by_linear_32(unsigned int linear_address);
 unsigned long long pageman_get_physical_address(unsigned long long cr3_address,unsigned long long linear_address);
+void pageman_set(struct PAGEMAN32* pageman);
+void* pageman_get();
+unsigned long long memman_alloc_page_64_4k(struct PAGEMAN32 *man);
+unsigned long long memman_alloc_page_64_4m(struct PAGEMAN32 *man);
+void memman_free_page_64_4k(struct PAGEMAN32 *man,unsigned long long addr);
+void memman_free_page_64_4m(struct PAGEMAN32 *man,unsigned long long addr);
 /* sheet.c */
 #define MAX_SHEETS		256
 #define SHEET_MOUSE_ENABLE 0x80000000
@@ -1053,12 +1066,14 @@ typedef struct _ahci_cfis_0x27{
 	short count;
 	short reserved;
 	unsigned int aux;
+	/*接下来是一些补充信息*/
+	unsigned int* prdbc_addr;
 }AHCI_CFIS_0X27;
 #pragma pack(1)
 typedef struct _ahci_prdt{//数据块描述结构 描述设备和系统传输数据的地址
 	unsigned int dba;//数据块地址
 	unsigned int dbau;//数据块地址的64位版本
-	unsigned reserved;
+	unsigned int reserved;
 	unsigned int dbc;//数据块大小
 }AHCI_PRDT;
 #pragma pack(1)
@@ -1217,7 +1232,7 @@ AHCI_TABLE* ahci_init_all();
 EFI_STATUS ahci_init(AHCI_DEV* ahci_dev);
 AHCI_SATA_FIS* ahci_make_fis(AHCI_SATA_FIS* fis,void* buff,unsigned long long lba,unsigned long long count,unsigned long long command,unsigned long long flag);
 void ahci_fis_write_prdt(AHCI_SATA_FIS* fis,unsigned int index,unsigned long long address,unsigned long long count);
-AHCI_SATA_FIS* ahci_fis_send(AHCI_DEV* dev,unsigned int ahci_abi_regs_index,AHCI_SATA_FIS* fis,unsigned long long prdtl);
+AHCI_SATA_FIS* ahci_fis_send(AHCI_DEV* dev,unsigned int ahci_abi_regs_index,AHCI_SATA_FIS* fis,unsigned long long prdtl,unsigned int flags);
 
 
 /* com.c */
@@ -1238,3 +1253,52 @@ typedef struct _blueos_vmcs{
 	void* vmcs;//VMCS字段
 	void* ept;//扩展页表
 } BLUEOS_VMCS;
+/*cache.c*/
+typedef struct {
+    unsigned long long lba;
+    unsigned int size; // Size in bytes
+    char *buffer;
+    char valid; // 判断是否空闲
+} CACHE_BLOCK;
+
+typedef struct {
+    CACHE_BLOCK* cache_blocks_point;
+    char *buffer;
+    unsigned long long offset;
+    unsigned long long size; // Size in bytes
+    char valid; // 判断是否空闲
+} REQUEST;
+
+typedef struct {
+    CACHE_BLOCK* cache_blocks_point;
+    char *buffer;
+    unsigned long long offset;
+    unsigned long long size; // Size in bytes
+    unsigned long long lba;
+    char valid; // 判断是否空闲
+} SYNC_REQUEST;
+#define CACHE_SIZE (4 * 1024 * 1024) // Example cache block size: 4 MB
+#define MAX_CACHES 128       // Maximum number of cache blocks
+#define MAX_REQUESTS 128      // Maximum number of requests
+#define MAX_SYNC_REQUESTS 32 // Maximum number of sync requests
+#define CACHE_BLOCK_ACTIVE 1
+#define CACHE_BLOCK_ENABLE 2
+#define CACHE_BLOCK_IDLE 0
+
+
+typedef struct {
+    CACHE_BLOCK cache_blocks[MAX_CACHES];
+    CACHE_BLOCK* cache_blocks_point[MAX_CACHES];
+    REQUEST requests[MAX_REQUESTS];
+    REQUEST* requests_point[MAX_REQUESTS];
+    SYNC_REQUEST sync_requests[MAX_SYNC_REQUESTS];
+    SYNC_REQUEST* sync_requests_point[MAX_SYNC_REQUESTS];
+    unsigned int block_count;
+    unsigned int request_count;
+    unsigned int sync_request_count;
+    PCI_DEV* pci_dev;
+    unsigned long long device_id;
+} CACHE_TABLE;
+void cache_init(CACHE_TABLE** this);
+EFI_STATUS read(CACHE_TABLE *this, void *buff, unsigned long long offset, unsigned long long size);
+EFI_STATUS sync(CACHE_TABLE *this);

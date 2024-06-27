@@ -100,6 +100,7 @@ void HariMain(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable)
 	struct FILEINFO *finfo;
 	extern char hankaku[4096];
 	struct PAGEMAN32 *pageman = &struct_pageman;
+	pageman_set(pageman);
 	Systemtable_base=Systemtable;
 	gThis=0;
 	init_gdtidt(0);//初始化gdt和idt
@@ -153,6 +154,7 @@ void HariMain(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable)
 	task_a->memman=memman;//注册内存控制器
 	task->tss.cr3=cr3_address;
 	fifo.task = task_a;
+	task->fifo=fifo;
 	task_run(task_a, 1, 2);
 	task_a->langmode = 0;
 	//创建公共图层数组
@@ -219,6 +221,8 @@ void HariMain(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable)
 	fifo32_put(&keycmd, key_leds);
 	*(unsigned int*)0x0026f03c =&sht_back;
 	init_apic((void*)0xfee00000);
+	
+	io_sti();
 	
 	/*初始化AHCI控制器*/
 	ahci_table_addr=ahci_init_all();
