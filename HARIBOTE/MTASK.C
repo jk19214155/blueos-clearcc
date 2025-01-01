@@ -6,7 +6,6 @@ struct TASKCTL *taskctl=0;
 struct TIMER *task_timer;
 int zero_task_lock=0;//零号任务锁
 unsigned task_ready=0;
-extern char buff[1024];
 struct TASKCTL *task_ctl_now(void){
 	return taskctl;
 }
@@ -153,6 +152,7 @@ void task_switchsub(void)
 
 void task_idle(void)
 {
+	com_out_string(0x3f8,"idle:task start");
 	for (;;) {
 		io_hlt();
 	}
@@ -164,7 +164,7 @@ struct TASK *task_init(struct MEMMAN *memman)
 	struct TASK *task, *idle;
 	unsigned long long cr3=load_cr3();
 	struct SEGMENT_DESCRIPTOR *gdt = (struct SEGMENT_DESCRIPTOR *) ADR_GDT;
-	struct PAGEMAN32 *pageman=*(struct PAGEMAN32 **)ADR_PAGEMAN;
+	struct PAGEMAN32 *pageman=pageman_get();
 	taskctl = (struct TASKCTL *) memman_alloc_4k(memman, sizeof (struct TASKCTL));
 	memman_link_page_64_m(pageman,cr3,taskctl,7,(sizeof (struct TASKCTL)+0xfff)>>12,0);//
 	for (i = 0; i < MAX_TASKS; i++) {
@@ -191,14 +191,14 @@ struct TASK *task_init(struct MEMMAN *memman)
 	task->tss.cr3= cr3;
 	task->memman=memman;
 	task->flags = 2;	/* 動作中マーク */
-	task->priority = (timer_get_fps(1)/50)>=1?(timer_get_fps(1)/50):1; /* 0.02秒 */
+	task->priority = (timer_get_fps(0)/50)>=1?(timer_get_fps(0)/50):1; /* 0.02秒 */
 	task->level = 0;	/* 最高レベル */
 	task->name="mainloop";
 	task_add(task);
 	task_switchsub();	/* レベル設定 */
 	load_tr(TASK_GDT0*8);
-	task_timer = timer_alloc(1);
-	timer_settime(1,task_timer, task->priority,0);
+	task_timer = timer_alloc(0);
+	timer_settime(0,task_timer, task->priority,0);
 	idle = task_alloc();
 	idle->tss.rsp = memman_alloc_4k(memman, 64 * 1024) + 64 * 1024;
 	memman_link_page_64_m(pageman,cr3,idle->tss.rsp- 64 * 1024,7,(64*1024+0xfff)>>12,0);//
@@ -263,6 +263,7 @@ unsigned int task_get_esp0(){//这个函数执行后 EAX会保存esp0的值 注�
 }
 
 void task_start(struct TASK *task){
+	char buff[128];
 	unsigned long long cr3=load_cr3();
 	//切换到目标进程的cr3
 	store_cr3(task->tss.cr3);
@@ -312,6 +313,7 @@ void task_run(struct TASK *task, int level, int priority)
 void task_sleep(struct TASK *task)
 {
 	struct TASK *now_task;
+	char buff[128];
 	sprintf(buff,"task_sleep:start task=%s\n",task->name);
 	com_out_string(0x3f8,buff);
 	if (task->flags == 2) {
@@ -345,6 +347,7 @@ void task_sleep(struct TASK *task)
 
 void task_switch(void)
 {
+	char buff[128];
 	struct TASKLEVEL *tl = &taskctl->level[taskctl->now_lv];
 	struct TASK *new_task, *now_task = tl->tasks[tl->now];
 	struct TSS32* old_tss32;
@@ -358,7 +361,7 @@ void task_switch(void)
 		tl = &taskctl->level[taskctl->now_lv];
 	}
 	new_task = tl->tasks[tl->now];
-	timer_settime(1,task_timer, new_task->priority,0);
+	timer_settime(0,task_timer, new_task->priority,0);
 	if (new_task != now_task) {
 		//com_out_string(0x3f8,"task switch ok\n");
 		now_task->flags_a|=(1<<2);//发生了抢占切换

@@ -1,0 +1,439 @@
+	.file	"int.c"
+.globl _guid
+	.data
+	.balign 4
+_guid:
+	.space 4
+.globl _start_lba_low
+	.data
+	.balign 4
+_start_lba_low:
+	.space 4
+.globl _start_lba_high
+	.data
+	.balign 4
+_start_lba_high:
+	.space 4
+.globl _end_lba_low
+	.data
+	.balign 4
+_end_lba_low:
+	.space 4
+.globl _end_lba_high
+	.data
+	.balign 4
+_end_lba_high:
+	.space 4
+.globl _status_low
+	.data
+	.balign 4
+_status_low:
+	.space 4
+.globl _status_high
+	.data
+	.balign 4
+_status_high:
+	.space 4
+.globl _name
+	.data
+	.balign 4
+_name:
+	.space 4
+.globl _GPT_ITEM
+	.data
+	.balign 4
+_GPT_ITEM:
+	.space 4
+.globl _sht
+	.data
+	.balign 4
+_sht:
+	.space 4
+.globl _MOUSESTATUS
+	.data
+	.balign 4
+_MOUSESTATUS:
+	.space 4
+.globl _p
+	.data
+	.balign 4
+_p:
+	.space 4
+.globl _q
+	.data
+	.balign 4
+_q:
+	.space 4
+.globl _size
+	.data
+	.balign 8
+_size:
+	.space 8
+.globl _free
+	.data
+	.balign 4
+_free:
+	.space 4
+.globl _flags
+	.data
+	.balign 4
+_flags:
+	.space 4
+.globl _task
+	.data
+	.balign 4
+_task:
+	.space 4
+.globl _FIFOMOUSE
+	.data
+	.balign 4
+_FIFOMOUSE:
+	.space 4
+.globl _timerctl
+	.data
+	.balign 4
+_timerctl:
+	.space 4
+.globl _msg_box
+	.data
+	.balign 16
+_msg_box:
+	.space 20
+.globl _tss
+	.data
+	.balign 16
+_tss:
+	.space 176
+.globl _ldt
+	.data
+	.balign 16
+_ldt:
+	.space 32
+.globl _cons
+	.data
+	.balign 4
+_cons:
+	.space 4
+.globl _ds_base
+	.data
+	.balign 8
+_ds_base:
+	.space 8
+.globl _cons_stack
+	.data
+	.balign 8
+_cons_stack:
+	.space 8
+.globl _fhandle
+	.data
+	.balign 4
+_fhandle:
+	.space 4
+.globl _fat
+	.data
+	.balign 4
+_fat:
+	.space 4
+.globl _cmdline
+	.data
+	.balign 4
+_cmdline:
+	.space 4
+.globl _langmode
+	.data
+_langmode:
+	.space 1
+.globl _langbyte1
+	.data
+_langbyte1:
+	.space 1
+.globl _task_sheet
+	.data
+	.balign 16
+_task_sheet:
+	.space 64
+.globl _task_sheet_max
+	.data
+	.balign 4
+_task_sheet_max:
+	.space 4
+.globl _brother_task
+	.data
+	.balign 4
+_brother_task:
+	.space 4
+.globl _child_task
+	.data
+	.balign 4
+_child_task:
+	.space 4
+.globl _father_task
+	.data
+	.balign 4
+_father_task:
+	.space 4
+.globl _index
+	.data
+	.balign 4
+_index:
+	.space 4
+.globl _memman
+	.data
+	.balign 4
+_memman:
+	.space 4
+.globl _taskctl
+	.data
+	.balign 4
+_taskctl:
+	.space 4
+.globl _shtctl
+	.data
+	.balign 4
+_shtctl:
+	.space 4
+.globl _id_high
+	.data
+	.balign 4
+_id_high:
+	.space 4
+.globl _id_low
+	.data
+	.balign 4
+_id_low:
+	.space 4
+.globl _mem_use
+	.data
+	.balign 8
+_mem_use:
+	.space 8
+.globl _root_dir_addr
+	.data
+	.balign 8
+_root_dir_addr:
+	.space 8
+.globl _fifo32_mouse_event
+	.data
+	.balign 4
+_fifo32_mouse_event:
+	.space 4
+.globl _mouse_x
+	.data
+	.balign 4
+_mouse_x:
+	.space 4
+.globl _mouse_y
+	.data
+	.balign 4
+_mouse_y:
+	.space 4
+.globl _mouse_btn
+	.data
+	.balign 4
+_mouse_btn:
+	.space 4
+.globl _sheet_mouse_on
+	.data
+	.balign 4
+_sheet_mouse_on:
+	.space 4
+.globl _file
+	.data
+	.balign 4
+_file:
+	.space 4
+.globl _SYSTEMTABLE
+	.data
+	.balign 4
+_SYSTEMTABLE:
+	.space 4
+.globl _BLOCK_DEV_FUNCTION
+	.data
+	.balign 4
+_BLOCK_DEV_FUNCTION:
+	.space 4
+.globl _cache_blocks
+	.data
+	.balign 16
+_cache_blocks:
+	.space 2176
+.globl _cache_blocks_point
+	.data
+	.balign 16
+_cache_blocks_point:
+	.space 512
+.globl _requests
+	.data
+	.balign 16
+_requests:
+	.space 2688
+.globl _requests_point
+	.data
+	.balign 16
+_requests_point:
+	.space 512
+.globl _sync_requests
+	.data
+	.balign 16
+_sync_requests:
+	.space 416
+.globl _sync_requests_point
+	.data
+	.balign 16
+_sync_requests_point:
+	.space 128
+.globl _block_count
+	.data
+	.balign 4
+_block_count:
+	.space 4
+.globl _request_count
+	.data
+	.balign 4
+_request_count:
+	.space 4
+.globl _sync_request_count
+	.data
+	.balign 4
+_sync_request_count:
+	.space 4
+.globl _device_id
+	.data
+	.balign 8
+_device_id:
+	.space 8
+.globl _CACHE_TABLE
+	.data
+	.balign 4
+_CACHE_TABLE:
+	.space 4
+.globl _node_id
+	.data
+	.balign 8
+_node_id:
+	.space 8
+.globl _part_base_lba
+	.data
+	.balign 8
+_part_base_lba:
+	.space 8
+.globl _part_end_lba
+	.data
+	.balign 8
+_part_end_lba:
+	.space 8
+.globl _part_id
+	.data
+	.balign 8
+_part_id:
+	.space 8
+.globl _pci_dev
+	.data
+	.balign 4
+_pci_dev:
+	.space 4
+.globl _seek
+	.data
+	.balign 8
+_seek:
+	.space 8
+.globl _fsizeof
+	.data
+	.balign 8
+_fsizeof:
+	.space 8
+.globl _fat32_fat
+	.data
+	.balign 4
+_fat32_fat:
+	.space 4
+.globl _mbr
+	.data
+	.balign 4
+_mbr:
+	.space 4
+.globl _cache
+	.data
+	.balign 4
+_cache:
+	.space 4
+.globl _FILE_OF_FAT32
+	.data
+	.balign 4
+_FILE_OF_FAT32:
+	.space 4
+.globl _dosHeader
+	.data
+	.balign 4
+_dosHeader:
+	.space 4
+.globl _fileHeader
+	.data
+	.balign 4
+_fileHeader:
+	.space 4
+.globl _sectionHeader
+	.data
+	.balign 4
+_sectionHeader:
+	.space 4
+.globl _optionalHeader
+	.data
+	.balign 4
+_optionalHeader:
+	.space 4
+.globl _buff
+	.data
+	.balign 4
+_buff:
+	.space 4
+.globl _TYPEOF_PE
+	.data
+	.balign 4
+_TYPEOF_PE:
+	.space 4
+.globl _get_vm_info
+	.data
+	.balign 4
+_get_vm_info:
+	.space 4
+.globl _total_memory
+	.data
+	.balign 8
+_total_memory:
+	.space 8
+.globl _allocated_memory
+	.data
+	.balign 8
+_allocated_memory:
+	.space 8
+.globl _total_vcpu
+	.data
+	.balign 4
+_total_vcpu:
+	.space 4
+.globl _allocated_vcpu
+	.data
+	.balign 4
+_allocated_vcpu:
+	.space 4
+.globl _total_vm_exits
+	.data
+	.balign 8
+_total_vm_exits:
+	.space 8
+.globl _last_error_code
+	.data
+	.balign 4
+_last_error_code:
+	.space 4
+.globl _last_error_message
+	.data
+	.balign 4
+_last_error_message:
+	.space 4
+.globl _VirtualMachineCTL
+	.data
+	.balign 4
+_VirtualMachineCTL:
+	.space 4

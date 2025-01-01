@@ -9,6 +9,7 @@ struct SHTCTL *shtctl_init(struct MEMMAN *memman, struct PAGEMAN32 *pageman, uns
 {
 	struct SHTCTL *ctl;
 	int i;
+	char buff[256];
 	unsigned long long cr3=load_cr3();
 	ctl = (struct SHTCTL *) memman_alloc_4k(memman, sizeof (struct SHTCTL));//mem_alloc!!!
 	memman_link_page_64_m(pageman,cr3,ctl,0x07,(sizeof (struct SHTCTL)+0xfff)>>12,0);
@@ -36,6 +37,8 @@ struct SHTCTL *shtctl_init(struct MEMMAN *memman, struct PAGEMAN32 *pageman, uns
 		ctl->sheets0[i].ctl = ctl; 
 	}*/
 err:
+	sprintf(buff,"sheet:vram: vram=%lx xsize= %ld ysize= %ld\n",(unsigned long long)vram,(unsigned long long)xsize,(unsigned long long)ysize);
+	com_out_string(0x3f8,buff);
 	return ctl;
 }
 
@@ -43,6 +46,7 @@ struct SHEET *sheet_alloc(struct SHTCTL *ctl)
 {
 	struct SHEET *sht;
 	int i;
+	char buff[128];
 	for (i = 0; i < ctl->sheets0_size; i++) {
 		sht = &ctl->sheets0[i];
 		if (sht->flags == 0) {
@@ -55,6 +59,8 @@ struct SHEET *sheet_alloc(struct SHTCTL *ctl)
 			return sht;
 		}
 	}
+	sprintf(buff,"sheet:sheet alloc\n");
+	com_out_string(0x3f8,buff);
 	return 0;	/* 全てのシートが使用中だった */
 }
 
@@ -354,8 +360,9 @@ void sheet_refreshsub32(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, 
 		pack.y_width=by1-by0;
 		pack.to_sid_map=(unsigned long long)map+((sht->vy0+by0) * ctl->xsize + sht->vx0 + bx0)*4;
 		pack.from_sid=sht->sid;
-		asm_sheet_refreshsub32(&pack);
-		continue;
+		//if(pack.x_width > 0 && pack.y_width > 0)
+			//asm_sheet_refreshsub32(&pack);
+		//continue;
 old:
 		//没有快速算法
 		for (by = by0; by < by1; by++) {

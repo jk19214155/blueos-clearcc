@@ -117,9 +117,7 @@ typedef char *  va_list;
     return i;
  }
 
-
-
- static char *Test_number(char *str, long long num, long long base, long long size, int precision,
+static char *Test_number8(char *str, long long num, long long base, long long size, int precision,
     int type)
  {
     char c, sign, tmp[66];
@@ -195,14 +193,90 @@ typedef char *  va_list;
  }
 
 
+ static char *Test_number16(short *str, long long num, long long base, long long size, int precision,
+    int type)
+ {
+    char c, sign, tmp[66];
+    const char *digits = "0123456789abcdefghijklmnopqrstuvwxyz";
+    int i;
 
+    if (type & LARGE)
+        digits = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    if (type & LEFT)
+        type &= ~ZEROPAD;
+    if (base < 2 || base > 36)
+        return 0;
+    c = (type & ZEROPAD) ? '0' : ' ';
+    sign = 0;
+    if (type & SIGN) {
+        if (num < 0) {
+            sign = '-';
+            num = -num;
+            size--;
+        } else if (type & PLUS) {
+            sign = '+';
+            size--;
+        } else if (type & SPACE) {
+            sign = ' ';
+            size--;
+        }
+    }
+    if (type & SPECIAL) {
+        if (base == 16)
+            size -= 2;
+        else if (base == 8)
+            size--;
+    }
+    i = 0;
+    if (num == 0)
+    {
+        tmp[i++] = '0';
+    }
+    else
+    {
+        while (num != 0)
+        {
+            tmp[i++] = digits[do_div(num, base)];
+        }
+    }
 
- int Test_vsprintf(char *buf, const char *fmt, va_list args)
+    if (i > precision)
+        precision = i;
+    size -= precision;
+    if (!(type & (ZEROPAD + LEFT)))
+        while (size-- > 0)
+            *str++ = ' ';
+    if (sign)
+        *str++ = sign;
+    if (type & SPECIAL) {
+        if (base == 8)
+            *str++ = '0';
+        else if (base == 16) {
+            *str++ = '0';
+            *str++ = digits[33];
+        }
+    }
+    if (!(type & LEFT))
+        while (size-- > 0)
+            *str++ = c;
+    while (i < precision--)
+        *str++ = '0';
+    while (i-- > 0)
+        *str++ = tmp[i];
+    while (size-- > 0)
+        *str++ = ' ';
+    return str;
+ }
+
+ int Test_vsprintf8(char *buf, const char *fmt0, va_list args)
  {
     int len;
     unsigned long long num;
     int i, base;
-    char *str;
+    
+	char *str;
+	char* fmt=fmt0;
+	
     const char *s;
 
     int flags;      /* flags to Test_number() */
@@ -307,7 +381,7 @@ typedef char *  va_list;
                 field_width = 2 * sizeof(void *);
                 flags |= ZEROPAD;
             }
-            str = Test_number(str,
+            str = Test_number8(str,
                      (unsigned long long)Test_va_arg(args, void *), 16,
                      field_width, precision, flags);
             continue;
@@ -361,7 +435,181 @@ typedef char *  va_list;
             num = Test_va_arg(args, int);
         else
             num = Test_va_arg(args, unsigned int);
-        str = Test_number(str, num, base, field_width, precision, flags);
+        str = Test_number8(str, num, base, field_width, precision, flags);
+    }
+    *str = '\0';
+    return str - buf;
+ }
+
+
+ int Test_vsprintf16(short *buf, const char *fmt0, va_list args)
+ {
+    int len;
+    unsigned long long num;
+    int i, base;
+    
+	short *str;
+	short* fmt=fmt0;
+	
+    const char *s;
+
+    int flags;      /* flags to Test_number() */
+
+    int field_width;    /* width of output field */
+    int precision;      /* min. # of digits for integers; max
+                   Test_number of chars for from string */
+    int qualifier;      /* 'h', 'l', or 'L' for integer fields */
+
+    for (str = buf; *fmt; ++fmt) {
+        if (*fmt != '%') {
+            *str++ = *fmt;
+            continue;
+        }
+
+        /* process flags */
+        flags = 0;
+          repeat:
+        ++fmt;      /* this also skips first '%' */
+        switch (*fmt) {
+        case '-':
+            flags |= LEFT;
+            goto repeat;
+        case '+':
+            flags |= PLUS;
+            goto repeat;
+        case ' ':
+            flags |= SPACE;
+            goto repeat;
+        case '#':
+            flags |= SPECIAL;
+            goto repeat;
+        case '0':
+            flags |= ZEROPAD;
+            goto repeat;
+        }
+
+        /* get field width */
+        field_width = -1;
+        if (isdigit(*fmt))
+            field_width = skip_atoi(&fmt);
+        else if (*fmt == '*') {
+            ++fmt;
+            /* it's the next argument */
+            field_width = Test_va_arg(args, int);
+            if (field_width < 0) {
+                field_width = -field_width;
+                flags |= LEFT;
+            }
+        }
+
+        /* get the precision */
+        precision = -1;
+        if (*fmt == '.') {
+            ++fmt;
+            if (isdigit(*fmt))
+                precision = skip_atoi(&fmt);
+            else if (*fmt == '*') {
+                ++fmt;
+                /* it's the next argument */
+                precision = Test_va_arg(args, int);
+            }
+            if (precision < 0)
+                precision = 0;
+        }
+
+        /* get the conversion qualifier */
+        qualifier = -1;
+        if (*fmt == 'h' || *fmt == 'l' || *fmt == 'L') {
+            qualifier = *fmt;
+            ++fmt;
+        }
+
+        /* default base */
+        base = 10;
+
+        switch (*fmt) {
+        case 'c':
+            if (!(flags & LEFT))
+                while (--field_width > 0)
+                    *str++ = ' ';
+            *str++ = (unsigned char)Test_va_arg(args, int);
+            while (--field_width > 0)
+                *str++ = ' ';
+            continue;
+
+        case 's':
+            s = Test_va_arg(args, char *);
+            len = strnlen(s, precision);
+
+            if (!(flags & LEFT))
+                while (len < field_width--)
+                    *str++ = ' ';
+            for (i = 0; i < len; ++i)
+                *str++ = *s++;
+            while (len < field_width--)
+                *str++ = ' ';
+            continue;
+
+        case 'p':
+            if (field_width == -1) {
+                field_width = 2 * sizeof(void *);
+                flags |= ZEROPAD;
+            }
+            str = Test_number16(str,
+                     (unsigned long long)Test_va_arg(args, void *), 16,
+                     field_width, precision, flags);
+            continue;
+
+        case 'n':
+            if (qualifier == 'l') {
+                long long *ip = Test_va_arg(args, long long *);
+                *ip = (str - buf);
+            } else {
+                int *ip = Test_va_arg(args, int *);
+                *ip = (str - buf);
+            }
+            continue;
+
+        case '%':
+            *str++ = '%';
+            continue;
+
+            /* integer Test_number formats - set up the flags and "break" */
+        case 'o':
+            base = 8;
+            break;
+
+        case 'X':
+            flags |= LARGE;
+        case 'x':
+            base = 16;
+            break;
+
+        case 'd':
+        case 'i':
+            flags |= SIGN;
+        case 'u':
+            break;
+
+        default:
+            *str++ = '%';
+            if (*fmt)
+                *str++ = *fmt;
+            else
+                --fmt;
+            continue;
+        }
+        if (qualifier == 'l')
+            num = Test_va_arg(args, unsigned long long);
+        else if (qualifier == 'h') {
+            num = (unsigned short)Test_va_arg(args, int);
+            if (flags & SIGN)
+                num = (short)num;
+        } else if (flags & SIGN)
+            num = Test_va_arg(args, int);
+        else
+            num = Test_va_arg(args, unsigned int);
+        str = Test_number16(str, num, base, field_width, precision, flags);
     }
     *str = '\0';
     return str - buf;
@@ -408,12 +656,30 @@ int strncmp(const char *s1,const char *s2,int n)
  //https://www.cnblogs.com/smartlife/articles/10237090.html
  int sprintf(char *buf, const char *fmt, ...)
 {
+	if(buf==0){
+		return 0;
+	}
     //记录fmt对应的地址
     va_list args;
     int val;
     //得到首个%对应的字符地址
     Test_va_start(args, fmt);
-    val = Test_vsprintf(buf, fmt, args);
+    val = Test_vsprintf8(buf, fmt, args);
+    Test_va_end(args);
+    return val;
+}
+
+int sprintf16(short *buf, const short *fmt, ...)
+{
+	if(buf==0){
+		return 0;
+	}
+    //记录fmt对应的地址
+    va_list args;
+    int val;
+    //得到首个%对应的字符地址
+    Test_va_start(args, fmt);
+    val = Test_vsprintf16(buf, fmt, args);
     Test_va_end(args);
     return val;
 }

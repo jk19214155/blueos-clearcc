@@ -27,12 +27,13 @@ void init_pic(void)
 }
 void init_apic(void* apic_base)
 {
-	int tmp_low,tmp_high,addr,i;
+	unsigned long long tmp_low,tmp_high,addr,i;
 	io_out8(PIC0_IMR, 0xff);//禁用8259中断控制器
-	io_out8(PIC0_IMR, 0xff);
+	io_out8(PIC1_IMR, 0xff);
 	//Enabling xAPIC(IA32_APIC_BASE[10]) and 2xAPIC(IA32_APIC_BASE[11])
     io_rdmsr(0x1b,&tmp_high,&tmp_low);
-    tmp_low = ((int)apic_base)|(1 << 11);
+    tmp_low = ((unsigned long long)apic_base) | (1 << 11);
+	tmp_high=0;
     io_wrmsr(0x1b,tmp_high,tmp_low);
     //Enabling LAPIC(SVR[8])
     *(int*)(apic_base+0xf0)|=(1<<8);
@@ -41,31 +42,32 @@ void init_apic(void* apic_base)
 	for(addr=0x10;addr<=0x3e;addr+=2){
 		io_write_io_apic(addr,1<<17);
 	}
+	unsigned long long rcba=(unsigned long long)pcie_get_rcba();
+	*(unsigned char*)(rcba+0x31fe)=(1<<8);
+	//*(int*)(rcba+0x3404)=(1<<7);//开启HPET
+	//*(int*)(rcba+0x3404)&=0xfffffffc;//清除HPET AS区域
 	//首先通过io-apic?置新的键盘中断
-	io_write_io_apic(0x12,0x21);
+	io_write_io_apic(0x12, 0x21);
 	io_write_io_apic(0x13,*(char*)(apic_base+0x20)<<24);
 	//设置新的定时器中断
-	io_write_io_apic(0x14,0x20);
+	io_write_io_apic(0x14,0x20 );
 	io_write_io_apic(0x15,*(char*)(apic_base+0x20)<<24);
 	//设置新的鼠标中断
-	io_write_io_apic(0x10+12*2,0x2c);
+	io_write_io_apic(0x10 + 12 * 2, 0x2c );
 	io_write_io_apic(0x10+12*2+1,*(char*)(apic_base+0x20)<<24);
 	//初始化高精度定时器
-	unsigned int rcba=pcie_get_rcba();
-	*(int*)(rcba+0x3404)|=(1<<7);//开启HPET
-	*(int*)(rcba+0x3404)&=0xfffffffc;//清除HPET AS区域
-	unsigned int HPET_base_address=0xfed00000;
+	unsigned long long HPET_base_address=0xfed00000;
 	//time0用于驱动系统定时器
-	*(int*)(HPET_base_address+0x100)=0x4c+(20<<9);//开启循环计数
-	*(int*)(HPET_base_address+0x104)=0;
-	*(int*)(HPET_base_address+0x108)=14318;//1ms/clock 1000fps
-	*(int*)(HPET_base_address+0x10c)=0;
+	//*(int*)(HPET_base_address+0x100)=0x4c+(20<<9);//开启循环计数
+	//*(int*)(HPET_base_address+0x104)=0;
+	//*(int*)(HPET_base_address+0x108)=14318;//1ms/clock 1000fps
+	//*(int*)(HPET_base_address+0x10c)=0;
 	//配置设备中断
-	io_write_io_apic(0x10+20*2,0x34);
-	io_write_io_apic(0x10+20*2+1,*(char*)(apic_base+0x20)<<24);
+	//io_write_io_apic(0x10+20*2,0x34);
+	//io_write_io_apic(0x10+20*2+1,*(char*)(apic_base+0x20)<<24);
 	//初始化多处理器环境
-	store_gdt((void*)0xc202);
-	store_idt((void*)0xc20a);
+	//store_gdt((void*)0xc202);
+	//store_idt((void*)0xc20a);
 	//memcpy((void*)0x8000,(void*)0xc200,512);
 	for(i=1;i<16;i++){
 		//io_ipi_message(apic_base,((char)i)<<24,0x05<<8);//广播init
@@ -75,11 +77,11 @@ void init_apic(void* apic_base)
 	return;
 }
 void io_write_io_apic(unsigned char index,unsigned int data){
-	*((char*)0xfec00000)=index;
-	*((int*)0xfec00010)=data;
+	*((unsigned char*)0xfec00000)=index;
+	*((unsigned int*)0xfec00010)=data;
 	return;
 }
 void io_ipi_message(void *apic_base,unsigned int high,unsigned int low){
-	*(int*)(apic_base+0x310)=high;
-	*(int*)(apic_base+0x300)=low;
+	*(unsigned int*)(apic_base+0x310)=high;
+	*(unsigned int*)(apic_base+0x300)=low;
 }

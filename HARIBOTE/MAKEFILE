@@ -1,7 +1,9 @@
 OBJS_BOOTPACK = bootpack.obj naskfunc.obj hankaku.obj graphic.obj dsctbl.obj \
 		int.obj fifo.obj keyboard.obj mouse.obj memory.obj sheet.obj timer.obj \
 		mtask.obj window.obj console.obj file.obj tek.obj dav.obj desktop.obj view.obj system.obj acpi.obj bmp.obj  dmg.obj drvier.obj \
-		fifo_mouse.obj com.obj vmx.obj ahci.obj pcie.obj sse.obj sprintf.obj memory_disk_sync.obj fat32.obj efi.obj cache.obj
+		fifo_mouse.obj com.obj vmx.obj ahci.obj pcie.obj sse.obj sprintf.obj memory_disk_sync.obj fat32.obj font.obj efi.obj cache.obj systemtable.obj
+
+EFI_APP_LIST = shell.efi
 
 TOOLPATH = ../../z_tools/
 INCPATH  = ../../z_tools/haribote/
@@ -15,6 +17,12 @@ GCC      = $(TOOLPATH)MinGW/bin/gcc.exe -I$(INCPATH) -I ./include -m32  -nostdli
 GCC64      = $(TOOLPATH)mingw64/bin/gcc.exe -I$(INCPATH) -I ./include -m64  -nostdlib -fno-builtin -ffreestanding \
 			-fno-stack-protector -Os -fno-pic -fno-pie -fno-asynchronous-unwind-tables  \
 			-fomit-frame-pointer -O0 -finput-charset=UTF-8 -w -c 
+GCC64s = $(TOOLPATH)mingw64/bin/gcc.exe -I$(INCPATH) -I ./include -m64 -nostdlib -fno-builtin -ffreestanding \
+        -fno-stack-protector -Os -fno-pic -fno-pie -fno-asynchronous-unwind-tables \
+        -fomit-frame-pointer -O0 -finput-charset=UTF-8 -Wall -Wextra -Werror \
+        -Wmissing-prototypes -Wstrict-prototypes -Wimplicit-function-declaration \
+        -Wredundant-decls -Wshadow -c
+
 GCC64p      = $(TOOLPATH)mingw64/bin/x86_64-w64-mingw32-gcc.exe -I$(INCPATH) -I ./include -m64   -fno-builtin -ffreestanding \
 			-fno-stack-protector -Os -fno-pic -fno-pie -fno-asynchronous-unwind-tables  \
 			-fomit-frame-pointer -O0 -finput-charset=UTF-8 -w 
@@ -34,14 +42,15 @@ DEL      = del
 SYS_HOME	= C:\Users\hp\Documents\GitHub\blueos-clearcc\HARIBOTE
 LIB_HOME	= C:\Users\hp\Documents\GitHub\Z_TOOLS\HARIBOTE
 
-# ƒfƒtƒHƒ‹ƒg“®ì
+# ï¿½fï¿½tï¿½Hï¿½ï¿½ï¿½gï¿½ï¿½ï¿½ï¿½
 
 default :
-#	$(MAKE) ipl09.bin –{Œn?•sg—pIPL??•û–@
-#	$(MAKE) haribote.sys –{Œn?•sg—pŒ´–{“IH‹ï? 
+#	$(MAKE) ipl09.bin ï¿½{ï¿½n?ï¿½sï¿½gï¿½pIPL??ï¿½ï¿½ï¿½@
+#	$(MAKE) haribote.sys ï¿½{ï¿½n?ï¿½sï¿½gï¿½pï¿½ï¿½ï¿½{ï¿½Iï¿½Hï¿½ï¿½? 
 	$(MAKE) bootpack.sys
+	$(MAKE) $(EFI_APP_LIST)
 
-# ƒtƒ@ƒCƒ‹¶¬‹K‘¥
+# ï¿½tï¿½@ï¿½Cï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Kï¿½ï¿½
 bootpack.sys : $(OBJS_BOOTPACK)
 	$(GCC64p) -o bootpack.sys -nostdlib  -s -Wl,--subsystem,10 -e HariMain -static-libgcc -shared $(OBJS_BOOTPACK)
 ipl09.bin : ipl09.nas makefile
@@ -71,7 +80,7 @@ haribote.sys : asmhead.bin bootpack.hrb makefile
 naskfunc.obj : naskfunc.nas makefile
 	$(NASM) naskfunc.nas -f elf64 -o naskfunc.obj -l naskfunc.lst
 
-# ˆê”Ê‹K‘¥
+# ï¿½ï¿½Ê‹Kï¿½ï¿½
 
 %.gas : %.c bootpack.h makefile
 	$(CC1) -o $*.gas $*.c
@@ -79,14 +88,18 @@ naskfunc.obj : naskfunc.nas makefile
 %.nas : %.gas makefile
 	$(GAS2NASK) $*.gas $*.nas
 
+
+
 #%.obj : %.nas makefile bootpack.h
 %.obj : %.c makefile bootpack.h
 #	$(NASK) $*.nas $*.obj $*.lst
 #	$(NASM) -f elf32 $*.nas -o $*.obj  -l $*.lst
-	$(GCC64) $*.c -o $*.obj -l $*.lst
+	$(GCC64)  $*.c -o $*.obj -l $*.lst
 
-# ƒRƒ}ƒ“ƒh
+# ï¿½Rï¿½}ï¿½ï¿½ï¿½h
 
+%.efi : makefile %.obj
+	$(GCC64p) -o $*.efi -nostdlib  -s -Wl,--subsystem,10 -e eif_main -static-libgcc -shared $*.obj
 clean :
 	-$(DEL) asmhead.bin
 	-$(DEL) hankaku.bin

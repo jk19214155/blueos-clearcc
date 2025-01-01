@@ -4,10 +4,11 @@
 
 static struct FIFO32 *mousefifo;
 static int mousedata0;
-static char buff[256];
+
 void inthandler2c(int *esp)
 /* PS/2マウスからの割り込み */
 {
+	char buff[256];
 	int data;
 	//io_out8(PIC1_OCW2, 0x64);	/* IRQ-12受付完了をPIC1に通知 */
 	//io_out8(PIC0_OCW2, 0x62);	/* IRQ-02受付完了をPIC0に通知 */
@@ -15,10 +16,10 @@ void inthandler2c(int *esp)
 	*(int*)(0xfee000b0)=0;
 	data = io_in8(PORT_KEYDAT);
 	fifo32_put(mousefifo, data + mousedata0);
-	//sprintf(buff,"inthandler2c data: %d\n",data);
-	//com_out_string(0x3f8,buff);
-	//sprintf(buff,"fifo_sattus: this:%x p:%d q:%d size:%d free:%d task:%x\n",mousefifo,mousefifo->p,mousefifo->q,mousefifo->size,mousefifo->free,mousefifo->task);
-	//com_out_string(0x3f8,buff);
+	sprintf(buff,"inthandler2c data: %d\n",data);
+	com_out_string(0x3f8,buff);
+	sprintf(buff,"fifo_sattus: this:%x p:%d q:%d size:%d free:%d task:%x\n",mousefifo,mousefifo->p,mousefifo->q,mousefifo->size,mousefifo->free,mousefifo->task);
+	com_out_string(0x3f8,buff);
 	return;
 }
 
@@ -27,16 +28,17 @@ void inthandler2c(int *esp)
 #define MOUSECMD_ENABLE_WHEEL	0xe8 
 void enable_mouse(struct FIFO32 *fifo, int data0, struct MOUSE_DEC *mdec)
 {
+	char buff[64];
 	/* 書き込み先のFIFOバッファを記憶 */
 	sprintf(buff,"enable_mouse fifo: %x\n",fifo);
 	com_out_string(0x3f8,buff);
 	mousefifo = fifo;
 	mousedata0 = data0;
 	/* ?用鼠??? */
-	wait_KBC_sendready();
-	io_out8(PORT_KEYCMD, KEYCMD_SENDTO_MOUSE);
-	wait_KBC_sendready();
-	io_out8(PORT_KEYDAT, MOUSECMD_ENABLE_WHEEL); 
+	//wait_KBC_sendready();
+	//io_out8(PORT_KEYCMD, KEYCMD_SENDTO_MOUSE);
+	//wait_KBC_sendready();
+	//io_out8(PORT_KEYDAT, MOUSECMD_ENABLE_WHEEL); 
 	/* ?用鼠?移? */
 	wait_KBC_sendready();
 	io_out8(PORT_KEYCMD, KEYCMD_SENDTO_MOUSE);
@@ -49,6 +51,7 @@ void enable_mouse(struct FIFO32 *fifo, int data0, struct MOUSE_DEC *mdec)
 
 int mouse_decode(struct MOUSE_DEC *mdec, unsigned char dat)
 {
+	char buff[64];
 	if (mdec->phase == 0) {
 		/* マウスの0xfaを待っている段階 */
 		com_out_string(0x3f8,"mouse_decode 0\n");

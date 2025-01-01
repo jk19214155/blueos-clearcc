@@ -93,9 +93,9 @@ AHCI_TABLE* ahci_init_all(){
 		for(int j=0;j<32;j++){
 			if(hba_pi&(1<<j)){
 				if((ahci_table0->ahci_dev[i].ahci_config_space_address->port)[j].i.HBA_RPxSIG==0x101){
-					AHCI_SATA_FIS* fis=ahci_make_fis(0,ahci_table0->ahci_dev[i].dev_info,0,3,0x25,0);
+					AHCI_SATA_FIS* fis=ahci_make_fis(0,ahci_table0->ahci_dev[i].dev_info,0,1,0xec,0);
 					ahci_table0->ahci_dev[i].dev_info[j]=memman_alloc_page_32(pageman);
-					ahci_fis_write_prdt(fis,0,ahci_table0->ahci_dev[i].dev_info[j],0x600-1);
+					ahci_fis_write_prdt(fis,0,ahci_table0->ahci_dev[i].dev_info[j],512-1);
 					ahci_fis_send(&(ahci_table0->ahci_dev[i]),j,fis,1,0x05);
 				}
 			}
@@ -334,6 +334,23 @@ AHCI_SATA_FIS* ahci_make_fis(AHCI_SATA_FIS* fis,void* buff,unsigned long long lb
 	//fis->prdt[0].dba=data_base;
 	//fis->prdt[0].dbau=0;
 	//fis->prdt[0].dbc=4096-1;//设备信息有512字节大小
+	// 打印制作完成的fis的地址和必要信息
+	sprintf(buff, "FIS address: %ld\n", (unsigned long long)fis);
+	cons_putstr0(task_now()->cons, buff);
+	
+	sprintf(buff, "Command: 0x%x, LBA: %ld, Count: %ld\n", 
+		(fis->cfis).ahci_cfis_0x27.command,
+		((unsigned long long)(fis->cfis).ahci_cfis_0x27.lba47_40 << 40) |
+		((unsigned long long)(fis->cfis).ahci_cfis_0x27.lba39_24 << 24) |
+		((unsigned long long)(fis->cfis).ahci_cfis_0x27.lba23_16 << 16) |
+		(fis->cfis).ahci_cfis_0x27.lba15_0,
+		(fis->cfis).ahci_cfis_0x27.count);
+	cons_putstr0(task_now()->cons, buff);
+	
+	sprintf(buff, "Device: 0x%x, Flag: 0x%x\n", 
+		(fis->cfis).ahci_cfis_0x27.device,
+		(fis->cfis).ahci_cfis_0x27.flag);
+	cons_putstr0(task_now()->cons, buff);
 	return fis;
 }
 void ahci_fis_write_prdt(AHCI_SATA_FIS* fis,unsigned int index,unsigned long long address,unsigned long long count){
@@ -364,10 +381,22 @@ AHCI_SATA_FIS* ahci_fis_send(AHCI_DEV* dev,unsigned int ahci_abi_regs_index,AHCI
 		//判断是哪一种设备
 		unsigned int HBA_RPxSIG=(ahci_base_address->port)[ahci_abi_regs_index].i.HBA_RPxSIG;
 		if(HBA_RPxSIG==0x00000101){//ATA设备
+			sprintf(buff, "Mounting FIS at address: %ld\n", (unsigned long long)fis);
+			cons_putstr0(cons, buff);
+			sprintf(buff, "Command: 0x%ld, LBA: %ld, Count: %ld\n", 
+					(unsigned long long)fis->cfis.ahci_cfis_0x27.command,
+					(unsigned long long)((fis->cfis.ahci_cfis_0x27.lba47_40 << 40) | 
+										 (fis->cfis.ahci_cfis_0x27.lba39_24 << 24) |
+										 (fis->cfis.ahci_cfis_0x27.lba23_16 << 16) |
+										 fis->cfis.ahci_cfis_0x27.lba15_0),
+					(unsigned long long)fis->cfis.ahci_cfis_0x27.count);
+			cons_putstr0(cons,buff);
+			sprintf(buff, "PRDTL: %ld, Flags: 0x%lx\n", (unsigned long long)prdtl, (unsigned long long)flags);
+			cons_putstr0(cons, buff);
 			if(cons!=0)
 				cons_putstr0(cons,"AHCI ATA device read/write\n");
 
-			clb[i].flags=(0x05)|ahci_command_header$flags$c;
+			clb[i].flags=flags;
 			clb[i].prdtl=prdtl;
 			clb[i].command_table_address_32=((unsigned long long)fis)&0xffffffff;//挂载
 			clb[i].command_table_address_64=((unsigned long long)fis>>32)&0xffffffff;
@@ -379,15 +408,6 @@ AHCI_SATA_FIS* ahci_fis_send(AHCI_DEV* dev,unsigned int ahci_abi_regs_index,AHCI
 			HBA_RPxCI|=(1<<i);//执行
 			(ahci_base_address->port)[ahci_abi_regs_index].i.HBA_RPxIS=0xffffffff;
 			(ahci_base_address->port)[ahci_abi_regs_index].i.HBA_RPxCI=HBA_RPxCI;
-			for(;;){
-				unsigned long long tfd=ahci_base_address->port[ahci_abi_regs_index].i.HBA_RPxTFD;
-				if(tfd&(1<<7)||tfd&(1<<3)){
-					continue;
-				}
-				else{
-					break;
-				}
-			}
 			return fis;
 			//释放内存
 			//pageman_unlink_page_32(pageman,fis,1);

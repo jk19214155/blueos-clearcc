@@ -6,6 +6,7 @@
 
 void init_gdtidt(UINTN main_this)
 {
+	char buff[64];
 	struct SEGMENT_DESCRIPTOR *gdt = (struct SEGMENT_DESCRIPTOR *) ADR_GDT;
 	struct GATE_DESCRIPTOR    *idt = (struct GATE_DESCRIPTOR    *) ADR_IDT;
 	int i;
@@ -34,11 +35,15 @@ void init_gdtidt(UINTN main_this)
 	//set_gatedesc(idt + 0x0e, (int) asm_inthandler0e, 2 * 8, AR_INTGATE32);
 	//set_gatedesc(idt + 0x0c, (int) asm_inthandler0c+main_this, now_cs, AR_INTGATE32);
 	//set_gatedesc(idt + 0x0d, (int) asm_inthandler0d+main_this, now_cs, AR_INTGATE32);
-	set_gatedesc(idt + 0x20, (int) asm_inthandler20+main_this, now_cs, AR_INTGATE32);
-	set_gatedesc(idt + 0x21, (int) asm_inthandler21+main_this, now_cs, AR_INTGATE32);
-	set_gatedesc(idt + 0x2c, (int) asm_inthandler2c+main_this, now_cs, AR_INTGATE32);
-	set_gatedesc(idt + 0x34, (int) asm_inthandler34+main_this, now_cs, AR_INTGATE32);
-	set_gatedesc(idt + 0x40, (int) asm_hrb_api+main_this,      now_cs, AR_INTGATE32 + 0x60);
+	sprintf(buff,"dsctbl:rsp=%x\n",asm_inthandler20);
+	com_out_string(0x3f8,buff);
+	sprintf(buff,"dsctbl:now_cs=%x\n",now_cs);
+	com_out_string(0x3f8,buff);
+	set_gatedesc(idt + 0x20, (unsigned long long) asm_inthandler20+main_this, now_cs, AR_INTGATE32);
+	set_gatedesc(idt + 0x21, (unsigned long long) asm_inthandler21+main_this, now_cs, AR_INTGATE32);
+	set_gatedesc(idt + 0x2c, (unsigned long long) asm_inthandler2c+main_this, now_cs, AR_INTGATE32);
+	set_gatedesc(idt + 0x34, (unsigned long long) asm_inthandler34+main_this, now_cs, AR_INTGATE32);
+	set_gatedesc(idt + 0x40, (unsigned long long) asm_hrb_api+main_this,      now_cs, AR_INTGATE32 + 0x60);
 	
 	return;
 }

@@ -104,11 +104,12 @@ int pcie_get_size_from_bar(PCI_DEV* pci_dev,unsigned int bar,unsigned int* size)
 	return 0;
 }
 
-unsigned pcie_get_rcba(){
+unsigned int pcie_get_rcba(){
 	unsigned int id = (0<<16) | (31<<11) | (1<<31) | (0<<8) | 0xf0;
-	io_out32(PCI_CONFIG_PORT,id);
+	unsigned long long address = (unsigned long long)((0 << 16) | (31 << 11) | (0 << 8) | (0xf0 & 0xFC) | ((unsigned long)0x80000000));
+	io_out32(PCI_CONFIG_PORT,address);
 	id = io_in32(PCI_DATA_PORT);
-	
+	id &= ~0xffff;
 	return id;
 }
 unsigned int pcie_find_capbility_by_id(PCI_DEV* pci_dev,unsigned int id){

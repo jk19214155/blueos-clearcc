@@ -1,6 +1,21 @@
 /* bootpackのメイン */
 
+
+
 #include "bootpack.h"
+
+#include <Protocol/EdidActive.h>
+#include <Protocol/GraphicsOutput.h>
+#include <Protocol/EdidOverride.h>
+#include <Guid/GlobalVariable.h>
+#include <Protocol/SimpleTextInEx.h>
+#include <Protocol/Tcg2Protocol.h>
+#include <Protocol/BlockIo.h>
+#include <Protocol/DevicePathUtilities.h>
+#include <Protocol/DevicePathFromText.h>
+#include <Protocol/LoadedImage.h>
+#include <Protocol/DevicePathToText.h>
+
 #include <stdio.h>
 #define KEYCMD_LED		0xed
 
@@ -16,14 +31,178 @@ static unsigned long long cr3_address;
 static struct MOUSE_DEC mdec;
 void* gThis;
 AHCI_TABLE* ahci_table_addr;
-void WinMain(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable){
-	Systemtable->ConOut->OutputString(Systemtable->ConOut,L"hello Winmain\r\n");
-	for(;;){
+
+EFI_GUID gEfiGraphicsOutputProtocolGuid={0x9042a9de, 0x23dc, 0x4a38, {0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a}};
+int sprintf16(short *buf, const short *fmt, ...);
+
+
+void* vram_base=0;
+
+void change_xy_mode(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* SystemTable){
+	char text_buff[256];
+	//切换显示模式
+	// 获取Graphics Output协议
+	EFI_GRAPHICS_OUTPUT_PROTOCOL *GraphicsOutput;
+	long long status;
+	status = SystemTable->BootServices->LocateProtocol(&gEfiGraphicsOutputProtocolGuid, NULL, (VOID **)&GraphicsOutput);
+	if (EFI_ERROR(status)) {
+		SystemTable->ConOut->OutputString(SystemTable->ConOut, (short unsigned int*)L"Fail from GraphicsOutputProtocol:init\r\n");
+		for(;;);
 	}
-	HariMain(gImageHandle,Systemtable);
-	
+	UINT32 mode_sel=1;//画面模式选择
+	UINTN mode_sel2=0;
+	int mode_num=0;
+	for(;;){//准备切换显示模式
+		//清除屏幕，准备打印分辨率信息
+		mode_num=0;
+		SystemTable->ConOut->ClearScreen(SystemTable->ConOut);
+		SystemTable->ConOut->OutputString(SystemTable->ConOut, (short unsigned int*)L"Please select the resolution you want to set from the list of supported options\r\n");
+		// 遍历所有支持的分辨率
+		UINT32 mode_set=-1;
+		EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *ModeInfo_set;
+		for (UINT32 Mode = 0,index=0; Mode < GraphicsOutput->Mode->MaxMode; Mode++) {
+			EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *ModeInfo;
+			UINTN SizeOfInfo;
+
+			// 获取该分辨率的信息
+			status = GraphicsOutput->QueryMode(GraphicsOutput, Mode, &SizeOfInfo, &ModeInfo);
+			if (EFI_ERROR(status)) {
+				SystemTable->ConOut->OutputString(SystemTable->ConOut, (short unsigned int*)L"Fail from GraphicsOutputProtocol:QueryMode\r\n");
+				continue;
+			}
+
+			// 只处理32位和24位色模式
+			if (ModeInfo->PixelFormat == PixelBlueGreenRedReserved8BitPerColor || ModeInfo->PixelFormat == PixelRedGreenBlueReserved8BitPerColor) {
+				// 输出该分辨率的信息
+				index++;
+				if(index==mode_sel){
+					SystemTable->ConOut->OutputString(SystemTable->ConOut, (short unsigned int*)L"[x]");
+					mode_sel2=Mode;//获取mode编号，后面选择时会用到
+				}
+				else{
+					SystemTable->ConOut->OutputString(SystemTable->ConOut, (short unsigned int*)L"[ ]");
+				}
+				sprintf16(text_buff,(short unsigned int*)L"%ld:Resolution: %ldx%ld, Format: %ld\r\n",(unsigned int) index, (unsigned int)ModeInfo->HorizontalResolution,(unsigned int) ModeInfo->VerticalResolution,(int) ModeInfo->PixelFormat);
+				SystemTable->ConOut->OutputString(SystemTable->ConOut, text_buff);
+				mode_set=Mode;
+				ModeInfo_set=ModeInfo;
+				
+				continue;
+			}
+		}
+		SystemTable->ConOut->OutputString(SystemTable->ConOut, (short unsigned int*)L"2018-2023 blueos.top All rights reserved.\r\n");
+		SystemTable->ConOut->OutputString(SystemTable->ConOut, (short unsigned int*)L"2018-2023 weiyufei@blueos.top All rights reserved.\r\n");
+		for(;;){
+			EFI_INPUT_KEY Key;
+			UINTN sel=0;
+			status = SystemTable->ConIn->ReadKeyStroke(SystemTable->ConIn, &Key);//获取按键
+			if (Key.UnicodeChar == L's') {
+				if(mode_sel<mode_num-1){//没有向下超界限
+					mode_sel++;
+					break;
+				}
+			}
+			if (Key.UnicodeChar == L'w') {
+				if(mode_sel>1){//没有向下超界限
+					mode_sel--;
+					break;
+				}
+			}
+			if(Key.UnicodeChar == L' '){
+				GraphicsOutput->SetMode(GraphicsOutput,mode_sel2);
+				//SystemTable->ConOut->OutputString(SystemTable->ConOut, (short unsigned int*)L"mode change success\r\n");
+				// 获取该分辨率的信息
+				EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *ModeInfo;
+				int SizeOfInfo;
+				status = GraphicsOutput->QueryMode(GraphicsOutput, mode_sel2, &SizeOfInfo, &ModeInfo);
+				*(char*)(0xff0)=0;
+				*(char*)(0xff0+1)=0;
+				*(char*)(0xff0+2)=32;
+				*(short*)(0xff0+4)=(short)ModeInfo->HorizontalResolution;//横向分辨率
+				*(short*)(0xff0+6)=(short)ModeInfo->VerticalResolution;//纵向分辨率
+				//重新获取一次协议
+				status = SystemTable->BootServices->LocateProtocol(&gEfiGraphicsOutputProtocolGuid, NULL, (VOID **)&GraphicsOutput);
+				if (EFI_ERROR(status)) {
+					SystemTable->ConOut->OutputString(SystemTable->ConOut, (short unsigned int*)L"Fail from GraphicsOutputProtocol:init\r\n");
+					for(;;);
+				}
+				vram_base=GraphicsOutput->Mode->FrameBufferBase;
+				SystemTable->ConOut->SetCursorPosition(SystemTable->ConOut,0,0);
+				goto next;
+			}
+		}
+	}
+next:
+	return;
 }
+
+void init_memman(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* SystemTable){
+	char text_buff[256];
+	//制作内存分布图
+	for(unsigned int i =0x800000;i<0x900000;i++){
+		*(char*)i=1;
+	}
+	SystemTable->ConOut->OutputString(SystemTable->ConOut, (short unsigned int*)L"map ok\r\n");
+	EFI_MEMORY_DESCRIPTOR* MemoryMap;
+	UINTN MapSize=0x200000;//1M内存
+	int MapKey=0;
+	int DescriptorSize=0;
+	int DescriptorVersion=0;
+	//获取MemoryMap信息
+	//内存分布图警告：https://forum.osdev.org/viewtopic.php?f=8&t=38500
+	EFI_STATUS Status = SystemTable->BootServices->GetMemoryMap(&MapSize, 0x900000, &MapKey, &DescriptorSize, &DescriptorVersion);
+	if(EFI_ERROR(Status)){
+		SystemTable->ConOut->OutputString(SystemTable->ConOut, (short unsigned int*)L"GetMemoryMap err\r\n");
+		for(;;);
+	}
+	else{
+		SystemTable->ConOut->OutputString(SystemTable->ConOut, (short unsigned int*)L"GetMemoryMap success\r\n");
+	}
+	sprintf16(text_buff,(short unsigned int*)L"DescriptorSize size: %ld\r\n",(int)DescriptorSize);
+	SystemTable->ConOut->OutputString(SystemTable->ConOut, text_buff);
+	sprintf16(text_buff,(short unsigned int*)L"MapSize size: %ld\r\n",(int)MapSize);
+	SystemTable->ConOut->OutputString(SystemTable->ConOut, text_buff);
+	sprintf16(text_buff,(short unsigned int*)L"MapKey: %ld\r\n",(int)MapKey);
+	SystemTable->ConOut->OutputString(SystemTable->ConOut, text_buff);
+	SystemTable->ConOut->OutputString(SystemTable->ConOut, (short unsigned int*)L"getmap ok\r\n");
+	/*开始填充内存分布图*/
+	int n=0;
+	for(int i=0;i<MapSize;i+=DescriptorSize){
+		unsigned int p=(int*)(0x900000+i);
+		int m_type=*(int*)p;
+		if(m_type==3||m_type==4||m_type==7){
+			if(*(int*)(p+12)!=0){//4G以上的内存
+				continue;
+			}
+			int m_start=*(int*)(p+8)>>12;//起始地址
+			int m_num=*(int*)(p+0x18);//页面数量
+			n+=m_num;
+			for(unsigned int j=0x800000+m_start;j<0x800000+m_num;j++){
+				*(char*)j=0;
+			}
+		}
+	}
+	sprintf16(text_buff,(short unsigned int*)L"free pages : %ld\r\n",(int)n);
+	SystemTable->ConOut->OutputString(SystemTable->ConOut, text_buff);
+	//最开始的12M内存禁用
+	for(int i=0;i<0xa00;i++){
+		*(char*)(0x800000+i)=-1;
+	}
+}
+
+void set_vram(){
+	PCI_DEV  pci_dev;
+	unsigned int addr;
+	pcie_find_dev_by_class(&pci_dev,0x0300);
+	pcie_get_bar_from_device(&pci_dev,0,&addr);
+	*(unsigned int*)(0xff0+8)=addr;
+}
+
 void ExitBootServer(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable){
+	
+	change_xy_mode(gImageHandle,Systemtable);
+	init_memman(gImageHandle,Systemtable);
+	//set_vram();
 	unsigned int MapKey;
 	unsigned int DescriptorSize;
 	unsigned int DescriptorVersion;
@@ -32,12 +211,15 @@ void ExitBootServer(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable){
 	Systemtable->BootServices->GetMemoryMap(&MapSize, 0x900000, &MapKey, &DescriptorSize, &DescriptorVersion);
 	Systemtable->BootServices->ExitBootServices(gImageHandle,MapKey);//退出boot service
 }
+
+
+
 void HariMain(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable)
 {
-	io_cli();//为了防止UEFI的定时器扰乱初始化，关闭所有中断
 	//SystemTable->RuntimeServices->GetVariable("xsize",&varGuid,EFI_VARIABLE_RUNTIME_ACCESS|EFI_VARIABLE_BOOTSERVICE_ACCESS,4,);
 	//SystemTable->RuntimeServices->GetVariable("ysize",&varGuid,EFI_VARIABLE_RUNTIME_ACCESS|EFI_VARIABLE_BOOTSERVICE_ACCESS,4,&(ModeInfo->VerticalResolution));
 	ExitBootServer(gImageHandle,Systemtable);
+	io_cli();//为了防止UEFI的定时器扰乱初始化，关闭所有中断
 	//com_out_string(0x3f8,"hello\n");
 	struct BOOTINFO *binfo = (struct BOOTINFO *) ADR_BOOTINFO;
 	struct SHTCTL *shtctl[10];//图层管理器
@@ -133,6 +315,14 @@ void HariMain(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable)
 	//else{
 	//	init_pic();//初始化pic
 	//}
+	if(support_apic()==1){//存在local_apic?使用local-apic?理中断
+		init_apic((void*)0xfee00000);
+	}
+	else{
+		com_out_string(0x3f8,"cot find apic\n");
+		init_pic();//初始化pic
+	}
+	
 	init_sse42();
 	sprintf(s,"fifobuff:%x\n",fifobuf);
 	com_out_string(0x3f8,s);
@@ -148,7 +338,7 @@ void HariMain(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable)
 	//}
 	fifo32_init(&keycmd, 32, keycmd_buf, 0);
 	init_pit();
-	init_hpet_timer();//初始化高精度定时器
+	//init_hpet_timer();//初始化高精度定时器
 	//运行第一个任务
 	task_a = task_init(memman);
 	task_a->memman=memman;//注册内存控制器
@@ -158,18 +348,21 @@ void HariMain(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable)
 	task_run(task_a, 1, 2);
 	task_a->langmode = 0;
 	//创建公共图层数组
+	com_out_string(0x3f8,"sheet init start\n");
 	struct View* p=(unsigned char *) memman_alloc_4k(memman, sizeof(struct View [512]));//内存分配!!!
 	memman_link_page_64_m(pageman,cr3_address,p,3,(sizeof(struct View [512])+0xfff)>>12,0);//没有目的链接地址
 	//准备两个图层控制器
 	*(int*)0x0026f01c=2;//两个桌面图层控制器
 	for(i=0;i<2;i++){//10个图层管理器
-		shtctl[i] = shtctl_init(memman,pageman, binfo->vram, binfo->scrnx, binfo->scrny);
+		shtctl[i] = shtctl_init(memman,pageman, ((unsigned long long)vram_base)>>32, binfo->scrnx, binfo->scrny);
 		shtctl[i]->sheets0=p;
 		shtctl[i]->sheets0_size=512;
 		(shtctl[i]->func).sheet_refreshsub=((unsigned long long)(shtctl[i]->func).sheet_refreshsub)+this;//增加偏移量
 	}
 	active_sheet_ctl = (unsigned long long) shtctl[shtctl_point];//当前正在显示的图层
 	*((int*)0x0026f018)=shtctl;//保存图层数组
+	
+	io_sti();
 	/* sht_back */
 	//第一屏幕背景
 	sht_back[0]  = sheet_alloc(shtctl[0]);
@@ -219,14 +412,15 @@ void HariMain(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable)
 	/* 最初にキーボード状態との食い違いがないように、設定しておくことにする */
 	fifo32_put(&keycmd, KEYCMD_LED);
 	fifo32_put(&keycmd, key_leds);
-	*(unsigned int*)0x0026f03c =&sht_back;
-	init_apic((void*)0xfee00000);
+	//*(unsigned int*)0x0026f03c =&sht_back;
 	
-	io_sti();
+	
+	com_out_string(0x3f8,"int sit\n");
+	
 	
 	/*初始化AHCI控制器*/
-	ahci_table_addr=ahci_init_all();
-	
+	//ahci_table_addr=ahci_init_all();
+	com_out_string(0x3f8,"ahci ready\n");
 goto st_next;
 	/* nihongo.fntの読み込み */
 	//fat = (int *) memman_alloc_4k(memman, 4 * 2880);//内存分配!!!

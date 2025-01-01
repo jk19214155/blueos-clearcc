@@ -466,8 +466,8 @@ struct Button{
 };
 void button_init(struct Button self);
 void button_flush(struct Button* self);
-void listview_init(struct ListView self,struct List list);
-void listview_additem(struct ListView self,struct Item item);
+//void listview_init(struct ListView self,struct List list);
+//void listview_additem(struct ListView self,struct Item item);
 struct List{//列表类
 	int index;//当前选中的目录项目
 	int num;//目录项数量
@@ -563,7 +563,7 @@ typedef struct _TASK_MSG_BOX{
 
 /* mtask.c */
 #define MAX_TASKS		1000	/* 最大タスク数 */
-#define TASK_GDT0		3		/* TSSをGDTの何番から割り当てるのか */
+#define TASK_GDT0		20		/* TSSをGDTの何番から割り当てるのか */
 #define MAX_TASKS_LV	100
 #define MAX_TASKLEVELS	10
 #pragma pack(1)
@@ -1102,7 +1102,7 @@ typedef struct _ahci_sata_fis{//SATA FIS的结构
 #define SCSI_READ_CAPACITY 0x9e
 unsigned int pcie_read_config(PCI_DEV* dev,int reg_offset); 
 void pcie_write_config(PCI_DEV* dev,int reg_offset,unsigned int config);
-unsigned pcie_get_rcba();
+unsigned int pcie_get_rcba();
 typedef struct block_dev_function{
 	EFI_STATUS (*data_move)(void* id,void* buff,unsigned long long lba,unsigned long long size,unsigned long long flags);
 }BLOCK_DEV_FUNCTION;
@@ -1233,7 +1233,79 @@ EFI_STATUS ahci_init(AHCI_DEV* ahci_dev);
 AHCI_SATA_FIS* ahci_make_fis(AHCI_SATA_FIS* fis,void* buff,unsigned long long lba,unsigned long long count,unsigned long long command,unsigned long long flag);
 void ahci_fis_write_prdt(AHCI_SATA_FIS* fis,unsigned int index,unsigned long long address,unsigned long long count);
 AHCI_SATA_FIS* ahci_fis_send(AHCI_DEV* dev,unsigned int ahci_abi_regs_index,AHCI_SATA_FIS* fis,unsigned long long prdtl,unsigned int flags);
-
+typedef struct _ahci_IDENTIFY_DEVICE_info{
+    unsigned short general_config;                // Word 0
+    unsigned short num_cylinders;                 // Word 1
+    unsigned short specific_config;               // Word 2
+    unsigned short num_heads;                     // Word 3
+    unsigned short retired[2];                    // Words 4-5
+    unsigned short num_sectors_per_track;         // Word 6
+    unsigned short vendor_unique[3];              // Words 7-9
+    char serial_number[20];                       // Words 10-19
+    unsigned short retired2[2];                   // Words 20-21
+    unsigned short obsolete;                      // Word 22
+    char firmware_revision[8];                    // Words 23-26
+    char model_number[40];                        // Words 27-46
+    unsigned short max_sectors_per_irq;           // Word 47
+    unsigned short reserved;                      // Word 48
+    unsigned short capabilities[2];               // Words 49-50
+    unsigned short obsolete2[2];                  // Words 51-52
+    unsigned short field_validity;                // Word 53
+    unsigned short current_cylinders;             // Word 54
+    unsigned short current_heads;                 // Word 55
+    unsigned short current_sectors_per_track;     // Word 56
+    unsigned int current_capacity_sectors;        // Words 57-58
+    unsigned short current_sectors_per_irq;       // Word 59
+    unsigned int total_addressable_sectors;       // Words 60-61
+    unsigned short obsolete3;                     // Word 62
+    unsigned short multiword_dma_support;         // Word 63
+    unsigned short pio_modes_supported;           // Word 64
+    unsigned short min_multiword_dma_cycle_time;  // Word 65
+    unsigned short rec_multiword_dma_cycle_time;  // Word 66
+    unsigned short min_pio_cycle_time;            // Word 67
+    unsigned short min_pio_cycle_time_iordy;      // Word 68
+    unsigned short reserved2[6];                  // Words 69-74
+    unsigned short queue_depth;                   // Word 75
+    unsigned short sata_capabilities;             // Word 76
+    unsigned short sata_reserved;                 // Word 77
+    unsigned short sata_feature_supported;        // Word 78
+    unsigned short sata_feature_enabled;          // Word 79
+    unsigned short major_version;                 // Word 80
+    unsigned short minor_version;                 // Word 81
+    unsigned short command_set_supported[3];      // Words 82-84
+    unsigned short command_set_active[2];         // Words 85-86
+    unsigned short ultra_dma_modes;               // Word 88
+    unsigned short time_for_security_erase;       // Word 89
+    unsigned short time_for_enhanced_security_erase; // Word 90
+    unsigned short current_apm_level;             // Word 91
+    unsigned short master_password_id;            // Word 92
+    unsigned short hardware_reset_result;         // Word 93
+    unsigned short acoustic_management;           // Word 94
+    unsigned short stream_min_req_size;           // Word 95
+    unsigned short streaming_transfer_time_dma;   // Word 96
+    unsigned short streaming_access_latency;      // Word 97
+    unsigned int streaming_performance_granularity; // Words 98-99
+    unsigned long long max_lba_48bit;             // Words 100-103
+    unsigned short streaming_transfer_time_pio;   // Word 104
+    unsigned short reserved3;                     // Word 105
+    unsigned short physical_logical_sector_size;  // Word 106
+    unsigned short inter_seek_delay;              // Word 107
+    unsigned short world_wide_name[4];            // Words 108-111
+    unsigned short reserved4[4];                  // Words 112-115
+    unsigned short reserved5;                     // Word 116
+    unsigned int logical_sector_size;             // Words 117-118
+    unsigned short command_set_support_ext;       // Word 119
+    unsigned short command_set_active_ext;        // Word 120
+    unsigned short reserved6[6];                  // Words 121-126
+    unsigned short removable_media_status;        // Word 127
+    unsigned short security_status;               // Word 128
+    unsigned short vendor_specific[31];           // Words 129-159
+    unsigned short cfa_power_mode;                // Word 160
+    unsigned short reserved7[15];                 // Words 161-175
+    char current_media_serial_number[60];         // Words 176-205
+    unsigned short reserved8[49];                 // Words 206-254
+    unsigned short integrity_word;                // Word 255
+}ahci_identify_info;
 
 /* com.c */
 void com_out_string(unsigned int port,char* str);
@@ -1263,18 +1335,20 @@ typedef struct {
 
 typedef struct {
     CACHE_BLOCK* cache_blocks_point;
-    char *buffer;
-    unsigned long long offset;
+    char *sbuffer;//源变址
+	char *dbuffer;//目的变址
     unsigned long long size; // Size in bytes
     char valid; // 判断是否空闲
 } REQUEST;
 
+
 typedef struct {
     CACHE_BLOCK* cache_blocks_point;
-    char *buffer;
-    unsigned long long offset;
-    unsigned long long size; // Size in bytes
-    unsigned long long lba;
+	unsigned long long flags;
+    //char *buffer;
+    //unsigned long long offset;
+    //unsigned long long size; // Size in bytes
+    //unsigned long long lba;
     char valid; // 判断是否空闲
 } SYNC_REQUEST;
 #define CACHE_SIZE (4 * 1024 * 1024) // Example cache block size: 4 MB
@@ -1285,8 +1359,12 @@ typedef struct {
 #define CACHE_BLOCK_ENABLE 2
 #define CACHE_BLOCK_IDLE 0
 
+#define SYNC_REQUEST_WRITE 1
+#define SYNC_REQUEST_READ 0
 
 typedef struct {
+	EFI_STATUS (*read)(void *this, void *buff, unsigned long long offset, unsigned long long size);
+	EFI_STATUS (*sync)(void *this);
     CACHE_BLOCK cache_blocks[MAX_CACHES];
     CACHE_BLOCK* cache_blocks_point[MAX_CACHES];
     REQUEST requests[MAX_REQUESTS];
@@ -1296,9 +1374,210 @@ typedef struct {
     unsigned int block_count;
     unsigned int request_count;
     unsigned int sync_request_count;
-    PCI_DEV* pci_dev;
+	union{
+   		 PCI_DEV* pci_dev;
+		 void* dev;
+	};
     unsigned long long device_id;
 } CACHE_TABLE;
 void cache_init(CACHE_TABLE** this);
-EFI_STATUS read(CACHE_TABLE *this, void *buff, unsigned long long offset, unsigned long long size);
-EFI_STATUS sync(CACHE_TABLE *this);
+/*fat32.c*/
+typedef struct _FILE_OF_FAT32{
+	EFI_STATUS (*fread)(struct _FILE* this,void* buff,unsigned long long seek,unsigned long long size); \
+	EFI_STATUS (*fwrite)(struct _FILE* this,void* buff,unsigned long long seek,unsigned long long size); \
+	EFI_STATUS (*fsize)(struct _FILE* this,unsigned long long* size); \
+	EFI_STATUS (*fopen)(struct _FILE* this,unsigned long long index); \
+	EFI_STATUS (*fclose)(struct _FILE* this);
+
+	unsigned long long node_id;//当前文件的起始FAT编号
+	unsigned long long device_id;
+	unsigned long long part_base_lba;
+	unsigned long long part_end_lba;
+	unsigned long long part_id;
+	PCI_DEV* pci_dev;
+	unsigned long long seek;
+	unsigned long long fsizeof;
+	unsigned int* fat32_fat;
+	unsigned long long size;
+	FAT32_HEADER* mbr;
+	CACHE_TABLE* cache;
+	
+}FILE_OF_FAT32;
+FILE_OF_FAT32* fat32_init(FILE_OF_FAT32* file_info,unsigned int device_id,unsigned long long part_base_lba);
+EFI_STATUS fat32_read_file_from_cache(FILE_OF_FAT32* this, void* buff, unsigned long long offset, unsigned long long size);
+/*efi.c*/
+#pragma pack(push, 1)
+
+// DOS Header
+typedef struct {
+    uint16_t e_magic;    // Magic number
+    uint16_t e_cblp;     // Bytes on last page of file
+    uint16_t e_cp;       // Pages in file
+    uint16_t e_crlc;     // Relocations
+    uint16_t e_cparhdr;  // Size of header in paragraphs
+    uint16_t e_minalloc; // Minimum extra paragraphs needed
+    uint16_t e_maxalloc; // Maximum extra paragraphs needed
+    uint16_t e_ss;       // Initial (relative) SS value
+    uint16_t e_sp;       // Initial SP value
+    uint16_t e_csum;     // Checksum
+    uint16_t e_ip;       // Initial IP value
+    uint16_t e_cs;       // Initial (relative) CS value
+    uint16_t e_lfarlc;   // File address of relocation table
+    uint16_t e_ovno;     // Overlay number
+    uint16_t e_res[4];   // Reserved words
+    uint16_t e_oemid;    // OEM identifier (for e_oeminfo)
+    uint16_t e_oeminfo;  // OEM information; e_oemid specific
+    uint16_t e_res2[10]; // Reserved words
+    uint32_t e_lfanew;   // File address of new exe header
+} IMAGE_DOS_HEADER;
+
+// PE Header
+typedef struct {
+    uint32_t Signature;
+    uint16_t Machine;
+    uint16_t NumberOfSections;
+    uint32_t TimeDateStamp;
+    uint32_t PointerToSymbolTable;
+    uint32_t NumberOfSymbols;
+    uint16_t SizeOfOptionalHeader;
+    uint16_t Characteristics;
+} IMAGE_FILE_HEADER;
+
+// Optional Header
+typedef struct {
+    uint16_t Magic;
+    uint8_t MajorLinkerVersion;
+    uint8_t MinorLinkerVersion;
+    uint32_t SizeOfCode;
+    uint32_t SizeOfInitializedData;
+    uint32_t SizeOfUninitializedData;
+    uint32_t AddressOfEntryPoint;
+    uint32_t BaseOfCode;
+    uint64_t ImageBase;
+    uint32_t SectionAlignment;
+    uint32_t FileAlignment;
+    uint16_t MajorOperatingSystemVersion;
+    uint16_t MinorOperatingSystemVersion;
+    uint16_t MajorImageVersion;
+    uint16_t MinorImageVersion;
+    uint16_t MajorSubsystemVersion;
+    uint16_t MinorSubsystemVersion;
+    uint32_t Win32VersionValue;
+    uint32_t SizeOfImage;
+    uint32_t SizeOfHeaders;
+    uint32_t CheckSum;
+    uint16_t Subsystem;
+    uint16_t DllCharacteristics;
+    uint64_t SizeOfStackReserve;
+    uint64_t SizeOfStackCommit;
+    uint64_t SizeOfHeapReserve;
+    uint64_t SizeOfHeapCommit;
+    uint32_t LoaderFlags;
+    uint32_t NumberOfRvaAndSizes;
+    uint64_t DataDirectory[16][2]; // Directory entries (Virtual Address, Size)
+} IMAGE_OPTIONAL_HEADER64;
+
+// Section Header
+typedef struct {
+    uint8_t  Name[8];
+    union {
+        uint32_t PhysicalAddress;
+        uint32_t VirtualSize;
+    } Misc;
+    uint32_t VirtualAddress;
+    uint32_t SizeOfRawData;
+    uint32_t PointerToRawData;
+    uint32_t PointerToRelocations;
+    uint32_t PointerToLinenumbers;
+    uint16_t NumberOfRelocations;
+    uint16_t NumberOfLinenumbers;
+    uint32_t Characteristics;
+} IMAGE_SECTION_HEADER;
+
+typedef struct {
+	EFI_STATUS (*read)(void* this, void* buff, char* name,unsigned long long *size);
+	IMAGE_DOS_HEADER* dosHeader;
+	IMAGE_FILE_HEADER* fileHeader;
+	IMAGE_SECTION_HEADER** sectionHeader;
+	IMAGE_OPTIONAL_HEADER64* optionalHeader;
+	void* buff;
+}TYPEOF_PE;
+#pragma pack(pop)
+/*vmx.c */
+#define MAX_VM_NAME_LENGTH 64
+
+typedef struct {
+    uint32_t vm_id;                       // 虚拟机唯一标识符
+    char name[MAX_VM_NAME_LENGTH];        // 虚拟机名称
+    uint8_t state;                        // 虚拟机状态（运行、暂停、停止等）
+    
+    // 内存相关
+    uint64_t memory_size;                 // 分配给虚拟机的内存大小
+    void* memory_start;                   // 虚拟机内存起始地址
+    
+    // CPU相关
+    uint32_t vcpu_count;                  // 虚拟CPU数量
+    uint64_t cr3;                         // CR3寄存器值（页表基址）
+    
+    // VMCS相关
+    void* vmcs_region;                    // VMCS区域指针
+    
+    // 设备相关
+    uint32_t disk_size;                   // 虚拟磁盘大小
+    char* disk_image_path;                // 虚拟磁盘镜像路径
+    
+    // 网络相关
+    uint8_t mac_address[6];               // 虚拟机MAC地址
+    
+    // 性能统计
+    uint64_t total_run_time;              // 总运行时间
+    uint64_t vm_exit_count;               // VM Exit次数
+    
+    // 调度相关
+    uint32_t priority;                    // 调度优先级
+    uint64_t time_slice;                  // 时间片长度
+    
+    // 错误处理
+    uint32_t last_error_code;             // 最后一次错误代码
+    char* last_error_message;             // 最后一次错误消息
+    
+    // 其他可能需要的字段...
+    
+} VirtualMachineInfo;
+#define MAX_VIRTUAL_MACHINES 16
+
+typedef struct {
+    VirtualMachineInfo vm_list[MAX_VIRTUAL_MACHINES];  // 虚拟机列表
+    uint32_t vm_count;                                 // 当前虚拟机数量
+    uint32_t active_vm_id;                             // 当前活动虚拟机ID
+    
+    // 虚拟机管理函数指针
+    EFI_STATUS (*create_vm)(struct VirtualMachineCTL* this, VirtualMachineInfo* vm_info);
+    EFI_STATUS (*start_vm)(struct VirtualMachineCTL* this, uint32_t vm_id);
+    EFI_STATUS (*stop_vm)(struct VirtualMachineCTL* this, uint32_t vm_id);
+    EFI_STATUS (*pause_vm)(struct VirtualMachineCTL* this, uint32_t vm_id);
+    EFI_STATUS (*resume_vm)(struct VirtualMachineCTL* this, uint32_t vm_id);
+    EFI_STATUS (*delete_vm)(struct VirtualMachineCTL* this, uint32_t vm_id);
+    
+    VirtualMachineInfo* (*get_vm_info)(struct VirtualMachineCTL* this, uint32_t vm_id);
+    EFI_STATUS (*set_vm_memory)(struct VirtualMachineCTL* this, uint32_t vm_id, uint64_t memory_size);
+    EFI_STATUS (*set_vm_vcpu_count)(struct VirtualMachineCTL* this, uint32_t vm_id, uint32_t vcpu_count);
+    
+    // 资源管理
+    uint64_t total_memory;        // 总可用内存
+    uint64_t allocated_memory;    // 已分配内存
+    uint32_t total_vcpu;          // 总可用vCPU数
+    uint32_t allocated_vcpu;      // 已分配vCPU数
+    
+    // 性能监控
+    uint64_t total_vm_exits;      // 所有虚拟机的VM Exit总数
+    
+    // 错误处理
+    uint32_t last_error_code;     // 最后一次错误代码
+    char* last_error_message;     // 最后一次错误消息
+    
+} VirtualMachineCTL;
+
+// 初始化VirtualMachineCTL的函数声明
+EFI_STATUS init_virtual_machine_ctl(VirtualMachineCTL* vm_ctl);
+void vmx_exit_handler();

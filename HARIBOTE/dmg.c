@@ -125,20 +125,27 @@ void task_disk(){
 		
 	}
 	if(i<ahci_table_addr->number){
-		//void* p=task_now()->cons;
+		void* p=task_now()->cons;
 		//task_now()->cons=0;
-		void* file=fat32_init(NULL,device_id,part_base_lba);
+		CACHE_TABLE* cache_table=NULL;
+		cache_init(&cache_table);
+		FILE_OF_FAT32* file=fat32_init(NULL,device_id,part_base_lba);
+		file->cache=cache_table;
 		void* buff=memman_alloc_page_64_4m(NULL);
-		fat32_read_file_from_ahci(file,buff,0, 0x0f000000);
+		cache_table->device_id=file->device_id;
+		cache_table->pci_dev=file->pci_dev;
+		fat32_read_file_from_cache(file,buff,0, 0x0f000000);
 		//fat32_read(file,buff,0,0x0f000000);
 		//task_now()->cons=p;
+		
+		//CACHE_TABLE* cache_table;
+		//cache_init(&cache_table);
+		//cache_table->read(cache_table,0,0x1000+4*1024*1024,4*1024*1024*2);
+		//cache_table->read(cache_table,0,0x0000,4*1024*1024*2);
+		//cache_table->sync(cache_table);
+		
 		task_now()->root_dir_addr=buff;
-		cmd_dir(task_now()->cons);
-		void* cache_table;
-		cache_init(&cache_table);
-		read(cache_table,0,0x1000+4*1024*1024,4*1024*1024*2);
-		read(cache_table,0,0x0000,4*1024*1024*2);
-		sync(cache_table);
+		//cmd_dir(task_now()->cons);
 	}
 	return;
 	//dmg_read(0x00100000,0,1440*2,0);//读入启动扇区

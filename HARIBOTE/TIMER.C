@@ -126,6 +126,7 @@ void inthandler20(int *esp)
 	unsigned int index=0;
 	*(int*)(0xfec00040)=0;
 	*(int*)(0xfee000b0)=0;
+	//com_out_string(0x3f8,"TIMER INT 20\n");
 	timerctl[index].count++;
 	if(timerctl[index].count==0){//”@‰Ê?¶?‰ñ ??‚’uˆÊ?ú
 		timerctl[index].count64++;
@@ -165,6 +166,7 @@ void inthandler34(int *esp){
 	char ts = 0;
 	unsigned int index=1;
 	//io_out8(PIC0_OCW2, 0x60);	/* IRQ-00ó•tŠ®—¹‚ğPIC‚É’Ê’m */
+	//com_out_string(0x3f8,"TIMER INT 34\n");
 	*(int*)(0xfec00040)=0;
 	*(int*)(0xfee000b0)=0;
 	timerctl[index].count++;

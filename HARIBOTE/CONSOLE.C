@@ -440,6 +440,9 @@ void cons_runcmd(char *cmdline, struct CONSOLE *cons, int *fat, int memtotal)
 	else if (asm_sse_strcmp(cmdline,"dmgtask",7) == 0){//开启命令行虚拟机环境
 		task_disk();
 	}
+	else if (asm_sse_strcmp(cmdline,"type",7) == 0){
+		cmd_type_file(cons,cmdline);
+	}
 	else if (asm_sse_strcmp(cmdline,"ahcilist",8) == 0){
 		sprintf(buff,"ahci_table_addr: %ld %ld %ld\n",ahci_table_addr,(long long)100,(long long )55);
 		cons_putstr0(cons, buff);
@@ -453,9 +456,9 @@ void cons_runcmd(char *cmdline, struct CONSOLE *cons, int *fat, int memtotal)
 					break;
 				}
 				if(ahci_table_addr->ahci_dev[i].dev_info[j]!=NULL){
-					//cons_putstr0(cons, ahci_table_addr->ahci_dev[i].dev_info[j]->ModelNumber);
-					//sprintf(buff,"clb base: %x\n",ahci_table_addr->ahci_dev[i].clb_base[j]);
-					cons_putstr0(cons, "\r\n");
+					cons_putstr0(cons, ahci_table_addr->ahci_dev[i].dev_info[j]->ModelNumber);
+					sprintf(buff,"ahci_identify_info max_sectors_per_irq: %x\n",((ahci_identify_info*)ahci_table_addr->ahci_dev[i].clb_base[j])->max_sectors_per_irq);
+					cons_putstr0(cons, buff);
 					k++;
 				}
 			}
@@ -590,7 +593,50 @@ void find_intel_gpu(struct CONSOLE *cons){
         }
     }
 }
+void cmd_type_file(struct CONSOLE *cons,char* cmdline){
+    struct TASK *task = task_now();
+    if (task->root_dir_addr == 0) {
+        cons_putstr0(cons, "文件系统未准备就绪\n");
+        return;
+    }
 
+    FAT32_HEADER *mbr = *(unsigned int*)0x0026f024;
+    unsigned int fat32_addr = *(unsigned int*)0x0026f028;
+    unsigned int part_base_lba = *(unsigned int*)0x0026f030;
+
+    // 在根目录中查找test.txt文件
+    struct FILEINFO *finfo = file_search("test.txt", (struct FILEINFO *)(task->root_dir_addr), 224);
+    if (finfo == 0) {
+        cons_putstr0(cons, "file not found\n");
+        return;
+    }
+
+    // 分配内存用于存储文件内容
+    char *file_content = (char *)memman_alloc_4k(task->memman, finfo->size + 1);
+    if (file_content == 0) {
+        cons_putstr0(cons, "memory allocation failed\n");
+        return;
+    }
+
+    // 读取文件内容
+    unsigned int size = finfo->size;
+    if (_cons_read_file(file_content, &size, fat32_addr, part_base_lba, mbr, finfo->clustno, 0) != 0) {
+        cons_putstr0(cons, "文件读取file失败\n");
+        memman_free_4k(task->memman, (int)file_content, finfo->size + 1);
+        return;
+    }
+
+    // 确保字符串以null结尾
+    file_content[finfo->size] = '\0';
+
+    // 输出文件内容
+    cons_putstr0(cons, "test.txt的内容：\n");
+    cons_putstr0(cons, file_content);
+    cons_putstr0(cons, "\n");
+
+    // 释放内存
+    memman_free_4k(task->memman, (int)file_content, finfo->size + 1);
+}
 void cmd_rdrand(struct CONSOLE *cons, int memtotal){
 	char s[60];
 	int i=rdrand();
@@ -734,7 +780,7 @@ void cmd_fdir(struct CONSOLE *cons)
 	cons_newline(cons);
 	return;
 }
-
+FILE_OF_FAT32* finfo;
 void cmd_cd(struct CONSOLE *cons,char* cmdline){
 	struct PAGEMAN32 *pageman=*(struct PAGEMAN32 **)ADR_PAGEMAN;
 	struct MEMMAN *memman =  task_now()->memman;
@@ -879,9 +925,9 @@ int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline)
 	if (finfo == 0 && name[i - 1] != '.') {
 		/* 見つからなかったので後ろに".HRB"をつけてもう一度探してみる */
 		name[i    ] = '.';
-		name[i + 1] = 'H';
-		name[i + 2] = 'R';
-		name[i + 3] = 'B';
+		name[i + 1] = 'E';
+		name[i + 2] = 'F';
+		name[i + 3] = 'I';
 		name[i + 4] = 0;
 		finfo = file_search(name, task_now()->root_dir_addr, 224);
 	}
@@ -891,7 +937,7 @@ int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline)
 		appsiz = finfo->size;
 		//*(unsigned int*)0x0026f03c=finfo;
 		p = file_loadfile2(finfo->clustno, &appsiz, task_now()->fat);
-		if (appsiz >= 36 && strncmp(p + 4, "Hari", 4) == 0 && *p == 0x00) {
+		if (appsiz >= 36 && asm_sse_strcmp(p + 4, "Hari", 4) == 0 && *p == 0x00) {
 			segsiz = *((int *) (p + 0x0000));
 			esp    = *((int *) (p + 0x000c));
 			datsiz = *((int *) (p + 0x0010));
@@ -939,7 +985,10 @@ int cmd_app(struct CONSOLE *cons, int *fat, char *cmdline)
 			}
 			memman_free_4k(memman, (int) q, segsiz);
 			task->langbyte1 = 0;
-		} else {
+		}else if(0){
+			
+		} 
+		else {
 			cons_putstr0(cons, ".hrb file format error.\n");
 		}
 		for(i=0;i<((appsiz+0xfff)>>12);i++){
@@ -1285,6 +1334,7 @@ int *inthandler0c(int *esp)
 	cons_putstr0(cons, "\nINT 0C :\n Stack Exception.\n");
 	sprintf(s, "EIP = %08X\n", esp[11]);
 	cons_putstr0(cons, s);
+	for(;;);
 	return &(task->tss.rsp0);	/* 異常終了させる */
 }
 
@@ -1306,6 +1356,7 @@ int *inthandler0d(int *esp)
 	cons_putstr0(cons, s);
 	sprintf(s,"APP DS =%08X\n",esp[8]);
 	cons_putstr0(cons, s);
+	for(;;);
 	return &(task->tss.rsp0);	/* 異常終了させる */
 }
 

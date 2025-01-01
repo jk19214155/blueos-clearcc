@@ -2,12 +2,12 @@
 
 #include "bootpack.h"
 
-static struct FIFO32 *keyfifo;
-static int keydata0;
-static char buff[256];
+struct FIFO32 *keyfifo;
+int keydata0;
 void inthandler21(int *esp)
 {
 	int data;
+	char buff[256];
 	//io_out8(PIC0_OCW2, 0x61);	/* IRQ-01Žó•tŠ®—¹‚ðPIC‚É’Ê’m */
 	*(int*)(0xfec00040)=0;
 	*(int*)(0xfee000b0)=0;

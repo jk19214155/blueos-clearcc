@@ -192,9 +192,10 @@ void init_page(struct PAGEMAN32 *man){
 		*(unsigned long long*)i=(0x400000+0x1000*j) | 7;//4k页面，可读可写,存在标志,用户可以使用
 		j++;
 	}
-	*(unsigned long long*)0x268000=*(unsigned long long*)cr3;
+	for(i=0;i<1;i++){
+		*((unsigned long long*)0x268000+i)=*((unsigned long long*)cr3+i);
+	}
 	store_cr3(0x268000);
-	*(int*)i=0x268007;
 	//初始化内核紧急页表
 	j=0;
 	for (i=0x269000;i<0x26a000;i+=4){
@@ -216,70 +217,9 @@ void init_page(struct PAGEMAN32 *man){
 	}
 	*(unsigned int*)0x0026f004=man->total_page_num;
 	return;
-	for(i=0;i<128;i++){
-		if(meminfo[i].index==i){//区?信息完整
-			if(meminfo[i].base_addr_high!=0 || meminfo[i].length_high!=0){//属于高4G内存
-				continue;//不处理
-			}
-			addr_from=meminfo[i].base_addr_low;
-			addr_to=addr_from+meminfo[i].length_low;
-			if(meminfo[i].type!=1){//是不可用内存
-				addr_from&=0xfffff000;//4k向下取整
-				addr_to=(addr_to+0xfff)&0xfffff000;//向上取整
-			}
-			else{//是可用内存
-				addr_from=(addr_from+0xfff)&0xfffff000;//向上取整
-				addr_to&=0xfffff000;//4k向下取整
-			}
-			addr_from>>=12;
-			addr_to>>=12;
-			addr_from&=0x000fffff;//符号问题
-			addr_to&=0x000fffff;//符号问题
-			if(meminfo[i].type==1){//可用内存
-				a=0;
-			}
-			else{//不可用内存
-				a=128;
-			}
-			
-			for(j=addr_from;j<=addr_to;j++){
-				man->mem_map_base[j]=(unsigned char)a;
-				if(a==0){//增加可用内存计数
-					man->free_page_num++;
-				}
-				man->total_page_num++;//总内存计数
-			}
-		}
-		else{//信息校验失败(内存探测完成)
-			*(int*)0x0026f004=man->total_page_num;
-			*(int*)0x0026f008=man->free_page_num;
-			break;
-		}
-	}
-	*(int*)0x26f020=i;
-	for(i=0x01;i<0x00900;i++){//0x900000之前没有可用内存
-		if(man->mem_map_base[i]==0){
-			man->free_page_num--;
-		}
-		man->mem_map_base[i]=0xff;
-	}
-	//for(i=0xc0000;i<=0xfffff;i++){//0xc00000之后没有可用内存
-	//	man->mem_map_base[i]=0xff;
-	//}
-
-	return;
 }
 
-/*struct MEMINFO {
-	int base_addr_low;
-	int base_addr_high;
-	int length_low;
-	int length_high;
-	int type;
-	int index;
-	int undefind1;
-	int undifind2;
-}*/
+
 unsigned int memmam_link_page_32_m(struct PAGEMAN32 *man,unsigned int cr3_address,unsigned int linear_address,unsigned int physical_address,int page_num,int mode){
 	int i;
 	sprintf(buff,"memman_alloc: alloc page num %d linear_address: %x physical_address: %x\n",page_num,linear_address,physical_address);
@@ -514,6 +454,9 @@ unsigned long long memman_alloc_page_64_4k(struct PAGEMAN32 *man){
 			if(task_now()!=0){//记录内存使用情况
 				task_now()->mem_use++;
 			}
+			for(int j=0;j<4096;j++){
+				*(char*)(i*4096+j)=0;
+			}
 			return i*4096;//返回物理地址
 		}
 	}
@@ -696,6 +639,113 @@ unsigned long long memman_link_page_64(struct PAGEMAN32* pageman,unsigned long l
 	return *(unsigned long long*)addr;
 }
 
+unsigned long long memman_unlink_page_64(struct PAGEMAN32* pageman, unsigned long long cr3_address, unsigned long long linear_address) {
+    
+	
+	unsigned long long index, addr;
+    unsigned long long mask = 0xff8;
+    unsigned long long mask2 = 0xfff;
+
+    // 计算 PML4 索引
+    index = (linear_address >> 36) & mask;
+    addr = index + (cr3_address & 0xfffffffffffff000);
+
+    if (pageman == 0) {
+        pageman = pageman_get();
+    }
+
+    // 获取 PDPT 地址并检查有效性
+    if ((*(unsigned long long*)addr & 1) == 0) {
+        return 1;  // 目标页表不存在，直接返回
+    }
+    addr = (*(unsigned long long*)addr) & 0xfffffffffffff000;
+
+    // 计算 PDPT 索引并获取 PDT 地址
+    index = (linear_address >> 27) & mask;
+    addr = addr + index;
+    if ((*(unsigned long long*)addr & 1) == 0) {
+        return 1;  // 目标页表不存在，直接返回
+    }
+    addr = (*(unsigned long long*)addr) & 0xfffffffffffff000;
+
+    // 计算 PDT 索引并获取 PT 地址
+    index = (linear_address >> 18) & mask;
+    addr = addr + index;
+    if ((*(unsigned long long*)addr & 1) == 0) {
+        return 1;  // 目标页表不存在，直接返回
+    }
+    addr = (*(unsigned long long*)addr) & 0xfffffffffffff000;
+
+    // 计算 PT 索引并找到最终的物理页地址
+    index = (linear_address >> 9) & mask;
+    addr = addr + index;
+    if ((*(unsigned long long*)addr & 1) == 0) {
+        return 1;  // 物理页不存在，无需回收
+    }
+
+    // 释放最终的物理页
+    unsigned long long physical_address = (*(unsigned long long*)addr & 0xfffffffffffff000);
+    memman_free_page_64_4k(pageman, physical_address);
+    *(unsigned long long*)addr = 0;
+
+    // 检查是否可以释放 PT 页表
+    char is_empty = 1;
+    for (int i = 0; i < 512; i++) {
+        if (((unsigned long long*)addr)[i] == 0) {
+            is_empty = 0;
+            break;
+        }
+    }
+    if (is_empty) {
+        memman_free_page_64_4k(pageman, addr);
+        addr = (linear_address >> 18) & mask;
+        *(unsigned long long*)addr = 0;
+
+        // 检查并释放 PDT 页表
+        is_empty = 1;
+        for (int i = 0; i < 512; i++) {
+            if (((unsigned long long*)addr)[i] == 0) {
+                is_empty = 0;
+                break;
+            }
+        }
+        if (is_empty) {
+            memman_free_page_64_4k(pageman, addr);
+            addr = (linear_address >> 27) & mask;
+            *(unsigned long long*)addr = 0;
+
+            // 检查并释放 PDPT 页表
+            is_empty = 1;
+            for (int i = 0; i < 512; i++) {
+                if (((unsigned long long*)addr)[i] == 0) {
+                    is_empty = 0;
+                    break;
+                }
+            }
+            if (is_empty) {
+                memman_free_page_64_4k(pageman, addr);
+                addr = (linear_address >> 36) & mask;
+                *(unsigned long long*)addr = 0;
+
+                // 检查并释放 PML4 页表
+                is_empty = 1;
+                for (int i = 0; i < 512; i++) {
+                    if (((unsigned long long*)addr)[i] == 0) {
+                        is_empty = 0;
+                        break;
+                    }
+                }
+                if (is_empty) {
+                    memman_free_page_64_4k(pageman, addr);
+                }
+            }
+        }
+    }
+
+    return 0; // 回收成功
+}
+
+
 unsigned long long memman_link_page_64_4m(struct PAGEMAN32* pageman,unsigned long long cr3_address,unsigned long long linear_address,unsigned long long physical_address,unsigned int mode){
 	unsigned long long index,addr;
 	unsigned long long mask=0xff8;
@@ -745,12 +795,38 @@ unsigned int memman_link_page_64_m(struct PAGEMAN32 *man,unsigned long long cr3_
 			memman_link_page_64(man,cr3_address,linear_address+i*0x1000,physical_address+i*0x1000,mode);
 		}
 	}
-	*(int*)0x0026f00c=man->free_page_num;
 	i=load_cr3();
 	store_cr3(i);
 	io_sti();
 	return physical_address;
 }
+
+unsigned int memman_unlink_page_64_m(struct PAGEMAN32 *man,unsigned long long cr3_address,unsigned long long linear_address,int page_num){
+	return 0;
+	io_cli();
+	unsigned long long i;
+	if(man==0){
+		man=pageman_get();
+	}
+	if(cr3_address==NULL){
+		cr3_address=load_cr3();
+	}
+	if(1){
+		for(i=0;i<page_num;i++){
+			memman_unlink_page_64(man,cr3_address,linear_address+i*0x1000);
+		}
+	}
+	else{
+		for(i=0;i<page_num;i++){
+			memman_unlink_page_64(man,cr3_address,linear_address+i*0x1000);
+		}
+	}
+	i=load_cr3();
+	store_cr3(i);
+	io_sti();
+	return 0;
+}
+
 unsigned long long pageman_get_physical_address(unsigned long long cr3_address,unsigned long long linear_address){
 	unsigned long long index,addr;
 	unsigned long long mask=0xff8;
@@ -777,4 +853,136 @@ void pageman_set(struct PAGEMAN32* pageman){
 }
 void* pageman_get(){
 	return global_pageman_point;
+}
+
+// EFI AllocatePool with Physical Address Linking
+unsigned long long EFI_AllocatePool(EFI_MEMORY_TYPE PoolType, unsigned long long Size, void** Buffer) {
+    if (Buffer == NULL || Size == 0) {
+        return EFI_INVALID_PARAMETER; // 参数无效
+    }
+
+    // 4K 向上对齐分配大小
+    Size = (Size + 0xFFF) & ~0xFFF;
+
+    // 获取当前任务的内存管理器
+    struct MEMMAN *memman = task_now()->memman;
+    if (memman == NULL) {
+        return EFI_OUT_OF_RESOURCES; // 内存资源不足
+    }
+
+    // 分配线性地址空间
+    unsigned long long linear_address = memman_alloc_4k(memman, Size);
+    if (linear_address == 0) {
+        return EFI_OUT_OF_RESOURCES; // 分配失败，资源不足
+    }
+
+    // 连接物理地址，确保分配的线性地址有效
+    unsigned long long cr3_address = task_now()->tss.cr3;  // 获取当前任务的CR3地址
+    unsigned long long physical_address = memman_alloc_page_64(memman); // 分配物理页地址
+    if (physical_address == 0) {
+        // 回收线性地址并返回错误
+        memman_free_4k(memman, linear_address, Size);
+        return EFI_OUT_OF_RESOURCES;
+    }
+
+    // 链接线性地址和物理地址
+    memman_link_page_64_m(memman, cr3_address, linear_address, physical_address, Size/4096,0);
+
+    *Buffer = (void*)linear_address;
+	if(Size!=4096){//如果只有一个页面申请那么不记录
+		EFI_FreePool_set_size(Buffer,Size);
+	}
+    return EFI_SUCCESS;
+}
+
+struct _EFI_FreePool_table_struct{
+	void* this;
+	UINT64 size_of_this;
+	UINT64 item_number;
+	struct item_struct{
+		void* buff;
+		UINT64 size;
+	}item[0];
+}*_EFI_FreePool_table=0;
+
+unsigned long long EFI_FreePool(void* Buffer);
+
+void EFI_FreePool_set_size(void* Buffer,UINT64 size){
+	if(size==4096){
+		return;
+	}
+	if(_EFI_FreePool_table==0){
+		EFI_AllocatePool(0, 4096, &_EFI_FreePool_table);
+		_EFI_FreePool_table->this=_EFI_FreePool_table;
+		_EFI_FreePool_table->size_of_this=4096;
+		_EFI_FreePool_table->item_number=0;
+	}
+	else if(_EFI_FreePool_table->this==0){
+		asm_memcpy(Buffer,_EFI_FreePool_table,_EFI_FreePool_table->size_of_this);//复制内容
+		EFI_FreePool(_EFI_FreePool_table);//释放原本的内存
+		_EFI_FreePool_table=Buffer;
+		_EFI_FreePool_table->size_of_this=size;
+		_EFI_FreePool_table->this=_EFI_FreePool_table;
+		return;
+	}
+	
+	UINT32 size_1=sizeof(struct _EFI_FreePool_table_struct);
+	UINT32 size_2=sizeof(_EFI_FreePool_table->item[0]);
+	
+	UINT32 size_3=_EFI_FreePool_table->item_number*size_2+size_1;
+	if(size_3>_EFI_FreePool_table->size_of_this){//如果超过了大小上限
+		_EFI_FreePool_table->this=0;
+		EFI_AllocatePool(0, size_3, &_EFI_FreePool_table);
+	}
+	_EFI_FreePool_table->item[_EFI_FreePool_table->item_number].buff=Buffer;
+	_EFI_FreePool_table->item[_EFI_FreePool_table->item_number].size=size;
+	
+	
+	_EFI_FreePool_table->item_number++;
+	return;
+}
+
+UINT64 EFI_FreePool_get_size(void* Buffer){
+	int i;
+	if(Buffer==_EFI_FreePool_table){
+		return _EFI_FreePool_table->size_of_this;
+	}
+	for(i=0;i<_EFI_FreePool_table->item_number;i++){
+		if(_EFI_FreePool_table->item[i].buff==Buffer){
+			break;
+		}
+	}
+	if(i<_EFI_FreePool_table->item_number){//没找到
+		return _EFI_FreePool_table->item[i].size;
+	}
+	else{
+		return 4096;
+	}
+}
+
+// EFI FreePool with Physical Address Unlinking
+unsigned long long EFI_FreePool(void* Buffer) {
+    if (Buffer == NULL) {
+        return EFI_INVALID_PARAMETER; // 参数无效
+    }
+
+    // 获取当前任务的内存管理器
+    struct MEMMAN *memman = task_now()->memman;
+    if (memman == NULL) {
+        return EFI_NOT_FOUND; // 当前任务无有效内存管理器
+    }
+
+    unsigned long long linear_address = (unsigned long long)Buffer;
+    unsigned long long cr3_address = task_now()->tss.cr3;
+
+    // 取消链接物理地址
+	UINT64 pagenum=EFI_FreePool_get_size(Buffer)/4096;
+    unsigned long long result = memman_unlink_page_64_m(memman, cr3_address, linear_address,pagenum);
+    if (result != 0) {
+        return EFI_NOT_FOUND; // 未找到链接的页表
+    }
+
+    // 释放线性地址空间
+    memman_free_4k(memman, linear_address, 0x1000);
+    return EFI_SUCCESS;
 }

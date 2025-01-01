@@ -120,7 +120,8 @@ io_store_eflags:	; void io_store_eflags(int eflags);
 load_gdtr:		; void load_gdtr(int limit, int addr);
 		;push eax
 		push rdx
-		push cx
+		sub esp,2
+		mov [esp],cx
 		lgdt [rsp]
 		add rsp,10
 		;64位0特权级所有段寄存器清零
@@ -664,11 +665,11 @@ start_app:		; void start_app(int eip, int cs, int esp, int ds, int *tss_esp0);
 		
 		mov		rbp,[rsp+ip_size+gpr_size*8]	; tss.esp0の番地
 		mov		[rbp  ],rsp		; os用のespを保孁e
-		mov		[rbp+4],ss		; os用のssを保孁e
-		mov		es,bx
-		mov		ds,bx
-		mov		fs,bx
-		mov		gs,bx
+		mov		[rbp+8],ss		; os用のssを保孁e
+		mov		es,r9d
+		mov		ds,r9d
+		mov		fs,r9d
+		mov		gs,r9d
 		;db 0x0f,0x35;sys_ret
 ;	以下�eretfでアプリに行かせるためのスタチe��調整
 		or		eax,3			; アプリ用のセグメント番号に3をorする
@@ -712,16 +713,18 @@ support_apic: ;int support_apic(void):
 	cpuid
 	bt edx,9
 	setc al
-	movzx eax,al
+	movzx rax,al
 	pop rdx
 	ret
-io_rdmsr: ;void io_rdmsr(int* edx,int* eax,int ecx)
+io_rdmsr: ;void io_rdmsr(unsigned long long ecx,unsigned long long* edx,unsigned long long* eax)
 	;db 0x0f,0x32 ;rdmsr
+	push rdx
 	rdmsr
-	mov [r8],rax
-	mov [rdx],rdx
+	mov [r8],eax
+	pop rax
+	mov [rax],edx
 	ret
-io_wrmsr: ;void io_wrmsr(int edx,int eax,int ecx)
+io_wrmsr: ;void io_wrmsr(unsigned long long ecx,unsigned long long edx,unsigned long long eax)
 	;db 0x0f,0x30 ;wrmsr
 	mov rax,r8
 	wrmsr
@@ -1048,8 +1051,17 @@ asm_x64_cs_init:
 asm_get_cs:
 	mov rax,cs
 	ret
+global asm_vmlaunch
+asm_vmlaunch:
+	vmlaunch
+	ret
+global asm_vmresume
+asm_vmresume:
+	vmresume
+	ret	
 ;void asm_sheet_refreshsub32(void* struct SHEET_REFRESH_PACK_32 pack);
 asm_sheet_refreshsub32:
+	cli
 	push rbx
 	push rsi
 	push rdi
@@ -1112,6 +1124,7 @@ asm_sheet_refreshsub32:
 	pop rdi
 	pop rsi
 	pop rbx
+	sti
 	ret
 
 
