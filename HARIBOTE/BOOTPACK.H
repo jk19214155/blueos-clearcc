@@ -10,6 +10,7 @@ int dmg_write(void* buff,int lba28,int block_number,int divice);
 EFI_SYSTEM_TABLE* get_sys_table_addr();
 EFI_GUID* get_var_guid();
 void test3();
+
 //EFI分区的代码
 #define gUidPartTypeEFI {0xC12A7328,0xF81F,0x11D2,{0xBA, 0x4B, 0x00, 0xA0, 0xC9, 0x3E, 0xC9, 0x3B}
 //数据分区的代码
@@ -331,6 +332,21 @@ struct PAGEMAN32 {
 	unsigned int total_page_num;
 	unsigned char* mem_map_base; 
 };
+
+struct inthandler0e_handling_info{
+	unsigned long long cr2;
+	unsigned long long cr3;
+	struct TASK* task;
+};
+
+struct inthandler0e_handling_function{
+	unsigned long long handling_number;
+	struct handling{
+		unsigned long long handling_index;
+		long long (*function)(struct inthandler0e_handling_info* p);
+	}handling[0];
+};
+
 unsigned int memtest(unsigned int start, unsigned int end);
 void memman_init(struct MEMMAN *man);
 unsigned long long memman_total(struct MEMMAN *man);
@@ -349,7 +365,7 @@ unsigned int pageman_unlink_page_32_m(struct PAGEMAN32 *man,unsigned int linear_
 unsigned pageman_unlink_page_32(struct PAGEMAN32 *man,unsigned int linear_address,int mode);
 unsigned long long memman_link_page_64(struct PAGEMAN32* pageman,unsigned long long cr3_address,unsigned long long linear_address,unsigned long long physical_address,unsigned int mode);
 unsigned int memman_link_page_64_m(struct PAGEMAN32 *man,unsigned long long cr3_address,unsigned long long linear_address,unsigned long long physical_address,int page_num,int mode);
-int inthandler0e(int cr2,int* esp);
+int inthandler0e(unsigned long long cr2,unsigned long long* esp);
 unsigned int get_physical_by_linear_32(unsigned int linear_address);
 unsigned long long pageman_get_physical_address(unsigned long long cr3_address,unsigned long long linear_address);
 void pageman_set(struct PAGEMAN32* pageman);
@@ -1326,11 +1342,22 @@ typedef struct _blueos_vmcs{
 	void* ept;//扩展页表
 } BLUEOS_VMCS;
 /*cache.c*/
+
+#define CACHE_BLOCK_IDLE  0
+#define CACHE_BLOCK_ENABLE 1
+#define CACHE_BLOCK_ACTIVE 2
+#define CACHE_BLOCK_DIRTY 3
+
 typedef struct {
     unsigned long long lba;
     unsigned int size; // Size in bytes
     char *buffer;
-    char valid; // 判断是否空闲
+    unsigned long long valid; // 判断是否空闲
+	unsigned long long flags;/*
+	0: CACHE_BLOCK_DIRTY状态下禁止写回磁盘
+	1.：此缓存块禁止被释放
+	2：CACHE_BLOCK_ENABLE状态下不从磁盘读取内容而直接变为CACHE_BLOCK_ACTIVE
+	*/
 } CACHE_BLOCK;
 
 typedef struct {
@@ -1338,33 +1365,28 @@ typedef struct {
     char *sbuffer;//源变址
 	char *dbuffer;//目的变址
     unsigned long long size; // Size in bytes
-    char valid; // 判断是否空闲
+    unsigned long long valid; // 判断是否空闲
 } REQUEST;
 
 
 typedef struct {
     CACHE_BLOCK* cache_blocks_point;
 	unsigned long long flags;
-    //char *buffer;
-    //unsigned long long offset;
-    //unsigned long long size; // Size in bytes
-    //unsigned long long lba;
-    char valid; // 判断是否空闲
+    unsigned long long valid; // 判断是否空闲
 } SYNC_REQUEST;
 #define CACHE_SIZE (4 * 1024 * 1024) // Example cache block size: 4 MB
 #define MAX_CACHES 128       // Maximum number of cache blocks
 #define MAX_REQUESTS 128      // Maximum number of requests
 #define MAX_SYNC_REQUESTS 32 // Maximum number of sync requests
-#define CACHE_BLOCK_ACTIVE 1
-#define CACHE_BLOCK_ENABLE 2
-#define CACHE_BLOCK_IDLE 0
 
 #define SYNC_REQUEST_WRITE 1
 #define SYNC_REQUEST_READ 0
 
 typedef struct {
 	EFI_STATUS (*read)(void *this, void *buff, unsigned long long offset, unsigned long long size);
+	EFI_STATUS (*write)(void *this, void *buff, unsigned long long offset, unsigned long long size);
 	EFI_STATUS (*sync)(void *this);
+	EFI_STATUS (*flush)(void* this);
     CACHE_BLOCK cache_blocks[MAX_CACHES];
     CACHE_BLOCK* cache_blocks_point[MAX_CACHES];
     REQUEST requests[MAX_REQUESTS];
@@ -1403,7 +1425,7 @@ typedef struct _FILE_OF_FAT32{
 	CACHE_TABLE* cache;
 	
 }FILE_OF_FAT32;
-FILE_OF_FAT32* fat32_init(FILE_OF_FAT32* file_info,unsigned int device_id,unsigned long long part_base_lba);
+FILE_OF_FAT32* fat32_init(FILE_OF_FAT32* file_info,CACHE_TABLE* cache_table ,unsigned int device_id,unsigned long long part_base_lba);
 EFI_STATUS fat32_read_file_from_cache(FILE_OF_FAT32* this, void* buff, unsigned long long offset, unsigned long long size);
 /*efi.c*/
 #pragma pack(push, 1)

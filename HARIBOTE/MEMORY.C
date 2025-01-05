@@ -6,6 +6,19 @@
 #define EFLAGS_AC_BIT		0x00040000
 #define CR0_CACHE_DISABLE	0x60000000
 char buff[128];
+struct inthandler0e_handling_function* inthandler0e_handling_function;
+struct {
+    unsigned long long handling_number;
+    struct {
+        long long (*function)(struct inthandler0e_handling_info* p);
+    } handling[8]; // 定义实际大小
+} inthandler0e_handling_function0 = {
+    .handling_number = 8,
+    .handling = {
+        { NULL }, { NULL }, { NULL }, { NULL },
+        { NULL }, { NULL }, { NULL }, { NULL }
+    }
+};
 unsigned int memtest(unsigned int start, unsigned int end)
 {
 	char flg486 = 0;
@@ -216,6 +229,7 @@ void init_page(struct PAGEMAN32 *man){
 		}
 	}
 	*(unsigned int*)0x0026f004=man->total_page_num;
+	inthandler0e_handling_function = &inthandler0e_handling_function0;
 	return;
 }
 
@@ -484,6 +498,7 @@ unsigned long long memman_alloc_page_64_4m(struct PAGEMAN32 *man){
 	}
 	unsigned long long i,j;
 	for(i=0;i<0x100000;i+=1024){
+		int j;
 		for(j=0;j<1024;j++){
 			if(man->mem_map_base[i+j]!=0){
 				break;
@@ -491,13 +506,16 @@ unsigned long long memman_alloc_page_64_4m(struct PAGEMAN32 *man){
 		}
 		if(j==1024){
 			for(j=0;j<1024;j++){
-				man->mem_map_base[i+j]==1;
+				man->mem_map_base[i+j]=1;
 			}
 			man->free_page_num-=1024;
 			if(task_now()!=0){//记录内存使用情况
 				task_now()->mem_use+=1024;
 			}
 			return i*4096;//返回物理地址
+		}
+		else{
+			i+=j;
 		}
 	}
 	*(int*)0x0026f010=man->free_page_num;//记录最后一次内存请求失败的时候的free值
@@ -588,11 +606,39 @@ void memman_copy_page_32_m(struct PAGEMAN32 *man,unsigned int cr3_address_s,int 
 	return;
 }
 
-int inthandler0e(int cr2,int* esp){
+int inthandler0e(unsigned long long cr2,unsigned long long* esp){
 	struct PAGEMAN32 *pageman=*(struct PAGEMAN32 **)ADR_PAGEMAN;
+	struct inthandler0e_handling_info info={
+		.cr2=cr2,
+		.cr3=load_cr3(),
+		.task=task_now(),
+	};
 	if(*esp&1){//缺页故障
-		memman_link_page_32(pageman,(task_now()->tss).cr3,cr2&0xfffff000,7,0);
-		return 0;
+		long long i,res;
+		for(i=0;i<inthandler0e_handling_function->handling_number;i++){
+			if(inthandler0e_handling_function->handling[i].function!=0 && inthandler0e_handling_function->handling[i].handling_index!=0){
+				int index=inthandler0e_handling_function->handling[i].handling_index&0xfe;
+				int index_now=cr2&0xfe;
+				if(index==index_now){
+					res=inthandler0e_handling_function->handling[i].function(&info);
+					if(res=0){
+						break;
+					}
+				}
+				else{
+					continue;
+				}
+			}
+		}
+		if(i<inthandler0e_handling_function->handling_number){//处理成功
+			
+		}
+		else{//处理失败
+			
+		}
+	}
+	else if(*esp&(1<<3)){//由应用程序引发
+		
 	}
 	else{
 		for(;;){
@@ -638,6 +684,47 @@ unsigned long long memman_link_page_64(struct PAGEMAN32* pageman,unsigned long l
 	*(unsigned long long*)addr=physical_address;
 	return *(unsigned long long*)addr;
 }
+
+unsigned long long memman_find_addr_64(struct PAGEMAN32* pageman,unsigned long long cr3_address,unsigned long long linear_address){
+	unsigned long long index, addr;
+    unsigned long long mask = 0xff8;
+    unsigned long long mask2 = 0xfff;
+
+    // 计算 PML4 索引
+    index = (linear_address >> 36) & mask;
+    addr = index + (cr3_address & 0xfffffffffffff000);
+
+    if (pageman == 0) {
+        pageman = pageman_get();
+    }
+
+    // 获取 PDPT 地址并检查有效性
+    if ((*(unsigned long long*)addr & 1) == 0) {
+        return addr;  // 目标页表不存在，直接返回
+    }
+    addr = (*(unsigned long long*)addr) & 0xfffffffffffff000;
+
+    // 计算 PDPT 索引并获取 PDT 地址
+    index = (linear_address >> 27) & mask;
+    addr = addr + index;
+    if ((*(unsigned long long*)addr & 1) == 0) {
+        return addr;  // 目标页表不存在，直接返回
+    }
+    addr = (*(unsigned long long*)addr) & 0xfffffffffffff000;
+
+    // 计算 PDT 索引并获取 PT 地址
+    index = (linear_address >> 18) & mask;
+    addr = addr + index;
+    if ((*(unsigned long long*)addr & 1) == 0) {
+        return addr;  // 目标页表不存在，直接返回
+    }
+    addr = (*(unsigned long long*)addr) & 0xfffffffffffff000;
+
+    // 计算 PT 索引并找到最终的物理页地址
+    index = (linear_address >> 9) & mask;
+    addr = addr + index;
+	return addr;
+} 
 
 unsigned long long memman_unlink_page_64(struct PAGEMAN32* pageman, unsigned long long cr3_address, unsigned long long linear_address) {
     
@@ -813,7 +900,7 @@ unsigned int memman_unlink_page_64_m(struct PAGEMAN32 *man,unsigned long long cr
 	}
 	if(1){
 		for(i=0;i<page_num;i++){
-			memman_unlink_page_64(man,cr3_address,linear_address+i*0x1000);
+			memman_unlink_page_64(man,cr3_address,linear_address&0xfffffffffffff000+i*0x1000);
 		}
 	}
 	else{

@@ -376,6 +376,7 @@ void cons_putstr0(struct CONSOLE *cons, char *s)
 	if(cons==0){
 		return;
 	}
+	com_out_string(0x3f8,s);
 	for (; *s != 0; s++) {
 		cons_putchar(cons, *s, 1);
 	}

@@ -12,13 +12,13 @@ MAKE     = $(TOOLPATH)make.exe -r
 NASK     = $(TOOLPATH)nask.exe
 NASM     = $(TOOLPATH)nasm.exe
 GCC      = $(TOOLPATH)MinGW/bin/gcc.exe -I$(INCPATH) -I ./include -m32  -nostdlib -fno-builtin -ffreestanding \
-			-fno-stack-protector -Os -fno-pic -fno-pie -fno-asynchronous-unwind-tables  \
+			-fno-stack-protector -Os -fPIC -fPIE -fno-asynchronous-unwind-tables  \
 			-fomit-frame-pointer -O0 -finput-charset=UTF-8 -w -c
 GCC64      = $(TOOLPATH)mingw64/bin/gcc.exe -I$(INCPATH) -I ./include -m64  -nostdlib -fno-builtin -ffreestanding \
-			-fno-stack-protector -Os -fno-pic -fno-pie -fno-asynchronous-unwind-tables  \
+			-fno-stack-protector -Os -fPIC -fPIE -fno-asynchronous-unwind-tables  \
 			-fomit-frame-pointer -O0 -finput-charset=UTF-8 -w -c 
 GCC64s = $(TOOLPATH)mingw64/bin/gcc.exe -I$(INCPATH) -I ./include -m64 -nostdlib -fno-builtin -ffreestanding \
-        -fno-stack-protector -Os -fno-pic -fno-pie -fno-asynchronous-unwind-tables \
+        -fno-stack-protector -Os -fPIC -fPIE-fno-asynchronous-unwind-tables \
         -fomit-frame-pointer -O0 -finput-charset=UTF-8 -Wall -Wextra -Werror \
         -Wmissing-prototypes -Wstrict-prototypes -Wimplicit-function-declaration \
         -Wredundant-decls -Wshadow -c
@@ -26,6 +26,10 @@ GCC64s = $(TOOLPATH)mingw64/bin/gcc.exe -I$(INCPATH) -I ./include -m64 -nostdlib
 GCC64p      = $(TOOLPATH)mingw64/bin/x86_64-w64-mingw32-gcc.exe -I$(INCPATH) -I ./include -m64   -fno-builtin -ffreestanding \
 			-fno-stack-protector -Os -fno-pic -fno-pie -fno-asynchronous-unwind-tables  \
 			-fomit-frame-pointer -O0 -finput-charset=UTF-8 -w 
+GCCMAC64p      = $(TOOLPATH)mingw64/bin/x86_64-w64-mingw32-gcc.exe -I$(INCPATH) -I ./include -m64   -fno-builtin -ffreestanding \
+			-fno-stack-protector -Os -fno-pic -fno-pie -fno-asynchronous-unwind-tables  \
+			-fomit-frame-pointer -O0 -finput-charset=UTF-8 -w 
+
 LD		= $(TOOLPATH)mingw64/bin/ld.exe
 CC1      = $(TOOLPATH)cc1.exe -I$(INCPATH) -Os -Wall -quiet
 GAS2NASK = $(TOOLPATH)gas2nask.exe -a

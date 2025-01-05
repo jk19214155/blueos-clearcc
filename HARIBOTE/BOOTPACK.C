@@ -361,7 +361,9 @@ void HariMain(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable)
 	}
 	active_sheet_ctl = (unsigned long long) shtctl[shtctl_point];//当前正在显示的图层
 	*((int*)0x0026f018)=shtctl;//保存图层数组
-	
+	//清除ahci状态
+	*(int*)(0xfec00040)=0;
+	*(int*)(0xfee000b0)=0;
 	io_sti();
 	/* sht_back */
 	//第一屏幕背景
@@ -419,7 +421,7 @@ void HariMain(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable)
 	
 	
 	/*初始化AHCI控制器*/
-	//ahci_table_addr=ahci_init_all();
+	ahci_table_addr=ahci_init_all();
 	com_out_string(0x3f8,"ahci ready\n");
 goto st_next;
 	/* nihongo.fntの読み込み */

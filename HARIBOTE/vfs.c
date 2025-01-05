@@ -9,3 +9,4 @@ typedef struct _VFS{
     EFI_STATUS (*write)(struct _VFS* this,void* buff,unsigned long long seek,unsigned long long size);
 }VFS;
 
+
