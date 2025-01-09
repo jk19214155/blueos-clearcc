@@ -1,12 +1,115 @@
 #include "bootpack.h"
 
+EFI_STATUS fat32_find_node_from_fat(FILE_OF_FAT32* this,unsigned int* node){
+		for (unsigned int i = 2; i < 4096; i++) {
+			if (this->fat32_fat[i] == 0) { // 找到未分配簇
+				*node=i;
+				return EFI_SUCCESS;
+			}
+		}
+		return EFI_OUT_OF_RESOURCES;
+}
 
+EFI_STATUS fat32_create_file_from_cache(FILE_OF_FAT32* this, char* file_name) {
+	char text_buff[128];
+    if (!this || !file_name) {
+        return EFI_INVALID_PARAMETER;
+    }
+	cons_putstr0(task_now()->cons,"fat32_create_file_from_cache running\n");
+    FAT32_HEADER* mbr = this->mbr;
+    unsigned int cluster_size = mbr->BPB_BytesPerSec * mbr->BPB_SecPerClus;
+    unsigned int current_cluster = this->node_id;
 
-extern char* text_buff;
+    // 1. 查找空目录项（支持跨簇）
+    unsigned char* cluster_buffer = memman_alloc_page_64_4m(NULL);
+    if (!cluster_buffer) {
+        return EFI_OUT_OF_RESOURCES;
+    }
 
+    unsigned char* free_entry = NULL;
+	int while_number=0;
+    while (1) {
+		//sprintf(text_buff,"dmg prdbc:%ld\n",prdbc);
+		cons_putstr0(task_now()->cons,"find while");
+		//读入文件内容
+        EFI_STATUS status = this->fread(this, cluster_buffer, while_number * cluster_size, cluster_size);
+        if (status != EFI_SUCCESS) {
+            memman_free_page_64_4m(NULL,cluster_buffer);
+            return EFI_DEVICE_ERROR;
+        }
 
-EFI_STATUS fat32_create_file_from_cache(FILE_OF_FAT32* this, void* buff, unsigned long long offset, unsigned long long size){
+        // 查找空目录项
+        for (unsigned int i = 0; i < cluster_size; i += 32) {
+            if (cluster_buffer[i] == 0x00 || cluster_buffer[i] == 0xE5) {
+                free_entry = &cluster_buffer[i];
+                break;
+            }
+        }
+
+        if (free_entry)
+			break;
+		while_number++;
+        // 到达当前簇的末尾，获取下一个簇号
+        unsigned int next_cluster = this->fat32_fat[current_cluster];
+        if (next_cluster >= 0x0FFFFFF8) { // 无法继续，需要分配新簇
+            for (unsigned int i = 2; i < mbr->BPB_TotSec32 / mbr->BPB_SecPerClus; i++) {
+                if (this->fat32_fat[i] == 0) { // 找到未分配簇
+                    this->fat32_fat[i] = 0x0FFFFFFF; // 标记为结束
+                    this->fat32_fat[current_cluster] = i; // 链接新簇
+                    current_cluster = i;
+                    break;
+                }
+            }
+
+            if (this->fat32_fat[current_cluster] != 0x0FFFFFFF) {
+                memman_free_page_64_4m(NULL,cluster_buffer);
+                return EFI_OUT_OF_RESOURCES; // 分配失败
+            }
+
+            // 新簇数据为空，跳过写入 0 操作
+        } else {
+            current_cluster = next_cluster;
+        }
+    }
+	cons_putstr0(task_now()->cons,"fat32_create_file_from_cache long name\n");
+	unsigned int lfn_entry_count=0;
+    // 2. 处理长文件名
+	cons_putstr0(task_now()->cons,"fat32_create_file_from_cache short name\n");
+    // 填写短文件名
+    FAT32_FILE_INFO* sfn_entry = free_entry;
+	unsigned int new_node;
+	fat32_find_node_from_fat(this,&new_node);
+	//this->fat32_fat[new_node]=0x0fffffff;不再分配空间
+	sfn_entry->type=0x20;
+	sfn_entry->start_low=0;
+	sfn_entry->start_high=0;
+	sfn_entry->create_time=0x0030;
+	sfn_entry->creat_time_ms=0;
+	sfn_entry->create_data=0x4A21;
+	sfn_entry->last_found=1;
+	sfn_entry->change_time=0x0030;
+	sfn_entry->change_data=0x4A21;
+	sfn_entry->file_size=0;
 	
+    asm_memcpy((char*)sfn_entry, file_name, 11); // 短文件名
+	cons_putstr0(task_now()->cons,"fat32_create_file_from_cache write dir\n");
+    // 写入目录簇并同步
+    EFI_STATUS status = this->fwrite(this, cluster_buffer, while_number * cluster_size, cluster_size);
+    if (status != EFI_SUCCESS) {
+        memman_free_page_64_4m(NULL,cluster_buffer);
+        return EFI_DEVICE_ERROR;
+    }
+	//写入磁盘块并同步
+	for(int i=0;i<this->mbr->BPB_NumFATs;i++){
+		this->cache->write(this->cache,this->fat32_fat,(this->part_base_lba+this->mbr->BPB_ResvdSecCnt+i*this->mbr->BPB_FATSz32)*512,this->mbr->BPB_FATSz32*512);
+	}
+    this->cache->sync(this->cache);
+	cons_putstr0(task_now()->cons,"fat32_create_file_from_cache flush fat\n");
+    // 3. 更新 FAT 表
+    this->cache->flush(this->cache);
+
+    memman_free_page_64_4m(NULL,cluster_buffer);
+    return EFI_SUCCESS;
 }
 
 
@@ -162,7 +265,8 @@ AHCI_SATA_FIS* fis[MAX_FIS];
 
 
 EFI_STATUS fat32_read_file_from_ahci(FILE_OF_FAT32* this, void* buff, unsigned long long offset, unsigned long long size) {
-    // 检查参数对齐
+    char text_buff[128];
+	// 检查参数对齐
 	cons_putstr0(task_now()->cons, "fat32:read_file_from_ahci start\n");
 	sprintf(text_buff,"mbr:%ld\n",this->mbr);
 	cons_putstr0(task_now()->cons,text_buff);
@@ -372,6 +476,9 @@ FILE_OF_FAT32* fat32_init(FILE_OF_FAT32* file_info,CACHE_TABLE* cache_table ,uns
 	//注册函数
 	file_info->fread=fat32_read_file_from_cache;
 	file_info->fwrite=fat32_write_file_from_cache;
+	
+	fat32_create_file_from_cache(file_info,"FSA         ");
+	
 	return file_info;
 }
 

@@ -475,11 +475,13 @@ void cons_runcmd(char *cmdline, struct CONSOLE *cons, int *fat, int memtotal)
 	else if(asm_sse_strcmp(cmdline,"ahcidir0",8) == 0){
 		task_disk();
 	}
-	else if (cmdline[0] != 0) {
-		if (cmd_app(cons, fat, cmdline) == 0) {
+	else if (asm_sse_strcmp(cmdline,"run ",4)) {
+		if (cmd_app(cons, fat, cmdline + 4) == 0) {
 			/* コマンドではなく、アプリでもなく、さらに空行でもない */
-			cons_putstr0(cons, "Bad command0.\n\n");
 		}
+	}
+	else{
+		cons_putstr0(cons, "Bad command.\n\n");
 	}
 	return;
 }

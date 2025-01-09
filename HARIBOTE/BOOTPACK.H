@@ -58,7 +58,7 @@ typedef struct {
 	unsigned char ext[3];
 	unsigned char type; //1:只读 2：隐藏 4：系统 8：卷标 0x10：子目录 0x20：归档
 	unsigned char res1;
-	unsigned char creat_time[10];
+	unsigned char creat_time_ms;
 	unsigned short create_time;
 	unsigned short create_data;
 	unsigned short last_found;
