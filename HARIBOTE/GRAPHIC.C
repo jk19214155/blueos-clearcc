@@ -2,6 +2,16 @@
 
 #include "bootpack.h"
 
+EFI_STATUS i915_init(void){
+	char* pci_dev=malloc(sizeof(PCI_DEV));
+	EFI_STATUS status;
+	status=pcie_find_dev_by_class(pci_dev,0x0300);
+	if(status!=0){
+		return status;
+	}
+	return 0;
+}
+
 void init_palette(void)
 {
 	static unsigned char table_rgb[16 * 3] = {

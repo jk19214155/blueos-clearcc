@@ -1,7 +1,10 @@
 OBJS_BOOTPACK = bootpack.obj naskfunc.obj hankaku.obj graphic.obj dsctbl.obj \
 		int.obj fifo.obj keyboard.obj mouse.obj memory.obj sheet.obj timer.obj \
 		mtask.obj window.obj console.obj file.obj tek.obj dav.obj desktop.obj view.obj system.obj acpi.obj bmp.obj  dmg.obj drvier.obj \
-		fifo_mouse.obj com.obj vmx.obj ahci.obj pcie.obj sse.obj sprintf.obj memory_disk_sync.obj fat32.obj font.obj efi.obj cache.obj systemtable.obj
+		fifo_mouse.obj com.obj vmx.obj ahci.obj pcie.obj sse.obj sprintf.obj memory_disk_sync.obj fat32.obj font.obj efi.obj cache.obj systemtable.obj \
+		stdfunc.obj  sqlite_os.obj\
+		sqlite3.obj
+OBJS_BOOTPACK_WITH_CPP = 
 
 EFI_APP_LIST = shell.efi
 
@@ -14,16 +17,15 @@ NASM     = $(TOOLPATH)nasm.exe
 GCC      = $(TOOLPATH)MinGW/bin/gcc.exe -I$(INCPATH) -I ./include -m32  -nostdlib -fno-builtin -ffreestanding \
 			-fno-stack-protector -Os -fPIC -fPIE -fno-asynchronous-unwind-tables  \
 			-fomit-frame-pointer -O0 -finput-charset=UTF-8 -w -c
+GXX64 = $(TOOLPATH)mingw64/bin/g++.exe -I$(INCPATH) -I ./include -m64  -nostdlib \
+        -ffreestanding -fno-stack-protector -Os -fPIC -fPIE -fno-asynchronous-unwind-tables \
+        -fomit-frame-pointer -O0 -finput-charset=UTF-8 -std=c++17 -fno-rtti -fno-exceptions -w -c
 GCC64      = $(TOOLPATH)mingw64/bin/gcc.exe -I$(INCPATH) -I ./include -m64  -nostdlib -fno-builtin -ffreestanding \
 			-fno-stack-protector -Os -fPIC -fPIE -fno-asynchronous-unwind-tables  \
-			-fomit-frame-pointer -O0 -finput-charset=UTF-8 -w -c 
-GCC64s = $(TOOLPATH)mingw64/bin/gcc.exe -I$(INCPATH) -I ./include -m64 -nostdlib -fno-builtin -ffreestanding \
-        -fno-stack-protector -Os -fPIC -fPIE-fno-asynchronous-unwind-tables \
-        -fomit-frame-pointer -O0 -finput-charset=UTF-8 -Wall -Wextra -Werror \
-        -Wmissing-prototypes -Wstrict-prototypes -Wimplicit-function-declaration \
-        -Wredundant-decls -Wshadow -c
+			-fomit-frame-pointer -O0 -finput-charset=UTF-8 -w -c
 
-GCC64p      = $(TOOLPATH)mingw64/bin/x86_64-w64-mingw32-gcc.exe -I$(INCPATH) -I ./include -m64   -fno-builtin -ffreestanding \
+
+GCC64p      = $(TOOLPATH)mingw64/bin/x86_64-w64-mingw32-g++.exe -I$(INCPATH) -I ./include -m64   -fno-builtin -ffreestanding \
 			-fno-stack-protector -Os -fno-pic -fno-pie -fno-asynchronous-unwind-tables  \
 			-fomit-frame-pointer -O0 -finput-charset=UTF-8 -w 
 GCCMAC64p      = $(TOOLPATH)mingw64/bin/x86_64-w64-mingw32-gcc.exe -I$(INCPATH) -I ./include -m64   -fno-builtin -ffreestanding \
@@ -55,8 +57,8 @@ default :
 	$(MAKE) $(EFI_APP_LIST)
 
 # �t�@�C�������K��
-bootpack.sys : $(OBJS_BOOTPACK)
-	$(GCC64p) -o bootpack.sys -nostdlib  -s -Wl,--subsystem,10 -e HariMain -static-libgcc -shared $(OBJS_BOOTPACK)
+bootpack.sys : $(OBJS_BOOTPACK) $(OBJS_BOOTPACK_WITH_CPP)
+	$(GCC64p) -o bootpack.sys -nostdlib  -s -Wl,--subsystem,10 -Wl,-Map=output.map -e HariMain -static-libgcc -shared $(OBJS_BOOTPACK) $(OBJS_BOOTPACK_WITH_CPP)
 ipl09.bin : ipl09.nas makefile
 	$(NASK) ipl09.nas ipl09.bin ipl09.lst
 
@@ -92,7 +94,8 @@ naskfunc.obj : naskfunc.nas makefile
 %.nas : %.gas makefile
 	$(GAS2NASK) $*.gas $*.nas
 
-
+sqlite3.obj: sqlite3.c makefile bootpack.h sqlite3.h
+	$(GCC64)  sqlite3.c -o sqlite3.obj -l sqlite3.lst -DSQLITE_THREADSAFE=0 -DSQLITE_OS_OTHER=1 -DSQLITE_OS_WIN=0 -DSQLITE_OMIT_LOCALTIME
 
 #%.obj : %.nas makefile bootpack.h
 %.obj : %.c makefile bootpack.h

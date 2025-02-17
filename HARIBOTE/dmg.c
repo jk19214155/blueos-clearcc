@@ -49,12 +49,28 @@ int dmg_info_num;
 
 extern AHCI_TABLE* ahci_table_addr;
 extern char* text_buff;
+
+void dmg_gpt_get_item(unsigned long long n){
+	
+}
+
+unsigned int dmg_cmp_guid(char* stra,char* strb){
+	int i=sizeof(EFI_GUID);
+	if (asm_sse_strcmp(stra,strb,i) == 0){
+		return 0;
+	}
+	else{
+		return 1;
+	}
+}
+
 void task_disk(){
 	struct PAGEMAN32 *pageman=*(struct PAGEMAN32 **)ADR_PAGEMAN;
 	struct TASK *task = task_now();
 	struct MEMMAN *memman = task_now()->memman;
 	EFI_GUID part_type_uid=gUidPartTypeBaseData;//数据段
 	EFI_GUID part_own_uid={0x7a57c1e4,0xea59,0x49c0,{0xad,0x61,0x97,0x6f,0x85,0x30,0x85,0xa3}};//启动盘唯一GUID
+	EFI_GUID part_own_uid2={0x346065d9,0x295d,0x4107,{0x86,0x25,0x98,0x6d,0xb5,0xef,0xa6,0x40}};
 	short command[128];
 	int command_point=0;
 	int i,j,k,m;
@@ -65,9 +81,11 @@ void task_disk(){
 	unsigned int ahci_id,ahci_port;
 	unsigned device_id=0;
 	AHCI_SATA_FIS* fis=0;
+	unsigned long long read_size=(1440*2*512);
+	void* read_base=memman_alloc_page_64_4m(NULL);
 	for(i=0;i<ahci_table_addr->number;i++){
-		fis=ahci_make_fis(fis,0x100000,0,1440*2,0x25,0);
-		ahci_fis_write_prdt(fis,0,0x100000,(1440*2*512)-1);
+		fis=ahci_make_fis(fis,read_base,0,read_size/512,0x25,0);
+		ahci_fis_write_prdt(fis,0,read_base,read_size-1);
 		unsigned int pi=(ahci_table_addr->ahci_dev[i].ahci_config_space_address->header.i.pi);
 		for(m=0;m<32;m++){
 			if((pi&(1<<m))==0){//没有设备
@@ -85,8 +103,9 @@ void task_disk(){
 			sprintf(text_buff,"prdbc:%ld\n",prdbc);
 			cons_putstr0(task_now()->cons,text_buff);
 			//找到启动磁盘
-			unsigned long long disk_data_base=0x100000;//数据加载的基地址
+			unsigned long long disk_data_base=read_base;//数据加载的基地址
 			unsigned long long disk_part_base=disk_data_base+0x400;
+			
 			for(j=0;j<16;j++){
 				GPT_ITEM* p=((GPT_ITEM*)disk_part_base)+j;
 				unsigned long long s=p->guid.Data1;
@@ -124,87 +143,27 @@ void task_disk(){
 		}
 		
 	}
+	memman_free_page_64_4m(NULL,read_base);
 	if(i<ahci_table_addr->number){
 		void* p=task_now()->cons;
 		//task_now()->cons=0;
 		CACHE_TABLE* cache_table=0;
 		cache_init(&cache_table);//缓存系统
 		cache_table->pci_dev=&(ahci_table_addr->ahci_dev[ahci_id]);//ahci sata硬盘读写系统
-		FILE_OF_FAT32* file=fat32_init(NULL,cache_table,device_id,part_base_lba);//fat32文件访问系统
-		void* buff=memman_alloc_page_64_4m(NULL);
-		file->fread(file,buff,0, 0x0f000000);
-		file->fwrite(file,buff,0, 0x0f000000);
-		//fat32_read(file,buff,0,0x0f000000);
-		//task_now()->cons=p;
-		
-		//CACHE_TABLE* cache_table;
-		//cache_init(&cache_table);
-		//cache_table->read(cache_table,0,0x1000+4*1024*1024,4*1024*1024*2);
-		//cache_table->read(cache_table,0,0x0000,4*1024*1024*2);
-		//cache_table->sync(cache_table);
-		
+		FILE* file=fat32_init(NULL,cache_table,device_id,part_base_lba);//fat32文件访问系统
+		unsigned long long file_size;
+		file->fsize(file,&file_size);
+		char* buff=malloc(file_size);
+		for(int i=0;i<file_size;i++){
+			buff[i]=0;
+		}
+		file->fread(file,buff,0, file_size);
+		task_now()->file_cache=cache_table;
+		task_now()->file=file;
 		task_now()->root_dir_addr=buff;
 		cmd_dir(task_now()->cons);
 	}
 	return;
-	//dmg_read(0x00100000,0,1440*2,0);//读入启动扇区
-	/*
-	if(j<16){//找到了设备，解析fat
-		FAT32_HEADER* mbr=memman_alloc_4k(memman,4096);//分配一个内存
-		pageman_link_page_32_m(pageman,mbr,7,1,0);
-		dmg_read(mbr,part_base_lba,1,device_id);//先读取1个扇区的内存进行分析
-		unsigned int BPB_TotSec32=mbr->BPB_TotSec32;//fat大小
-		*(unsigned int*)(0x0026f024)=mbr;
-		unsigned int BPB_ResvdSecCnt=mbr->BPB_ResvdSecCnt;//fat前保留的扇区数
-		//获取FAT大小
-		unsigned int BPB_FATSz32=mbr->BPB_FATSz32;
-		fat32_addr=memman_alloc_4k(memman,BPB_FATSz32*512);//分配内存
-		pageman_link_page_32_m(pageman,fat32_addr,7,(BPB_FATSz32+3)>>2,0);
-		dmg_read(fat32_addr,part_base_lba+mbr->BPB_ResvdSecCnt,BPB_FATSz32,device_id);
-		*(unsigned int*)(0x0026f028)=fat32_addr;
-		//接下来获取跟目录信息
-		unsigned int root_lba=mbr->BPB_Root;
-		void* root_dir_addr=memman_alloc_4k(memman,8192);//4k页就够了
-		pageman_link_page_32_m(pageman,root_dir_addr,7,2,0);
-		unsigned int size=8192;
-		_read_file(root_dir_addr+16,&size,fat32_addr, part_base_lba,mbr, mbr->BPB_Root,0,device_id);
-		//接下来获取文件夹里的文件数量
-		 //int num=_get_file_number(root_dir_addr,8192);
-		 //*(int*)(0x0026f038)=num;
-		 //*(unsigned int*)(0x0026f030)=part_base_lba;
-		 //*(unsigned int*)(0x0026f034)=part_endl_lba;
-		 /*接下来读取背景文件ground.jpg
-		 //struct SHEET **sht_back=*(unsigned int*)0x0026f03c;
-		 //struct FILEINFO * finfo=file_search("ground.jpg",0, 20);
-		 //if(finfo!=0){
-			//unsigned int size=finfo->size;
-			//file_loadfile2(finfo->clustno,&size, int *fat);
-		 //}
-	}
-	*/
-	//注册设备
-	/*for(i=0;i<dmg_info_num;i++){
-		info[i].status=0;
-	}*/
-	/*运行AHCI初始化函数*/
-	//PCI_DEV* ahci=ahci_init();
-	//*(unsigned int*)0x0026f044=&ahci_buff;
-	//ahci_get_info(ahci,0,ahci_buff);
-	for(;;){
-		io_cli();
-		if (fifo32_status(&task->fifo) == 0) {
-			task_sleep(task);
-			io_sti();
-		} else {
-			int i = fifo32_get(&task->fifo);
-			io_sti();
-		}
-		if(i=='q' || i=='Q'){
-			cons_putstr0(task->cons,"dmg task exit\n");
-		}else{
-			command[command_point++]=i;
-		}
-	}
 }
 /*
 buff:保存的地址

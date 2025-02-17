@@ -1,5 +1,6 @@
 //Thanks to ChatGPT 3.5 from OpenAI for the help
 //Thanks to Claude from Slack for the help
+
 #include<Uefi.h>
 
 #define uint8_t unsigned char
@@ -16,7 +17,7 @@ void test3();
 //数据分区的代码
 #define gUidPartTypeBaseData {0xEBD0A0A2,0xB9E5,0x4433,{0x87, 0xC0, 0x68, 0xB6, 0xB7, 0x26, 0x99, 0xC7}}
 //EFI分区表的表项
-#pragma pack(1)
+#pragma pack(push, 1)
 typedef struct{
 	EFI_GUID type;//分区的类型id
 	EFI_GUID guid;//分区自身的唯一id
@@ -28,8 +29,9 @@ typedef struct{
 	unsigned int status_high;//分区状态
 	short name[36];//人类可读的UTF-16编码格式
 }GPT_ITEM;
+#pragma pack(pop)
 //阻止结构体内部对齐
-#pragma pack(1)
+#pragma pack(push, 1)
 typedef struct{
 	unsigned char BS_jmpBOOT[3];
 	unsigned char BS_OEMName[8];
@@ -51,8 +53,9 @@ typedef struct{
 	unsigned int BPB_Root;//文件根目录的起始簇号
 	//剩下的部分不使用，因此不解析
 }FAT32_HEADER;
+#pragma pack(pop)
 //FAT32_FILE_INFO是32字节结构
-#pragma pack(1)
+#pragma pack(push, 1)
 typedef struct {
 	unsigned char name[8];
 	unsigned char ext[3];
@@ -68,19 +71,22 @@ typedef struct {
 	unsigned short start_low;
 	unsigned int file_size;
 }FAT32_FILE_INFO;
-#pragma pack(1)
+#pragma pack(pop)
+#pragma pack(push, 1)
 typedef struct{//设备信息
 	unsigned int divice_index;//设备编号
 }BLUEOS_STORAGE_INFO;
-#pragma pack(1)
+#pragma pack(pop)
+#pragma pack(push, 1)
 typedef struct{
 	unsigned short name[64];//文件名
 	unsigned int device;//所属设备
 	unsigned int size_low;
 	unsigned int size_high;
 }BLUEOS_FILE_INFO;
+#pragma pack(pop)
 //FAT32_LONG_NAME是32字节结构
-#pragma pack(1)
+#pragma pack(push, 1)
 typedef struct {
 	char type;
 	unsigned short name1[5];
@@ -92,8 +98,9 @@ typedef struct {
 	unsigned short start;//通常是0
 	unsigned short name3[2];
 }FAT32_LONG_NAME;
+#pragma pack(pop)
 /* asmhead.nas */
-#pragma pack(1)
+#pragma pack(push, 1)
 struct BOOTINFO { /* 0x0ff0-0x0fff */
 	char cyls; /* 引导扇区读取了磁盘的哪一部分 */
 	char leds; /* ブート時のキーボードのLEDの状態 */
@@ -108,14 +115,16 @@ struct BOOTINFO { /* 0x0ff0-0x0fff */
 	*3. 32色全彩色
 	*/
 };
+#pragma pack(pop)
 #define ADR_BOOTINFO	0x00000ff0
 #define ADR_DISKIMG		0x00100000
-#pragma pack(1)
+#pragma pack(push, 1)
 struct EBOOTINFO{
 	int cpu_info;
 	int cpu_num;
 };
-#pragma pack(1)
+#pragma pack(pop)
+#pragma pack(push, 1)
 struct MEMINFO {
 	unsigned int base_addr_low;
 	unsigned int base_addr_high;
@@ -126,9 +135,11 @@ struct MEMINFO {
 	unsigned int undefind1;
 	unsigned int undifind2;
 };
+#pragma pack(pop)
 #define ADR_MEMINFO		0x0026a000
 #define ADR_PAGEMAN 	0x0026f000
 /* naskfunc.nas */
+
 void io_hlt(void);
 void io_cli(void);
 void io_sti(void);
@@ -175,35 +186,35 @@ unsigned long long asm_get_cs();
 unsigned long long store_cr4();
 int load_cr4(unsigned long long cr4);
 void asm_memcpy(unsigned long long rdi,unsigned long long rsi,unsigned long long rcx);
-//void memset(char* s,int num,int longer);
-//void strcpy(char* s,char* t,int longer);
-//int strcmp(char* s,char* t,int longer);
-
+void asm_memset(char* s,int num,int longer);
+char* asm_strcpy(char *dest, const char *src);
 /* fifo.c */
-#pragma pack(1)
+#pragma pack(push, 1)
 struct FIFO32 {
 	int *buf;
 	int p, q, size, free, flags;
 	struct TASK *task;
 };
+#pragma pack(pop)
 void fifo32_init(struct FIFO32 *fifo, int size, int *buf, struct TASK *task);
 int fifo32_put(struct FIFO32 *fifo, int data);
 int fifo32_get(struct FIFO32 *fifo);
 int fifo32_status(struct FIFO32 *fifo);
 
 /* fifo_mouse.c */
-#pragma pack(1)
+#pragma pack(push, 1)
 typedef struct _MOUSESTATUS{
 	UINTN x,y,btn;
 	struct SHEET* sht;
 }MOUSESTATUS;
-#pragma pack(1)
+#pragma pack(pop)
+#pragma pack(push, 1)
 typedef struct _FIFOMOUSE {
 	MOUSESTATUS *buf;
 	int p, q, size, free, flags;
 	struct TASK *task;
 }FIFOMOUSE;
-
+#pragma pack(pop)
 void fifo_mouse_init(struct _FIFOMOUSE *fifo, int size, MOUSESTATUS *buf, struct TASK *task);
 MOUSESTATUS* fifo_mouse_put(struct _FIFOMOUSE *fifo, UINTN x,UINTN y ,UINTN btn);
 MOUSESTATUS* fifo_mouse_get(struct _FIFOMOUSE *fifo);
@@ -244,13 +255,14 @@ void putblock8_32(int *vram, int vxsize, int pxsize,
 #define COL8_848484		0x00848484
 
 /* dsctbl.c */
-#pragma pack(1)
+#pragma pack(push, 1)
 struct SEGMENT_DESCRIPTOR {
 			short limit_low, base_low;
 			char base_mid, access_right;
 			char limit_high, base_high;
 };
-#pragma pack(1)
+#pragma pack(pop)
+#pragma pack(push, 1)
 struct GATE_DESCRIPTOR {
 	short offset_low, selector;
 	char dw_count, access_right;
@@ -258,6 +270,7 @@ struct GATE_DESCRIPTOR {
 	unsigned int offset_64;
 	unsigned int res;
 };
+#pragma pack(pop)
 void init_gdtidt(UINTN main_this);
 void asm_x64_cs_init(unsigned long long cs_sel);
 void set_segmdesc(struct SEGMENT_DESCRIPTOR *sd, unsigned int limit, unsigned long long base, int ar);
@@ -301,11 +314,12 @@ void init_keyboard(struct FIFO32 *fifo, int data0);
 #define PORT_KEYCMD		0x0064
 
 /* mouse.c */
-#pragma pack(1)
+#pragma pack(push, 1)
 struct MOUSE_DEC {
 	unsigned char buf[4], phase;
 	int x, y, btn,wheel;
 };
+#pragma pack(pop)
 void inthandler2c(int *esp);
 void enable_mouse(struct FIFO32 *fifo, int data0, struct MOUSE_DEC *mdec);
 int mouse_decode(struct MOUSE_DEC *mdec, unsigned char dat);
@@ -317,22 +331,24 @@ int mouse_decode_wheel(struct MOUSE_DEC *mdec, unsigned char dat);
 #define MEMMAN_FREES		4090	/* これで約32KB */
 #define MEMMAN_ADDR			0x003c0000
 #define MEMMAN_CORE_ADDR	0x0026f014//指针位置
-#pragma pack(1)
+#pragma pack(push, 1)
 struct FREEINFO {	/* あき情報 */
 	unsigned long long addr, size;
 };
-#pragma pack(1)
+#pragma pack(pop)
+#pragma pack(push, 1)
 struct MEMMAN {		/* メモリ管理 */
 	unsigned long long frees, maxfrees, lostsize, losts;
 	struct FREEINFO free[MEMMAN_FREES];
 };
-#pragma pack(1)
+#pragma pack(pop)
+#pragma pack(push, 1)
 struct PAGEMAN32 {
 	unsigned int free_page_num;
 	unsigned int total_page_num;
 	unsigned char* mem_map_base; 
 };
-
+#pragma pack(pop)
 struct inthandler0e_handling_info{
 	unsigned long long cr2;
 	unsigned long long cr3;
@@ -374,10 +390,12 @@ unsigned long long memman_alloc_page_64_4k(struct PAGEMAN32 *man);
 unsigned long long memman_alloc_page_64_4m(struct PAGEMAN32 *man);
 void memman_free_page_64_4k(struct PAGEMAN32 *man,unsigned long long addr);
 void memman_free_page_64_4m(struct PAGEMAN32 *man,unsigned long long addr);
+unsigned long long memman_unlink_page_64(struct PAGEMAN32* pageman, unsigned long long cr3_address, unsigned long long linear_address);
+unsigned int memman_unlink_page_64_m(struct PAGEMAN32 *man,unsigned long long cr3_address,unsigned long long linear_address,int page_num);
 /* sheet.c */
 #define MAX_SHEETS		256
 #define SHEET_MOUSE_ENABLE 0x80000000
-#pragma pack(1)
+#pragma pack(push, 1)
 struct SHEET {
 	union{
 		void *buf;
@@ -403,11 +421,13 @@ struct SHEET {
 	unsigned int* (*lost_sign)(struct SHEET* self);//失去鼠标焦点
 	struct VIEW_FUNC (*func);
 };
-#pragma pack(1)
+#pragma pack(pop)
+#pragma pack(push, 1)
 struct DISPLAY{
 	void (*sheet_refreshsub)(struct SHTCTL* ctl, int vx0, int vy0, int vx1, int vy1, int h0, int h1);//局部刷新函数
 };
-#pragma pack(1)
+#pragma pack(pop)
+#pragma pack(push, 1)
 struct SHTCTL {
 	void *vram;//图层管理器输出buff
 	void *map;//图层排布buff(总体显示情况)
@@ -421,7 +441,8 @@ struct SHTCTL {
 	struct DISPLAY func;//操作函数
 	unsigned int colordept;//色彩深度
 };
-#pragma pack(1)
+#pragma pack(pop)
+#pragma pack(push, 1)
 struct SHEET_REFRESH_PACK_32{
 	unsigned long long from_vram_addr;
 	unsigned long long to_vram_addr;
@@ -433,6 +454,7 @@ struct SHEET_REFRESH_PACK_32{
 	unsigned long long from_sid;
 	unsigned long long from_sid_ext;
 };
+#pragma pack(pop)
 struct SHTCTL *shtctl_init(struct MEMMAN *memman,struct PAGEMAN32 *pageman, unsigned char *vram, int xsize, int ysize);
 struct SHEET *sheet_alloc(struct SHTCTL *ctl);
 void sheet_setbuf(struct SHEET *sht, unsigned char *buf, int xsize, int ysize, int col_inv);
@@ -445,7 +467,7 @@ void sheet_refreshsub24(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, 
 void sheet_refreshsub32(struct SHTCTL *ctl, int vx0, int vy0, int vx1, int vy1, int h0, int h1);
 
 /*view.c*/
-#pragma pack(1)
+#pragma pack(push, 1)
 struct View {//由SHEET类派生而来 type：1
 	struct SHEET sht;
 	struct View* top;//上层控件
@@ -453,10 +475,11 @@ struct View {//由SHEET类派生而来 type：1
 	struct View* child;//子控件
 	int background_color;//背景色
 };
+#pragma pack(pop)
 void view_init(struct View* view);
 void view_setfunc(struct View* self,struct VIEW_FUNC* func);
 void view_flush(struct View* self,int x0,int y0,int x1,int y1);//控制器刷新函数
-#pragma pack(1)
+#pragma pack(push, 1)
 struct VIEW_FUNC{
 	void* (*mouse_down)(struct View* self,int x,int y);//鼠标按下事件
 	void* (*mouse_up)(struct View* self,int x,int y);//鼠标抬起事件
@@ -464,7 +487,8 @@ struct VIEW_FUNC{
 	void* (*get_sign)(struct View* self);//获取鼠标焦点
 	void* (*lost_sign)(struct View* self);//失去鼠标焦点
 };
-#pragma pack(1)
+#pragma pack(pop)
+#pragma pack(push, 1)
 struct TextView{
 	struct View view;
 	char* text;//文本内容
@@ -472,6 +496,7 @@ struct TextView{
 	int point;//要显示的位置
 	int ix,iy;//文本框输入焦点位置
 };
+#pragma pack(pop)
 void textview_init(struct TextView* self,char* text);
 void textview_settext(struct TextView* self,char* text);
 void textview_flush(struct TextView* self);
@@ -514,7 +539,7 @@ struct task_abort{//应用程序终止列表
 
 /* timer.c */
 #define MAX_TIMER		500
-#pragma pack(1)
+#pragma pack(push, 1)
 struct TIMER {
 	struct TIMER *next;
 	unsigned int timeout, timeout64;
@@ -525,7 +550,8 @@ struct TIMER {
 	struct FIFO32 *fifo;
 	int data;
 };
-#pragma pack(1)
+#pragma pack(pop)
+#pragma pack(push, 1)
 struct TIMERCTL {
 	unsigned int count, count64, next, next64;
 	unsigned int timer_type;//计数器类型
@@ -538,6 +564,7 @@ struct TIMERCTL {
 	EFI_STATUS (*timer_second2count)(unsigned int *time64,unsigned int *time);//这个函数将标准定点时间秒转换为计数值 定点格式为 time64.time
 	EFI_STATUS (*timer_msecond2count)(unsigned int *time64,unsigned int *time);//这个函数将标准定点时间毫秒转换为计数值
 };
+#pragma pack(pop)
 extern struct TIMERCTL timerctl[8];
 void init_pit(void);
 void init_hpet_timer(void);
@@ -552,7 +579,7 @@ int timer_cancel(unsigned int index,struct TIMER *timer);
 void timer_cancelall(unsigned int index,struct FIFO32 *fifo);
 EFI_STATUS timer_wait(unsigned int time_of_ms,unsigned int data);
 /*taskmsg.c*/
-#pragma pack(1)
+#pragma pack(push, 1)
 typedef struct _TASK_MSG{
 	unsigned int type;//消息类型
 	void* name;//消息名称
@@ -563,12 +590,14 @@ typedef struct _TASK_MSG{
 	unsigned int c;//接收者进程id
 	struct _TASK_MSG* next;//下一个消息
 }TASK_MSG;
-#pragma pack(1)
+#pragma pack(pop)
+#pragma pack(push, 1)
 typedef struct _TASK_MSG_MUSK{//消息来源
 	unsigned int pid;
 	struct _TASK_MSG_MUSK* next;
 }TASK_MSG_MUSK;
-#pragma pack(1)
+#pragma pack(pop)
+#pragma pack(push, 1)
 typedef struct _TASK_MSG_BOX{
 	unsigned int fifo_sel;//当有消息时向fifo发送哪个编号
 	unsigned int num;//消息数量
@@ -576,19 +605,20 @@ typedef struct _TASK_MSG_BOX{
 	unsigned int flag;//0：使能消息进入 1：musk列表类型（0：阻止列表 1：允许列表）
 	struct _TASK_MSG_MUSK* musk;
 }TASK_MSG_BOX;
-
+#pragma pack(pop)
 /* mtask.c */
 #define MAX_TASKS		1000	/* 最大タスク数 */
 #define TASK_GDT0		20		/* TSSをGDTの何番から割り当てるのか */
 #define MAX_TASKS_LV	100
 #define MAX_TASKLEVELS	10
-#pragma pack(1)
+#pragma pack(push, 1)
 struct TSS32 {
 	int backlink, esp0, ss0, esp1, ss1, esp2, ss2, cr3;
 	int eip, eflags, eax, ecx, edx, ebx, esp, ebp, esi, edi;
 	int es, cs, ss, ds, fs, gs;
 	int ldtr, iomap;
 };
+#pragma pack(pop)
 struct TSS64{
 	unsigned int res1;
 	unsigned long long rsp0;
@@ -609,8 +639,10 @@ struct TSS64{
 	unsigned long long rflages;
 	unsigned long long ldtr;
 };
+struct CACHE_TABLE;
+struct FILE;
 //flags_a 0:任务是0否1是第一次运行 1:任务发生资源连锁是1否报错
-#pragma pack(1)
+#pragma pack(push, 1)
 struct TASK {
 	/*flages_a
 	0:read only任务首次启动
@@ -627,6 +659,8 @@ struct TASK {
 	struct SEGMENT_DESCRIPTOR ldt[4];
 	struct CONSOLE *cons;
 	unsigned long long int ds_base, cons_stack;
+	struct CACHE_TABLE* file_cache;
+	struct FILE* file;
 	struct FILEHANDLE *fhandle;//打开的文件列表
 	int *fat;
 	char *cmdline;
@@ -652,13 +686,15 @@ struct TASK {
 	UINTN mouse_btn;//鼠标按键状态
 	struct SHEET* sheet_mouse_on;//鼠标位于那个图层之上
 };
-#pragma pack(1)
+#pragma pack(pop)
+#pragma pack(push, 1)
 struct TASKLEVEL {
 	int running; /* 当前级别运行的任务数量 */
 	int now; /* 现在正在运行的任务编号 */
 	struct TASK *tasks[MAX_TASKS_LV];//当前级别任务数组
 };
-#pragma pack(1)
+#pragma pack(pop)
+#pragma pack(push, 1)
 struct TASKCTL {
 	int now_lv; /* 现在运行中的任务级别 */
 	char lv_change; /* 下一次要切换到的任务级别 */
@@ -669,6 +705,7 @@ struct TASKCTL {
 	struct TSS64 tss;//正在运行的任务的tss
 	
 };
+#pragma pack(pop)
 extern struct TASKCTL *taskctl;
 extern struct TIMER *task_timer;
 struct TASKCTL *task_ctl_now(void);
@@ -742,13 +779,14 @@ void hrb_api_linewin(struct SHEET *sht, int x0, int y0, int x1, int y1, int col)
 void cmd_rdrand(struct CONSOLE *cons, int memtotal);
 void cons_set_system_task(struct TASK* task);
 /* file.c */
-#pragma pack(1)
+#pragma pack(push, 1)
 struct FILEINFO {
 	unsigned char name[8], ext[3], type;
 	char reserve[10];
 	unsigned short time, date, clustno;
 	unsigned int size;
 };
+#pragma pack(pop)
 struct vfs_FILEINFO{
 	int type;;/*
 	0:存在标志
@@ -798,7 +836,7 @@ struct TASK *desktop_start();
 struct TASK* system_start();
 void system_task_abort(struct task_abort* task);
 /* acpi.c */
-#pragma pack(1)
+#pragma pack(push, 1)
 struct ACPI_RSDP {
 	char Signature[8];
 	unsigned char Checksum;
@@ -810,7 +848,8 @@ struct ACPI_RSDP {
 	unsigned char ExtendedChecksum;
 	unsigned char Reserved[3];
 };
-#pragma pack(1)
+#pragma pack(pop)
+#pragma pack(push, 1)
 struct ACPISDTHeader {//SDT表头部
   char Signature[4];
   unsigned int Length;
@@ -822,12 +861,14 @@ struct ACPISDTHeader {//SDT表头部
   unsigned int CreatorID;
   unsigned int CreatorRevision;
 };
-#pragma pack(1)
+#pragma pack(pop)
+#pragma pack(push, 1)
 struct ACPI_RSDT {
 	struct ACPISDTHeader header;
 	unsigned int Entry;
 };
-#pragma pack(1)
+#pragma pack(pop)
+#pragma pack(push, 1)
 typedef struct
 {
   unsigned char AddressSpace;
@@ -836,7 +877,8 @@ typedef struct
   unsigned char AccessSize;
   unsigned int Address[2];
 } GenericAddressStructure;
-#pragma pack(1)
+#pragma pack(pop)
+#pragma pack(push, 1)
 struct ACPI_FADT//FADT表的格式
 {
     struct   ACPISDTHeader h;
@@ -904,14 +946,14 @@ struct ACPI_FADT//FADT表的格式
     GenericAddressStructure X_GPE0Block;
     GenericAddressStructure X_GPE1Block;
 };
-
+#pragma pack(pop)
 void init_acpi(void);
 int acpi_shutdown(void);
 /*pci.c*/
 #define PCI_CONFIG_PORT 0xCF8
 #define PCI_DATA_PORT 0xCFC
 
-#pragma pack(1)
+#pragma pack(push, 1)
 typedef struct ahci_header_regs {
 
   unsigned int cap; 
@@ -928,8 +970,8 @@ typedef struct ahci_header_regs {
   unsigned int cap2; // 0x24
   unsigned int bohc; // 0x28
 }AHCI_HEADER_REGS;
-
-#pragma pack(1)
+#pragma pack(pop)
+#pragma pack(push, 1)
 typedef struct ahci_abi_regs {
   unsigned int clb; //HBA_RPxCLB命令队列地址
   unsigned int clbu;
@@ -950,6 +992,7 @@ typedef struct ahci_abi_regs {
   unsigned int HBA_RPxFBS;
 
 } AHCI_ABI_REGS;
+#pragma pack(pop)
 /*
 #define HBA_RPBASE (0x40)
 #define HBA_RPSIZE (0x80 >> 2)
@@ -968,7 +1011,7 @@ typedef struct ahci_abi_regs {
 #define HBA_RPxSNTF 15
 #define HBA_RPxFBS 16
 */
-#pragma pack(1)
+#pragma pack(push, 1)
 typedef struct ahci_regs{
 	union{
 		AHCI_HEADER_REGS i;
@@ -979,7 +1022,8 @@ typedef struct ahci_regs{
 		char space_char[0x80];
 	}port[32];
 }AHCI_REGS;
-#pragma pack(1)
+#pragma pack(pop)
+#pragma pack(push, 1)
 typedef struct pci_device{//设备信息编号
 	int bus;
 	int device;
@@ -989,7 +1033,7 @@ typedef struct pci_device{//设备信息编号
 	int class_code;
 	int subclass_code;
 }PCI_DEV;
-
+#pragma pack(pop)
 typedef struct {
     unsigned short GeneralConfiguration;            // 0
     unsigned short NumberOfCylinders;               // 1
@@ -1041,7 +1085,7 @@ typedef struct {
     unsigned short Reserved7[167];                  // 89-255
 } IDENTIFY_DEVICE_DATA;
 
-#pragma pack(1)
+#pragma pack(push, 1)
 typedef struct ahci_device{
 	PCI_DEV pci_dev;
 	unsigned long long fis_base[32];
@@ -1051,6 +1095,7 @@ typedef struct ahci_device{
 	AHCI_REGS* ahci_config_space_address;
 	IDENTIFY_DEVICE_DATA* dev_info[32];
 }AHCI_DEV;
+#pragma pack(pop)
 #define ahci_command_header$flags$a (1<<5)
 #define ahci_command_header$flags$w (1<<6)
 #define ahci_command_header$flags$p (1<<7)
@@ -1058,7 +1103,7 @@ typedef struct ahci_device{
 #define ahci_command_header$flags$b (1<<9)
 #define ahci_command_header$flags$c (1<<10)
 
-#pragma pack(1)
+#pragma pack(push, 1)
 typedef struct _ahci_command_header{//AHCI 设备的寄存器描述结构 每个描述一个设备
 	unsigned short flags;//各种标志 0-4:CFL(DWORD) 5:A (ATAPI) 6:W (write) 7:P (enable ) 8:R ready 9:B (busy) 10:C (BSY auto clear) 11:Reserved 12-15:PMP
 	unsigned short prdtl;//AHCI_PRDT 描述表长度
@@ -1067,7 +1112,8 @@ typedef struct _ahci_command_header{//AHCI 设备的寄存器描述结构 每个
 	unsigned int command_table_address_64;//描述表的64位版本地址
 	unsigned int undifind[4];//未使用
 }AHCI_COMMAND_HEADER;
-#pragma pack(1)
+#pragma pack(pop)
+#pragma pack(push, 1)
 typedef struct _ahci_cfis_0x27{
 	char type;//必须填写为0x27
 	char flag;
@@ -1085,14 +1131,16 @@ typedef struct _ahci_cfis_0x27{
 	/*接下来是一些补充信息*/
 	unsigned int* prdbc_addr;
 }AHCI_CFIS_0X27;
-#pragma pack(1)
+#pragma pack(pop)
+#pragma pack(push, 1)
 typedef struct _ahci_prdt{//数据块描述结构 描述设备和系统传输数据的地址
 	unsigned int dba;//数据块地址
 	unsigned int dbau;//数据块地址的64位版本
 	unsigned int reserved;
 	unsigned int dbc;//数据块大小
 }AHCI_PRDT;
-#pragma pack(1)
+#pragma pack(pop)
+#pragma pack(push, 1)
 typedef struct _ahci_sata_fis{//SATA FIS的结构
 	union{//CFIS结构
 		AHCI_CFIS_0X27 ahci_cfis_0x27;
@@ -1103,7 +1151,7 @@ typedef struct _ahci_sata_fis{//SATA FIS的结构
 	}acmd;
 	AHCI_PRDT prdt[0];//动态大小 
 }AHCI_SATA_FIS;
-
+#pragma pack(pop)
 
 #define ATA_IDENTIFY_DEVICE 0xec
 #define ATA_READ_DMA 0xc8
@@ -1187,10 +1235,10 @@ unsigned int _dmg_read(StorageDevice* dev,int user_index, void* buf, unsigned in
 unsigned int _dmg_write(StorageDevice* dev,int user_index, void* buf, unsigned int* count);
 unsigned int _dmg_seek(StorageDevice* dev, int user_index,unsigned int* offset);
 unsigned int _dmg_close(StorageDevice* dev);
-#pragma pack(1)
+
 /*ahci.c*/
 /*0x80大小*/
-#pragma pack(1)
+#pragma pack(push, 1)
 typedef struct _AHCI_BAR6_PORT_TABLE{
 	unsigned int PxCLB;
 	unsigned int PxCLBU;
@@ -1213,8 +1261,9 @@ typedef struct _AHCI_BAR6_PORT_TABLE{
 	unsigned int RES2[10];
 	unsigned int PxVS[4];
 }AHCI_BAR6_PORT_TABLE;
+#pragma pack(pop)
 /*0x40大小*/
-#pragma pack(1)
+#pragma pack(push, 1)
 typedef struct _AHCI_BAR6_TABLE{
 	unsigned int cap;
 	unsigned int ghc;
@@ -1229,7 +1278,7 @@ typedef struct _AHCI_BAR6_TABLE{
 	unsigned int bohc;
 	unsigned int UnUse[5];
 }AHCI_BAR6_TABLE;
-
+#pragma pack(pop)
 typedef struct _AHCI_TABLE{
 	AHCI_DEV ahci_dev[8];
 	int number;
@@ -1390,12 +1439,8 @@ typedef struct {
     CACHE_BLOCK cache_blocks[MAX_CACHES];
     CACHE_BLOCK* cache_blocks_point[MAX_CACHES];
     REQUEST requests[MAX_REQUESTS];
-    REQUEST* requests_point[MAX_REQUESTS];
-    SYNC_REQUEST sync_requests[MAX_SYNC_REQUESTS];
-    SYNC_REQUEST* sync_requests_point[MAX_SYNC_REQUESTS];
     unsigned int block_count;
     unsigned int request_count;
-    unsigned int sync_request_count;
 	union{
    		 PCI_DEV* pci_dev;
 		 void* dev;
@@ -1404,21 +1449,39 @@ typedef struct {
 } CACHE_TABLE;
 void cache_init(CACHE_TABLE** this);
 /*fat32.c*/
-typedef struct _FILE_OF_FAT32{
-	EFI_STATUS (*fread)(struct _FILE* this,void* buff,unsigned long long seek,unsigned long long size); \
-	EFI_STATUS (*fwrite)(struct _FILE* this,void* buff,unsigned long long seek,unsigned long long size); \
-	EFI_STATUS (*fsize)(struct _FILE* this,unsigned long long* size); \
-	EFI_STATUS (*fopen)(struct _FILE* this,unsigned long long index); \
+typedef struct _FILE{
+	EFI_STATUS (*fread)(struct _FILE* this,void* buff,unsigned long long seek,unsigned long long size); 
+	EFI_STATUS (*fwrite)(struct _FILE* this,void* buff,unsigned long long seek,unsigned long long size); 
+	EFI_STATUS (*fsize)(struct _FILE* this,unsigned long long* size); 
+	EFI_STATUS (*fopen)(struct _FILE* this,unsigned long long index); 
+	EFI_STATUS (*fcreate)(struct _FILE* this,unsigned long long index); 
+	EFI_STATUS (*fremove)(struct _FILE* this,unsigned long long index); 
 	EFI_STATUS (*fclose)(struct _FILE* this);
+	
+	EFI_STATUS (*dchange)( struct _FILE* this,unsigned long long index);
+	/*
+	value的取值
+	0 void* 完整文件目录信息
+	1 char* 文件名
+	2 char* 文件类型名
+	3 char* 文件创建日期 字符串形式 "yyyy mm dd hh mm ss" 下同
+	4 char* 文件访问时间
+	5 char* 文件修改时间
+	6 unsigned long long 唯一标识符
+	7 char* 字符串形式的唯一标识符
+	8 char 是否是文件元数据数据库文件
+	*/
+	EFI_STATUS (*dginfo)(struct _FILE* this,unsigned long long index,void** res,unsigned long long longer,unsigned long long value);
+	EFI_STATUS (*dsinfo)(struct _FILE* this,unsigned long long index,void* res,unsigned long long longer,unsigned long long value);
+}FILE;
+typedef struct _FILE_OF_FAT32{
+	struct _FILE top;
 
-	unsigned long long node_id;//当前文件的起始FAT编号
-	unsigned long long device_id;
+	unsigned long long fnode;//当前文件的起始FAT编号
+	unsigned long long dnode;//当前目录的起始FAT编号
+	unsigned long long findex;
 	unsigned long long part_base_lba;
 	unsigned long long part_end_lba;
-	unsigned long long part_id;
-	PCI_DEV* pci_dev;
-	unsigned long long seek;
-	unsigned long long fsizeof;
 	unsigned int* fat32_fat;
 	unsigned long long size;
 	FAT32_HEADER* mbr;
@@ -1427,6 +1490,9 @@ typedef struct _FILE_OF_FAT32{
 }FILE_OF_FAT32;
 FILE_OF_FAT32* fat32_init(FILE_OF_FAT32* file_info,CACHE_TABLE* cache_table ,unsigned int device_id,unsigned long long part_base_lba);
 EFI_STATUS fat32_read_file_from_cache(FILE_OF_FAT32* this, void* buff, unsigned long long offset, unsigned long long size);
+EFI_STATUS fat32_open_file_from_cache(FILE_OF_FAT32* this, char* file_name, unsigned int* index);
+EFI_STATUS fat32_create_file_from_cache(FILE_OF_FAT32* this, char* file_name);
+EFI_STATUS fat32_delete_file_from_cache(FILE_OF_FAT32* this, unsigned long long index);
 /*efi.c*/
 #pragma pack(push, 1)
 
@@ -1603,3 +1669,50 @@ typedef struct {
 // 初始化VirtualMachineCTL的函数声明
 EFI_STATUS init_virtual_machine_ctl(VirtualMachineCTL* vm_ctl);
 void vmx_exit_handler();
+/*rtc.c*/
+/*
+int tm_sec; /* 秒 – 取值区间为[0,59] 
+int tm_min; /* 分 - 取值区间为[0,59] 
+int tm_hour; /* 时 - 取值区间为[0,23] 
+ int tm_mday; /* 一个月中的日期 - 取值区间为[1,31] 
+ int tm_mon; /* 月份（从一月开始，0代表一月） - 取值区间为[0,11] 
+ int tm_year; /* 年份，其值等于实际年份减去1900 
+ int tm_wday;/* 星期 – 取值区间为[0,6]，其中0代表星期天，1代表星期一，以此类推 
+ int tm_yday; /* 从每年的1月1日开始的天数 – 取值区间为[0,365]，其中0代表1月1日，1代表1月2日，以此类推 
+ int tm_isdst; /* 夏令时标识符，实行夏令时的时候，tm_isdst为正。不实行夏令时的进候，tm_isdst为0；不了解情况时，tm_isdst()为负。
+*/
+struct tm{
+	int tm_sec;
+	int tm_min;
+	int tm_hour;
+	int tm_mday;
+	int tm_mon;
+	int tm_year;
+	int tm_wday;
+	int tm_yday;
+	int tm_isdst;
+};
+#define time_t unsigned long long
+/*sdtfunc.c*/
+void malloc_init();
+void* malloc(unsigned long long size);
+void* realloc(void* p,unsigned long long size);
+void free(void *ptr);
+void* malloc_4k(unsigned long long size);
+void* realloc_4k(void* p,unsigned long long size);
+void free_4k(void *ptr);
+void *memchr(const void *str, int c, unsigned long long n);
+void *memmove(void *str1, const void *str2, unsigned long long n);
+unsigned long long strspn(const char *s, const char *accept);
+char *strchr(const char *str, int c);
+unsigned long long strcspn(const char *str1, const char *str2);
+char *strrchr(const char *str, int c);
+double fabs(double x);
+int sqlite3_os_init(void);
+int sqlite3_os_end(void) ;
+void ___chkstk_ms(void);
+int vsprintf(char *buf, const char *fmt, char* args);
+int vsprintf16(char *buf, const short *fmt, char* args);
+int printf(char* format,...);
+unsigned long long strnlen(char* str,long long n);
+void myLogCallback(void *pArg, int iErrCode, const char *zMsg);

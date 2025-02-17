@@ -689,7 +689,7 @@ unsigned long long memman_find_addr_64(struct PAGEMAN32* pageman,unsigned long l
 	unsigned long long index, addr;
     unsigned long long mask = 0xff8;
     unsigned long long mask2 = 0xfff;
-
+	int seek=linear_address&0xfff;//页内地址
     // 计算 PML4 索引
     index = (linear_address >> 36) & mask;
     addr = index + (cr3_address & 0xfffffffffffff000);
@@ -889,7 +889,6 @@ unsigned int memman_link_page_64_m(struct PAGEMAN32 *man,unsigned long long cr3_
 }
 
 unsigned int memman_unlink_page_64_m(struct PAGEMAN32 *man,unsigned long long cr3_address,unsigned long long linear_address,int page_num){
-	return 0;
 	io_cli();
 	unsigned long long i;
 	if(man==0){

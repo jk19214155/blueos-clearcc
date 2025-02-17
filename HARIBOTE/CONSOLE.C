@@ -3,6 +3,7 @@
 #include "bootpack.h"
 #include <stdio.h>
 #include <string.h>
+#include "sqlite3.h"
 void cmd_fdir(struct CONSOLE *cons);
 extern struct TASK* system_task;
 char text_buff[100];
@@ -394,6 +395,71 @@ void cons_putstr1(struct CONSOLE *cons, char *s, int l)
 	}
 	return;
 }
+
+// 创建内存数据库
+void cons_sql(char* filename){
+	sqlite3* db;                // 数据库句柄
+	sqlite3_stmt* stmt;         // 预编译语句对象
+	const char* sql;            // SQL 查询
+	int rc;                     // 返回值
+	printf("SQLite start.\n");
+	/*启动sqlite*/
+	int n=sqlite3_initialize();
+	if(n!=SQLITE_OK){
+		printf("error code: %d",n);
+	}
+	rc = sqlite3_open(filename, &db); // ":memory:" 表示内存数据库
+	if (rc != SQLITE_OK) {
+		printf("Cannot open database: %s\n", sqlite3_errmsg(db));
+		return rc;
+	}
+	printf("SQLite database opened successfully.\n");
+	// 创建测试表
+	sql = "CREATE TABLE test (id INTEGER PRIMARY KEY, value TEXT);";
+	rc = sqlite3_exec(db, sql, 0, 0, 0);
+	if (rc != SQLITE_OK) {
+		printf("SQL error: %s\n", sqlite3_errmsg(db));
+		sqlite3_close(db);
+		return rc;
+	}
+	printf("Table created successfully.\n");
+
+		// 插入测试数据
+		sql = "INSERT INTO test (value) VALUES ('Hello, SQLite!');";
+		rc = sqlite3_exec(db, sql, 0, 0, 0);
+		if (rc != SQLITE_OK) {
+			printf("SQL error: %s\n", sqlite3_errmsg(db));
+			sqlite3_close(db);
+			return rc;
+		}
+		printf("Data inserted successfully.\n");
+
+		// 查询测试数据
+		sql = "SELECT id, value FROM test;";
+		rc = sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+		if (rc != SQLITE_OK) {
+			printf("Failed to fetch data: %s\n", sqlite3_errmsg(db));
+			sqlite3_close(db);
+			return rc;
+		}
+
+		printf("Query result:\n");
+		while (sqlite3_step(stmt) == SQLITE_ROW) {
+			int id = sqlite3_column_int(stmt, 0);
+			unsigned char* value = sqlite3_column_text(stmt, 1);
+			printf("id: %ld, value: %s\n", id, value);
+		}
+		printf("Query End\n");
+		// 释放预编译语句对象
+		sqlite3_finalize(stmt);
+		printf("free stmt\n");
+		// 关闭数据库
+		sqlite3_close(db);
+		printf("database closed\n");
+		printf("test filesystem\n");
+		return 0;
+}
+
 void cmd_cd(struct CONSOLE *cons,char* cmdline);
 extern AHCI_TABLE* ahci_table_addr;
 void cons_runcmd(char *cmdline, struct CONSOLE *cons, int *fat, int memtotal)
@@ -472,8 +538,18 @@ void cons_runcmd(char *cmdline, struct CONSOLE *cons, int *fat, int memtotal)
 		cons_putstr0(cons, "ok!");
 		
 	}
+	else if (asm_sse_strcmp(cmdline,"sql",3) == 0){
+		
+		task_disk();
+		printf("memory sql test\n");
+		cons_sql(":memory:");
+		printf("file sql test\n");
+		cons_sql("FSA");
+			
+	}
 	else if(asm_sse_strcmp(cmdline,"ahcidir0",8) == 0){
 		task_disk();
+		fat32_create_file_from_cache(task_now()->file,"test");
 	}
 	else if (asm_sse_strcmp(cmdline,"run ",4)) {
 		if (cmd_app(cons, fat, cmdline + 4) == 0) {
@@ -702,6 +778,9 @@ void cmd_dir(struct CONSOLE *cons)
 				sprintf(s, "filename.ext   %7d %5dY%2dM%2dD %2d:%2d:%2d\n", finfo[i].size,year,month,date,hour,min,second);
 				for (j = 0; j < 8; j++) {
 					s[j] = finfo[i].name[j];
+					if(s[j]==0){
+						s[j]=' ';
+					}
 				}
 				s[ 9] = finfo[i].ext[0];
 				s[10] = finfo[i].ext[1];

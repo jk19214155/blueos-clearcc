@@ -5,6 +5,12 @@ void com_out_string(unsigned int port,char* str){
 		if(str[i]==0){
 			break;
 		}
+		for(;;){
+			int status=io_in8(port+5)&0x20;
+			if(status){
+				break;
+			}
+		}
 		if(str[i]==0||((unsigned char)str[i])>=0x80){
 			io_out8(port,'/');
 			io_out8(port,'!');

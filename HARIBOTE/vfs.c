@@ -1,12 +1,12 @@
 #include "bootpack.h"
-
-typedef struct _VFS{
-    EFI_STATUS (*mount)(struct _VFS* this,unsigned long long device_id,unsigned long long part_base_lba,unsigned long long part_end_lba,unsigned long long part_id);
-    EFI_STATUS (*umount)(struct _VFS* this);
-    EFI_STATUS (*open)(struct _VFS* this,unsigned long long index);
-    EFI_STATUS (*close)(struct _VFS* this);
-    EFI_STATUS (*read)(struct _VFS* this,void* buff,unsigned long long seek,unsigned long long size);
-    EFI_STATUS (*write)(struct _VFS* this,void* buff,unsigned long long seek,unsigned long long size);
-}VFS;
-
+#include "sqlite3.h"
+sqlite3* db_vfs;
+void vfs_init(){
+	sqlite3_open(":memory:", &db_vfs); // ":memory:" 表示内存数据库
+	sqlite3_exec(db, "CREATE TABLE path2path(rootpath VARCHAR(25000),destpath VARCHAR(25000));", 0, 0, 0);
+	sqlite3_exec(db, "CREATE TABLE path2cache(rootpath VARCHAR(25000),cache BIGINT);", 0, 0, 0);
+}
+void vfs_add_path(char* path,CACHE_TABLE* cache){
+	
+}
 

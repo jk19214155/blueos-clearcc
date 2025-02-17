@@ -401,13 +401,9 @@ AHCI_SATA_FIS* ahci_fis_send(AHCI_DEV* dev,unsigned int ahci_abi_regs_index,AHCI
 			clb[i].command_table_address_32=((unsigned long long)fis)&0xffffffff;//挂载
 			clb[i].command_table_address_64=((unsigned long long)fis>>32)&0xffffffff;
 			fis->cfis.ahci_cfis_0x27.prdbc_addr=&(clb[i].prdbc);
-			//HBA_RPxSACT|=(1<<i);//执行
-			//(ahci_base_address->port)[ahci_abi_regs_index].i.HBA_RPxSACT=HBA_RPxSACT;
-			HBA_RPxSACT|=(1<<i);//执行
-			(ahci_base_address->port)[ahci_abi_regs_index].i.HBA_RPxSACT=HBA_RPxSACT;
-			HBA_RPxCI|=(1<<i);//执行
-			(ahci_base_address->port)[ahci_abi_regs_index].i.HBA_RPxIS=0xffffffff;
+			HBA_RPxCI=(1<<i);//执行
 			(ahci_base_address->port)[ahci_abi_regs_index].i.HBA_RPxCI=HBA_RPxCI;
+			printf("AHCI:run fis at : %ld\n",i);
 			return fis;
 			//释放内存
 			//pageman_unlink_page_32(pageman,fis,1);

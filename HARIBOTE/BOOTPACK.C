@@ -3,7 +3,7 @@
 
 
 #include "bootpack.h"
-
+#include "sqlite3.h"
 #include <Protocol/EdidActive.h>
 #include <Protocol/GraphicsOutput.h>
 #include <Protocol/EdidOverride.h>
@@ -35,6 +35,7 @@ AHCI_TABLE* ahci_table_addr;
 EFI_GUID gEfiGraphicsOutputProtocolGuid={0x9042a9de, 0x23dc, 0x4a38, {0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a}};
 int sprintf16(short *buf, const short *fmt, ...);
 
+struct BOOTINFO BOOTINFO0;
 
 void* vram_base=0;
 
@@ -115,11 +116,11 @@ void change_xy_mode(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* SystemTable){
 				EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *ModeInfo;
 				int SizeOfInfo;
 				status = GraphicsOutput->QueryMode(GraphicsOutput, mode_sel2, &SizeOfInfo, &ModeInfo);
-				*(char*)(0xff0)=0;
-				*(char*)(0xff0+1)=0;
-				*(char*)(0xff0+2)=32;
-				*(short*)(0xff0+4)=(short)ModeInfo->HorizontalResolution;//横向分辨率
-				*(short*)(0xff0+6)=(short)ModeInfo->VerticalResolution;//纵向分辨率
+				BOOTINFO0.cyls=0;
+				BOOTINFO0.leds=0;
+				BOOTINFO0.vmode=32;
+				BOOTINFO0.scrnx=(short)ModeInfo->HorizontalResolution;//横向分辨率
+				BOOTINFO0.scrny=(short)ModeInfo->VerticalResolution;//纵向分辨率
 				//重新获取一次协议
 				status = SystemTable->BootServices->LocateProtocol(&gEfiGraphicsOutputProtocolGuid, NULL, (VOID **)&GraphicsOutput);
 				if (EFI_ERROR(status)) {
@@ -212,16 +213,16 @@ void ExitBootServer(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable){
 	Systemtable->BootServices->ExitBootServices(gImageHandle,MapKey);//退出boot service
 }
 
+extern AHCI_TABLE* ahci_table_addr;
 
+sqlite3* db;
 
 void HariMain(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable)
 {
-	//SystemTable->RuntimeServices->GetVariable("xsize",&varGuid,EFI_VARIABLE_RUNTIME_ACCESS|EFI_VARIABLE_BOOTSERVICE_ACCESS,4,);
-	//SystemTable->RuntimeServices->GetVariable("ysize",&varGuid,EFI_VARIABLE_RUNTIME_ACCESS|EFI_VARIABLE_BOOTSERVICE_ACCESS,4,&(ModeInfo->VerticalResolution));
 	ExitBootServer(gImageHandle,Systemtable);
 	io_cli();//为了防止UEFI的定时器扰乱初始化，关闭所有中断
 	//com_out_string(0x3f8,"hello\n");
-	struct BOOTINFO *binfo = (struct BOOTINFO *) ADR_BOOTINFO;
+	struct BOOTINFO *binfo = (struct BOOTINFO *) &BOOTINFO0;
 	struct SHTCTL *shtctl[10];//图层管理器
 	struct SHEET sheet_temp;//临时图层
 	unsigned long long shtctl_point=0;
@@ -241,7 +242,6 @@ void HariMain(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable)
 	struct SHEET* sheet_mouse_on_last=0;//上次鼠标中断的图层
 	int mouse_on_header=0;//鼠标抓取了标题栏吗？
 	struct PAGEMAN32 struct_pageman;
-	//void* sys_esp;
 	static char keytable0[0x80] = {//基本码表
 		0,   0,   '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '^', 0x08, 0,
 		'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '@', '[', 0x0a, 0, 'A', 'S',
@@ -286,35 +286,11 @@ void HariMain(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable)
 	Systemtable_base=Systemtable;
 	gThis=0;
 	init_gdtidt(0);//初始化gdt和idt
-	//init_acpi();//初始化acpi
-	//acpi_shutdown();
-	//memtotal = memtest(0x00900000, 0xbfffffff);//初始化内存
 	memman_init(memman);
-	//memman_free(memman, 0x00001000, 0x0009e000); /* 0x00001000 - 0x0009efff */
-	//memman_free(memman, 0x00900000, memtotal - 0xb0000000);
-	//memman_free(memman, 0xc0200000, 0xdfffffff);//虚拟空间的地址大小
 	memman_free(memman,0x0000010000000000,0x00007fffffffffff);
 	init_page(pageman);//初始化分页
 	cr3_address=load_cr3();
-	//memman_link_page_64_m(pageman,0x268000,0xc0000000,0x00270001,16,1);//gdt映射到本来的位置
-	//memman_link_page_64_m(pageman,0x268000,0xc0020000,0x0026f001,1,1);//idt映射到本来的位置
-	//memman_link_page_64_m(pageman,0x268000,0xc0100000,0x00280001,128,1);//haribote.hrb映射到高地址
-	//memman_link_page_64_m(pageman,0x268000,0x07,0x01,0x900,1);//低地址映射到本来的位置
-	//memman_link_page_64_m(pageman,0x268000,0xe0000000,0xe0000001,0x20000-1024,1);//高地址映射到本来的位置
-	//memman_link_page_64_m(pageman,0x268000,0xfffff000,0x268007,1,1);//顶端页面映射自身
 	*((struct PAGEMAN32 **)ADR_PAGEMAN)=pageman;//保存变量
-	
-	//store_cr3(0x268000);//内核页表加载
-	//j=load_cr0();
-	//j|=0x80000000;//开启分页
-	//store_cr0(j);
-	//load_gdtr(0xffff,0xc0000000);//重载gdt至高位内存
-	//load_idtr(0xffff,0xc0020800);//重载idt至高位内存
-	//if(support_apic()==1){//存在local_apic?使用local-apic?理中断
-	//}
-	//else{
-	//	init_pic();//初始化pic
-	//}
 	if(support_apic()==1){//存在local_apic?使用local-apic?理中断
 		init_apic((void*)0xfee00000);
 	}
@@ -332,10 +308,6 @@ void HariMain(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable)
 	*((int *) 0x0fec) = (int) &fifo;//系统fifo
 	init_keyboard(&fifo, 256);//键盘从25开始
 	enable_mouse(&fifo, 512, &mdec);//鼠标从512开始
-	//if(support_apic()==0){//使用apic时执行此代码
-	//	io_out8(PIC0_IMR, 0xf8); /* PITとPIC1とキーボードを許可(11111000) */
-	//	io_out8(PIC1_IMR, 0xef); /* マウスを許可(11101111) */
-	//}
 	fifo32_init(&keycmd, 32, keycmd_buf, 0);
 	init_pit();
 	//init_hpet_timer();//初始化高精度定时器
@@ -354,7 +326,7 @@ void HariMain(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable)
 	//准备两个图层控制器
 	*(int*)0x0026f01c=2;//两个桌面图层控制器
 	for(i=0;i<2;i++){//10个图层管理器
-		shtctl[i] = shtctl_init(memman,pageman, ((unsigned long long)vram_base)>>32, binfo->scrnx, binfo->scrny);
+		shtctl[i] = shtctl_init(memman,pageman, ((unsigned long long)vram_base), binfo->scrnx, binfo->scrny);
 		shtctl[i]->sheets0=p;
 		shtctl[i]->sheets0_size=512;
 		(shtctl[i]->func).sheet_refreshsub=((unsigned long long)(shtctl[i]->func).sheet_refreshsub)+this;//增加偏移量
@@ -422,39 +394,35 @@ void HariMain(EFI_HANDLE gImageHandle,EFI_SYSTEM_TABLE* Systemtable)
 	
 	/*初始化AHCI控制器*/
 	ahci_table_addr=ahci_init_all();
-	com_out_string(0x3f8,"ahci ready\n");
-goto st_next;
-	/* nihongo.fntの読み込み */
-	//fat = (int *) memman_alloc_4k(memman, 4 * 2880);//内存分配!!!
-	//memman_link_page_64_m(pageman,0x268000,fat,7,3,0);//
-	
-	//file_readfat(fat, (unsigned char *) (ADR_DISKIMG + 0x000200));
-
-	//finfo = file_search("nihongo.fnt", (struct FILEINFO *) (ADR_DISKIMG + 0x002600), 224);
-	
-	if (finfo != 0) {
-		i = finfo->size;
-		nihongo = file_loadfile2(finfo->clustno, &i, fat);
-	} else {
-		nihongo = (unsigned char *) memman_alloc_4k(memman, 16 * 256 + 32 * 94 * 47);//内存分配!!!
-		memman_link_page_64_m(pageman,cr3_address,nihongo,1,  22841,0);//
-		for (i = 0; i < 16 * 256; i++) {
-			nihongo[i] = hankaku[i]; /* フォントがなかったので半角部分をコピー */
-		}
-		for (i = 16 * 256; i < 16 * 256 + 32 * 94 * 47; i++) {
-			nihongo[i] = 0xff; /* フォントがなかったので全角部分を0xffで埋め尽くす */
-		}
-	}
-	*((int *) 0x0fe8) = (int) nihongo;//字库数据位置
-	for(i=0;i<3;i++){
-		void* p=pageman_unlink_page_32(pageman,(int)fat+0x1000*i,1);
-		//memman_free_page_32(pageman,p);
-	}
-	memman_free_4k(memman, (int) fat, 4 * 2880);
-st_next:
 	//system_start();//启动系统进程
 	//device_init();//初始化存储设备驱动
 	//start_task_disk();//启动磁盘服务
+	/*支持标准库*/
+	malloc_init();
+	/*启动sqlite*/
+	//sqlite3_initialize();
+	// 创建内存数据库
+	//sqlite3_open(":memory:", &db); // ":memory:" 表示内存数据库
+	//创建设备信息表
+	//char* sql = "CREATE TABLE device (id INTEGER PRIMARY KEY, bus INT, device INT,function INT);";
+	//sqlite3_exec(db, sql, 0, 0, 0);
+	//创建用户信息表
+	//sql = "CREATE TABLE user (id PRIMARY KEY, name VARCHAR(4096), rootpath VARCHAR(4096),isroot BOOLEAN,password VARCHAR(4096);";
+	//sqlite3_exec(db, sql, 0, 0, 0);
+	/*开始运行*/
+	//寻找启动分区
+	//task_disk();
+	//void* p=task_now()->cons;
+	//CACHE_TABLE* cache_table=0;
+	//cache_init(&cache_table);//缓存系统
+	//cache_table->pci_dev=&(ahci_table_addr->ahci_dev[ahci_id]);//ahci sata硬盘读写系统
+	//FILE* file=fat32_init(NULL,cache_table,device_id,part_base_lba);//fat32文件访问系统
+	//void* buff=memman_alloc_page_64_4m(NULL);
+	//file->fread(file,buff,0, 0x0f000000);
+	//file->fwrite(file,buff,0, 0x0f000000);
+		
+	//task_now()->root_dir_addr=buff;
+	//cmd_dir(task_now()->cons);
 	new_mx=-1;
 	io_sti();
 	for (;;) {
@@ -1142,7 +1110,7 @@ struct TASK *open_constask(struct SHEET *sht, unsigned int memtotal)
 	task->memman=memman_alloc_4k(memman,sizeof(struct MEMMAN));;//应用程序的内存控制器
 	memman_link_page_64_m(pageman,cr3_address,task->memman,3,(sizeof(struct MEMMAN)+0xfff)>>12,0);
 	memman_init(task->memman);
-	memman_free(task->memman,0x00007fffffffffff,0xffffffffffffffff);
+	memman_free(task->memman,0xfffff00000000000,0xffffffffffffffff);
 	
 	
 	*((unsigned long long *) (task->tss.rsp + 8)) = (unsigned long long) sht;

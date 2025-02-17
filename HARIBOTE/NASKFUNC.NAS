@@ -22,7 +22,7 @@ bits 64						; 32ビットモード用の機械語を作らせる
 		global	farjmp, farcall
 		global	asm_hrb_api, start_app
 		global sys_nop , asm_sse_strcmp
-		;global	_memset,_strcpy,_strcmp
+		global	asm_memset,asm_strcpy,asm_strcmp,asm_memcpy,asm_memcmp,asm_memset
 		global	support_apic, io_wrmsr, io_rdmsr, test2, get_lock, rdrand
 		global	store_gdt, store_idt,sys_reboot,sys_call, test3, asm_task_switch32
 		global asm_x64_cs_init,asm_get_cs,asm_sheet_refreshsub32
@@ -680,21 +680,62 @@ start_app:		; void start_app(int eip, int cs, int esp, int ds, int *tss_esp0);
 		push	rcx				; アプリのeip
 		retf
 ;	アプリが終亁e��てもここには来なぁe
-strcmp:	;int strcmp(char* s,char* t,int longer);
-	mov rsi,rcx
-	mov rdi,rdx
-	mov rcx,r8
-	repne cmpsd
-	mov eax,ecx
-	ret
-strcpy:	;void strcpy(char* s,char* t,int longer);
-	mov rsi,rcx
-	mov rdi,rdx
-	mov rcx,r8
-	;db 0xf3,0xa5;rep movsb
-	rep movsb
-	ret
-memset:	;void memset(char* s,int num,int longer)
+
+; int strcmp(const char *s1, const char *s2)
+asm_strcmp:
+    mov rsi, rcx  ; s1 -> rsi
+    mov rdi, rdx  ; s2 -> rdi
+    cld           ; 确保DF标志位为0，正向扫描
+    mov al, 0     ; 设置终止字符
+    repe cmpsb    ; 比较直到发现不同的字节或遇到'\0'
+    movzx eax, byte [rsi - 1]
+    movzx edx, byte [rdi - 1]
+    sub eax, edx  ; 计算差值
+    ret
+
+; char* strcpy(char *dest, const char *src)
+asm_strcpy:
+    mov rdi, rdx  ; src -> rdi
+	push rcx
+    mov rcx, -1   ; 计数器初始化为 -1
+    xor al, al    ; 终止字符 '\0'
+    cld
+    repne scasb   ; 计算 src 的长度，包括 '\0'
+    not rcx       ; 计算实际长度（包含 '\0'）
+    mov rsi, rdx  ; src -> rsi
+	pop rdi		  ; dest -> rdi
+    mov rcx, rcx  ; 设置复制的字节数
+    rep movsb     ; 复制整个字符串
+    mov rax, rcx  ; 返回 dest
+    ret
+
+; int memcmp(const void *s1, const void *s2, size_t n)
+asm_memcmp:
+    mov rsi, rcx  ; s1 -> rsi
+    mov rdi, rdx  ; s2 -> rdi
+    mov rcx, r8   ; n -> rcx
+    cld
+    repe cmpsb    ; 比较 n 字节
+    jne .diff
+    xor eax, eax  ; 若相等，返回0
+    ret
+.diff:
+    movzx eax, byte [rsi - 1]
+    movzx edx, byte [rdi - 1]
+    sub eax, edx  ; 计算差值
+    ret
+
+; void* memcpy(void *dest, const void *src, size_t n)
+asm_memcpy:
+    mov rsi, rdx  ; src -> rsi
+    mov rdi, rcx  ; dest -> rdi
+    mov rcx, r8   ; n -> rcx
+    cld
+    rep movsb     ; 复制 n 字节
+    mov rax, rcx  ; 返回 dest
+    ret
+	
+asm_memset:	;void memset(char* s,int num,int longer)
 	push rdi
 	push rax
 	push rcx
@@ -786,7 +827,7 @@ support_rand: ;int support_rand()
 	ret
 rdrand: ;int rdrand()
 	db 0x0f,0xc7,0xf0 ;rdrand eax
-	;rdrand
+	rdrand eax
 	ret
 _invlpg:
 	ret
@@ -1191,13 +1232,7 @@ asm_sheet_refreshsub32a:
 	pop rsi
 	pop rbx
 	ret
-global asm_memcpy
-asm_memcpy:
-	mov rdi,rcx
-	mov rsi,rdx
-	mov rcx,r8
-	rep movsb
-	ret
+
 extern console_task
 global asm_console_task_start_64
 ;这个函数的目的是因为x64架构下无法使用栈传递第一个和第二个参数 但是为了任务切换效率无法切换调用者保存寄存器 因此使用这个函数中转

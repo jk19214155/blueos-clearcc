@@ -24,7 +24,7 @@ void memset(char* str,int c,unsigned long long n){
 	}
 	return;
 }
-
+/*
 unsigned int strnlen(char* s,unsigned int n){
 	for(unsigned int i=0;;i++){
 		if(s[i]==0){
@@ -37,7 +37,7 @@ unsigned int strnlen(char* s,unsigned int n){
 		}
 	}
 }
-
+*/
 unsigned int strlen(char* s){
 	for(unsigned int i=0;;i++){
 		if(s[i]==0)
@@ -684,3 +684,23 @@ int sprintf16(short *buf, const short *fmt, ...)
     return val;
 }
 
+int vsprintf(char *buf, const char *fmt, va_list args)
+{
+	if(buf==0){
+		return 0;
+	}
+    //记录fmt对应的地址
+    //得到首个%对应的字符地址
+    int val = Test_vsprintf8(buf, fmt, args);
+    return val;
+}
+int vsprintf16(char *buf, const short *fmt, va_list args)
+{
+	if(buf==0){
+		return 0;
+	}
+    //记录fmt对应的地址
+    //得到首个%对应的字符地址
+    int val = Test_vsprintf16(buf, fmt, args);
+    return val;
+}
